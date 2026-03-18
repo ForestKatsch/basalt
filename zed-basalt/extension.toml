@@ -7,6 +7,5 @@ description = "Basalt language support for Zed"
 repository = "https://github.com/example/zed-basalt"
 
 [grammars.basalt]
-repository = "https://github.com/example/tree-sitter-basalt"
-rev = "959a5bc"
-path = "../tree-sitter-basalt"
+repository = "file:///Users/forest/Developer/basalt/zed-basalt/grammars/basalt"
+rev = "ac6cba4ea1dbd32827f65a72c42c5f7353a1a783"
