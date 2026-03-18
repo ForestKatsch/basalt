@@ -1,0 +1,12 @@
+[package]
+name = "basalt"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+basalt-core = { path = "../basalt-core" }
+basalt-vm = { path = "../basalt-vm" }
+
+[[bin]]
+name = "basalt"
+path = "src/main.rs"

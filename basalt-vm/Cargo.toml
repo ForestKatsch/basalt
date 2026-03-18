@@ -1,0 +1,8 @@
+[package]
+name = "basalt-vm"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+basalt-core = { path = "../basalt-core" }
+indexmap = "2"
