@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 /// Bytecode instructions. All register operands are u16.
 /// Values are untagged 8-byte slots.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum Op {
     // Constants
     LoadInt(u16, i64),    // reg = i64 value
@@ -13,12 +13,6 @@ pub enum Op {
     LoadBool(u16, bool),  // reg = bool value
     LoadString(u16, u32), // reg = string constant index
     LoadNil(u16),         // reg = nil
-
-    // Variables
-    GetLocal(u16, u16),   // dst = locals[src]
-    SetLocal(u16, u16),   // locals[dst] = src
-    GetUpvalue(u16, u16), // dst = upvalues[idx]
-    SetUpvalue(u16, u16), // upvalues[idx] = src
 
     // Arithmetic (integer)
     AddInt(u16, u16, u16), // dst = a + b
@@ -109,11 +103,6 @@ pub enum Op {
     ReturnNil,
     ReturnError(u16), // return error value
 
-    // Closures
-    MakeClosure(u16, u32, u8), // dst, func_id, upvalue_count
-    CaptureLocal(u16),         // capture local into upvalue list
-    CaptureUpvalue(u16),       // capture parent's upvalue
-
     // Collections
     MakeArray(u16, u16, u16), // dst, start_reg, count
     MakeMap(u16, u16, u16),   // dst, start_reg, entry_count (key/val pairs)
@@ -152,9 +141,6 @@ pub enum Op {
     // Type testing
     IsType(u16, u16, u32),       // dst = value is type_id
     IsEnumVariant(u16, u16, u8), // dst = value is variant_index
-
-    // Identity test
-    IsIdentical(u16, u16, u16), // dst = a is b (reference identity)
 
     // Range
     MakeRange(u16, u16, u16), // dst = start..end
@@ -367,7 +353,7 @@ impl Compiler {
             if let TypedItem::TypeDef(td) = item {
                 match &td.kind {
                     crate::ast::TypeDefKind::Struct(sdef) => {
-                        for method in &sdef.methods {
+                        for _method in &sdef.methods {
                             // Method bodies aren't type-checked yet in this pass,
                             // but we still need to register them
                         }
@@ -391,6 +377,18 @@ impl Compiler {
     }
 
     fn compile_fn(&mut self, fdef: &TypedFnDef) -> Result<usize, String> {
+        // Pre-register a placeholder so self-recursive and forward references
+        // can resolve the function index during body compilation.
+        let idx = self.functions.len();
+        self.functions.push(CompiledFunction {
+            name: fdef.name.clone(),
+            param_count: fdef.params.len() as u8,
+            register_count: 0,
+            code: Vec::new(),
+            param_types: fdef.params.iter().map(|(_, t)| t.clone()).collect(),
+            return_type: fdef.return_type.clone(),
+        });
+
         let mut fc = FnCompiler::new();
 
         // Allocate registers for parameters
@@ -409,15 +407,15 @@ impl Compiler {
             fc.emit(Op::ReturnNil);
         }
 
-        let idx = self.functions.len();
-        self.functions.push(CompiledFunction {
+        // Fill in the placeholder with the actual compiled function
+        self.functions[idx] = CompiledFunction {
             name: fdef.name.clone(),
             param_count: fdef.params.len() as u8,
             register_count: fc.registers,
             code: fc.code,
             param_types: fdef.params.iter().map(|(_, t)| t.clone()).collect(),
             return_type: fdef.return_type.clone(),
-        });
+        };
 
         Ok(idx)
     }
@@ -543,19 +541,13 @@ impl Compiler {
                     let dst = fc.alloc_reg();
                     fc.emit(Op::Move(dst, reg));
                     Ok(dst)
+                } else if let Some(idx) = self.functions.iter().position(|f| f.name == *name) {
+                    // Function reference (by index)
+                    let reg = fc.alloc_reg();
+                    fc.emit(Op::LoadInt(reg, idx as i64));
+                    Ok(reg)
                 } else {
-                    // Could be a function reference
-                    if let Some(idx) = self.functions.iter().position(|f| f.name == *name) {
-                        let reg = fc.alloc_reg();
-                        fc.emit(Op::LoadInt(reg, idx as i64)); // function index as value
-                        Ok(reg)
-                    } else {
-                        // It might be a function that hasn't been compiled yet
-                        let reg = fc.alloc_reg();
-                        let str_idx = self.intern_string(name);
-                        fc.emit(Op::LoadString(reg, str_idx)); // store name for runtime resolution
-                        Ok(reg)
-                    }
+                    Err(format!("undefined variable '{}'", name))
                 }
             }
             TypedExprKind::BinOp(left, op, right) => {
@@ -717,7 +709,7 @@ impl Compiler {
             }
             TypedExprKind::StructLit(type_name, fields) => {
                 let type_id = self.intern_type(type_name);
-                let start_reg = fc.registers;
+                let _start_reg = fc.registers;
                 // Compile fields in order of declaration
                 let field_order = self.get_field_order(type_name);
                 for field_name in &field_order {
@@ -732,7 +724,7 @@ impl Compiler {
             TypedExprKind::EnumVariant(type_name, variant, args) => {
                 let type_id = self.intern_type(type_name);
                 let variant_idx = self.get_variant_index(type_name, variant)?;
-                let start_reg = fc.registers;
+                let _start_reg = fc.registers;
                 for arg in args {
                     self.compile_expr(fc, arg)?;
                 }
@@ -941,7 +933,7 @@ impl Compiler {
                         let variant_idx = self.get_variant_index(&full_name, variant).unwrap_or(0);
                         fc.emit(Op::IsEnumVariant(dst, src, variant_idx));
                     }
-                    IsTarget::Expr(rhs_expr) => {
+                    IsTarget::Expr(_rhs_expr) => {
                         // We need to compile the rhs expression.
                         // For 'is' with an expression on the RHS, it's used as identity test.
                         // But rhs_expr is an AST Expr, not TypedExpr.
@@ -1157,7 +1149,7 @@ impl Compiler {
         fc: &mut FnCompiler,
         scrutinee: &TypedExpr,
         arms: &[TypedMatchArm],
-        result_ty: &Type,
+        _result_ty: &Type,
     ) -> Result<u16, String> {
         let scrutinee_reg = self.compile_expr(fc, scrutinee)?;
         let result_reg = fc.alloc_reg();
@@ -1257,7 +1249,7 @@ impl Compiler {
                 let jump = fc.emit(Op::JumpIfFalse(cmp_reg, 0));
                 Ok(Some(jump))
             }
-            Pattern::Error(name) => {
+            Pattern::Error(_name) => {
                 let is_err = fc.alloc_reg();
                 fc.emit(Op::IsError(is_err, scrutinee_reg));
                 let jump = fc.emit(Op::JumpIfFalse(is_err, 0));

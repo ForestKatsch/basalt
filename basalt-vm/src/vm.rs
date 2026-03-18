@@ -1,6 +1,6 @@
 /// Basalt VM - Bytecode execution engine.
 use crate::value::*;
-use basalt_core::compiler::{CompiledFunction, IntType, Op, Program};
+use basalt_core::compiler::{IntType, Op, Program};
 use indexmap::IndexMap;
 use std::cell::RefCell;
 use std::sync::Arc;
@@ -63,120 +63,108 @@ impl VM {
             return Err("stack overflow: maximum call depth exceeded".to_string());
         }
 
-        let func = self.program.functions[func_idx].clone();
-        let reg_count = (func.register_count as usize).max(256);
+        // Check instruction budget at call boundaries (amortized)
+        self.instruction_count += 1;
+        if self.instruction_count > MAX_INSTRUCTIONS {
+            return Err("execution limit exceeded".to_string());
+        }
+
+        let reg_count = self.program.functions[func_idx].register_count as usize;
+        let reg_count = reg_count.max(args.len()).max(16);
         let mut registers = vec![Value::Nil; reg_count];
 
         for (i, arg) in args.iter().enumerate() {
-            if i < registers.len() {
-                registers[i] = arg.clone();
-            }
+            registers[i] = arg.clone();
         }
 
-        let result = self.execute(&func, &mut registers)?;
+        let result = self.execute(func_idx, &mut registers)?;
         self.call_depth -= 1;
         Ok(result)
     }
 
-    fn execute(&mut self, func: &CompiledFunction, reg: &mut Vec<Value>) -> Result<Value, String> {
+    fn execute(&mut self, func_idx: usize, reg: &mut [Value]) -> Result<Value, String> {
+        let code_len = self.program.functions[func_idx].code.len();
         let mut pc = 0;
 
-        while pc < func.code.len() {
-            self.instruction_count += 1;
-            if self.instruction_count > MAX_INSTRUCTIONS {
-                return Err("execution limit exceeded".to_string());
-            }
-
-            let op = &func.code[pc];
+        while pc < code_len {
+            // Copy the instruction out (Op is Copy) to release borrow on self
+            let op = self.program.functions[func_idx].code[pc];
             pc += 1;
 
             match op {
                 // === Constants ===
                 Op::LoadInt(d, n) => {
-                    self.ensure(reg, *d);
-                    reg[*d as usize] = Value::int(*n);
+                    reg[d as usize] = Value::int(n);
                 }
                 Op::LoadFloat(d, f) => {
-                    self.ensure(reg, *d);
-                    reg[*d as usize] = Value::float(*f);
+                    reg[d as usize] = Value::float(f);
                 }
                 Op::LoadBool(d, b) => {
-                    self.ensure(reg, *d);
-                    reg[*d as usize] = Value::bool(*b);
+                    reg[d as usize] = Value::bool(b);
                 }
                 Op::LoadString(d, idx) => {
-                    self.ensure(reg, *d);
-                    let s = self.program.strings[*idx as usize].clone();
-                    reg[*d as usize] = Value::string(s);
+                    let s = self.program.strings[idx as usize].clone();
+                    reg[d as usize] = Value::string(s);
                 }
                 Op::LoadNil(d) => {
-                    self.ensure(reg, *d);
-                    reg[*d as usize] = Value::Nil;
+                    reg[d as usize] = Value::Nil;
                 }
                 Op::Move(d, s) => {
-                    self.ensure(reg, (*d).max(*s));
-                    let v = reg[*s as usize].clone();
-                    reg[*d as usize] = v;
+                    let v = reg[s as usize].clone();
+                    reg[d as usize] = v;
                 }
 
                 // === Integer Arithmetic ===
                 Op::AddInt(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    let va = reg[*a as usize].as_int();
-                    let vb = reg[*b as usize].as_int();
-                    reg[*d as usize] =
+                    let va = reg[a as usize].as_int();
+                    let vb = reg[b as usize].as_int();
+                    reg[d as usize] =
                         Value::int(va.checked_add(vb).ok_or("integer overflow in addition")?);
                 }
                 Op::SubInt(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    let va = reg[*a as usize].as_int();
-                    let vb = reg[*b as usize].as_int();
-                    reg[*d as usize] = Value::int(
+                    let va = reg[a as usize].as_int();
+                    let vb = reg[b as usize].as_int();
+                    reg[d as usize] = Value::int(
                         va.checked_sub(vb)
                             .ok_or("integer overflow in subtraction")?,
                     );
                 }
                 Op::MulInt(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    let va = reg[*a as usize].as_int();
-                    let vb = reg[*b as usize].as_int();
-                    reg[*d as usize] = Value::int(
+                    let va = reg[a as usize].as_int();
+                    let vb = reg[b as usize].as_int();
+                    reg[d as usize] = Value::int(
                         va.checked_mul(vb)
                             .ok_or("integer overflow in multiplication")?,
                     );
                 }
                 Op::DivInt(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    let vb = reg[*b as usize].as_int();
+                    let vb = reg[b as usize].as_int();
                     if vb == 0 {
                         return Err("division by zero".to_string());
                     }
-                    reg[*d as usize] = Value::int(reg[*a as usize].as_int() / vb);
+                    reg[d as usize] = Value::int(reg[a as usize].as_int() / vb);
                 }
                 Op::ModInt(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    let vb = reg[*b as usize].as_int();
+                    let vb = reg[b as usize].as_int();
                     if vb == 0 {
                         return Err("modulo by zero".to_string());
                     }
-                    reg[*d as usize] = Value::int(reg[*a as usize].as_int() % vb);
+                    reg[d as usize] = Value::int(reg[a as usize].as_int() % vb);
                 }
                 Op::PowInt(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    let base = reg[*a as usize].as_int();
-                    let exp = reg[*b as usize].as_int();
+                    let base = reg[a as usize].as_int();
+                    let exp = reg[b as usize].as_int();
                     if exp < 0 {
                         return Err("negative exponent for integer power".to_string());
                     }
-                    reg[*d as usize] = Value::int(
+                    reg[d as usize] = Value::int(
                         checked_pow_i64(base, exp as u64)
                             .ok_or("integer overflow in exponentiation")?,
                     );
                 }
                 Op::NegInt(d, s) => {
-                    self.ensure(reg, (*d).max(*s));
-                    reg[*d as usize] = Value::int(
-                        reg[*s as usize]
+                    reg[d as usize] = Value::int(
+                        reg[s as usize]
                             .as_int()
                             .checked_neg()
                             .ok_or("integer overflow in negation")?,
@@ -185,255 +173,207 @@ impl VM {
 
                 // === Float Arithmetic ===
                 Op::AddFloat(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    reg[*d as usize] =
-                        Value::float(reg[*a as usize].as_float() + reg[*b as usize].as_float());
+                    reg[d as usize] =
+                        Value::float(reg[a as usize].as_float() + reg[b as usize].as_float());
                 }
                 Op::SubFloat(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    reg[*d as usize] =
-                        Value::float(reg[*a as usize].as_float() - reg[*b as usize].as_float());
+                    reg[d as usize] =
+                        Value::float(reg[a as usize].as_float() - reg[b as usize].as_float());
                 }
                 Op::MulFloat(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    reg[*d as usize] =
-                        Value::float(reg[*a as usize].as_float() * reg[*b as usize].as_float());
+                    reg[d as usize] =
+                        Value::float(reg[a as usize].as_float() * reg[b as usize].as_float());
                 }
                 Op::DivFloat(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    reg[*d as usize] =
-                        Value::float(reg[*a as usize].as_float() / reg[*b as usize].as_float());
+                    reg[d as usize] =
+                        Value::float(reg[a as usize].as_float() / reg[b as usize].as_float());
                 }
                 Op::ModFloat(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    reg[*d as usize] =
-                        Value::float(reg[*a as usize].as_float() % reg[*b as usize].as_float());
+                    reg[d as usize] =
+                        Value::float(reg[a as usize].as_float() % reg[b as usize].as_float());
                 }
                 Op::PowFloat(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    reg[*d as usize] = Value::float(
-                        reg[*a as usize]
-                            .as_float()
-                            .powf(reg[*b as usize].as_float()),
-                    );
+                    reg[d as usize] =
+                        Value::float(reg[a as usize].as_float().powf(reg[b as usize].as_float()));
                 }
                 Op::NegFloat(d, s) => {
-                    self.ensure(reg, (*d).max(*s));
-                    reg[*d as usize] = Value::float(-reg[*s as usize].as_float());
+                    reg[d as usize] = Value::float(-reg[s as usize].as_float());
                 }
 
                 // === String ===
                 Op::ConcatString(d, a, b) | Op::StringConcat(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    let sa = self.val_to_string(&reg[*a as usize]);
-                    let sb = self.val_to_string(&reg[*b as usize]);
-                    reg[*d as usize] = Value::string(sa + &sb);
+                    let sa = self.val_to_string(&reg[a as usize]);
+                    let sb = self.val_to_string(&reg[b as usize]);
+                    reg[d as usize] = Value::string(sa + &sb);
                 }
 
                 // === Integer Comparisons ===
                 Op::EqInt(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    reg[*d as usize] =
-                        Value::bool(reg[*a as usize].as_int() == reg[*b as usize].as_int());
+                    reg[d as usize] =
+                        Value::bool(reg[a as usize].as_int() == reg[b as usize].as_int());
                 }
                 Op::NeqInt(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    reg[*d as usize] =
-                        Value::bool(reg[*a as usize].as_int() != reg[*b as usize].as_int());
+                    reg[d as usize] =
+                        Value::bool(reg[a as usize].as_int() != reg[b as usize].as_int());
                 }
                 Op::LtInt(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    reg[*d as usize] =
-                        Value::bool(reg[*a as usize].as_int() < reg[*b as usize].as_int());
+                    reg[d as usize] =
+                        Value::bool(reg[a as usize].as_int() < reg[b as usize].as_int());
                 }
                 Op::LteInt(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    reg[*d as usize] =
-                        Value::bool(reg[*a as usize].as_int() <= reg[*b as usize].as_int());
+                    reg[d as usize] =
+                        Value::bool(reg[a as usize].as_int() <= reg[b as usize].as_int());
                 }
                 Op::GtInt(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    reg[*d as usize] =
-                        Value::bool(reg[*a as usize].as_int() > reg[*b as usize].as_int());
+                    reg[d as usize] =
+                        Value::bool(reg[a as usize].as_int() > reg[b as usize].as_int());
                 }
                 Op::GteInt(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    reg[*d as usize] =
-                        Value::bool(reg[*a as usize].as_int() >= reg[*b as usize].as_int());
+                    reg[d as usize] =
+                        Value::bool(reg[a as usize].as_int() >= reg[b as usize].as_int());
                 }
 
                 // === Float Comparisons ===
                 Op::EqFloat(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    reg[*d as usize] =
-                        Value::bool(reg[*a as usize].as_float() == reg[*b as usize].as_float());
+                    reg[d as usize] =
+                        Value::bool(reg[a as usize].as_float() == reg[b as usize].as_float());
                 }
                 Op::NeqFloat(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    reg[*d as usize] =
-                        Value::bool(reg[*a as usize].as_float() != reg[*b as usize].as_float());
+                    reg[d as usize] =
+                        Value::bool(reg[a as usize].as_float() != reg[b as usize].as_float());
                 }
                 Op::LtFloat(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    reg[*d as usize] =
-                        Value::bool(reg[*a as usize].as_float() < reg[*b as usize].as_float());
+                    reg[d as usize] =
+                        Value::bool(reg[a as usize].as_float() < reg[b as usize].as_float());
                 }
                 Op::LteFloat(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    reg[*d as usize] =
-                        Value::bool(reg[*a as usize].as_float() <= reg[*b as usize].as_float());
+                    reg[d as usize] =
+                        Value::bool(reg[a as usize].as_float() <= reg[b as usize].as_float());
                 }
                 Op::GtFloat(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    reg[*d as usize] =
-                        Value::bool(reg[*a as usize].as_float() > reg[*b as usize].as_float());
+                    reg[d as usize] =
+                        Value::bool(reg[a as usize].as_float() > reg[b as usize].as_float());
                 }
                 Op::GteFloat(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    reg[*d as usize] =
-                        Value::bool(reg[*a as usize].as_float() >= reg[*b as usize].as_float());
+                    reg[d as usize] =
+                        Value::bool(reg[a as usize].as_float() >= reg[b as usize].as_float());
                 }
 
                 // === String Comparisons ===
                 Op::EqString(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    reg[*d as usize] = Value::bool(
-                        self.val_to_string(&reg[*a as usize])
-                            == self.val_to_string(&reg[*b as usize]),
+                    reg[d as usize] = Value::bool(
+                        self.val_to_string(&reg[a as usize])
+                            == self.val_to_string(&reg[b as usize]),
                     );
                 }
                 Op::NeqString(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    reg[*d as usize] = Value::bool(
-                        self.val_to_string(&reg[*a as usize])
-                            != self.val_to_string(&reg[*b as usize]),
+                    reg[d as usize] = Value::bool(
+                        self.val_to_string(&reg[a as usize])
+                            != self.val_to_string(&reg[b as usize]),
                     );
                 }
                 Op::LtString(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    reg[*d as usize] = Value::bool(
-                        self.val_to_string(&reg[*a as usize])
-                            < self.val_to_string(&reg[*b as usize]),
+                    reg[d as usize] = Value::bool(
+                        self.val_to_string(&reg[a as usize]) < self.val_to_string(&reg[b as usize]),
                     );
                 }
                 Op::LteString(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    reg[*d as usize] = Value::bool(
-                        self.val_to_string(&reg[*a as usize])
-                            <= self.val_to_string(&reg[*b as usize]),
+                    reg[d as usize] = Value::bool(
+                        self.val_to_string(&reg[a as usize])
+                            <= self.val_to_string(&reg[b as usize]),
                     );
                 }
                 Op::GtString(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    reg[*d as usize] = Value::bool(
-                        self.val_to_string(&reg[*a as usize])
-                            > self.val_to_string(&reg[*b as usize]),
+                    reg[d as usize] = Value::bool(
+                        self.val_to_string(&reg[a as usize]) > self.val_to_string(&reg[b as usize]),
                     );
                 }
                 Op::GteString(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    reg[*d as usize] = Value::bool(
-                        self.val_to_string(&reg[*a as usize])
-                            >= self.val_to_string(&reg[*b as usize]),
+                    reg[d as usize] = Value::bool(
+                        self.val_to_string(&reg[a as usize])
+                            >= self.val_to_string(&reg[b as usize]),
                     );
                 }
 
                 // === Bool Comparisons ===
                 Op::EqBool(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    reg[*d as usize] =
-                        Value::bool(reg[*a as usize].as_bool() == reg[*b as usize].as_bool());
+                    reg[d as usize] =
+                        Value::bool(reg[a as usize].as_bool() == reg[b as usize].as_bool());
                 }
                 Op::NeqBool(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    reg[*d as usize] =
-                        Value::bool(reg[*a as usize].as_bool() != reg[*b as usize].as_bool());
+                    reg[d as usize] =
+                        Value::bool(reg[a as usize].as_bool() != reg[b as usize].as_bool());
                 }
 
                 // === Generic Equality ===
                 Op::EqGeneric(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    reg[*d as usize] = Value::bool(reg[*a as usize].deep_eq(&reg[*b as usize]));
+                    reg[d as usize] = Value::bool(reg[a as usize].deep_eq(&reg[b as usize]));
                 }
                 Op::NeqGeneric(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    reg[*d as usize] = Value::bool(!reg[*a as usize].deep_eq(&reg[*b as usize]));
+                    reg[d as usize] = Value::bool(!reg[a as usize].deep_eq(&reg[b as usize]));
                 }
 
                 // === Logical ===
                 Op::Not(d, s) => {
-                    self.ensure(reg, (*d).max(*s));
-                    reg[*d as usize] = Value::bool(!reg[*s as usize].as_bool());
+                    reg[d as usize] = Value::bool(!reg[s as usize].as_bool());
                 }
                 Op::And(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    reg[*d as usize] =
-                        Value::bool(reg[*a as usize].as_bool() && reg[*b as usize].as_bool());
+                    reg[d as usize] =
+                        Value::bool(reg[a as usize].as_bool() && reg[b as usize].as_bool());
                 }
                 Op::Or(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    reg[*d as usize] =
-                        Value::bool(reg[*a as usize].as_bool() || reg[*b as usize].as_bool());
+                    reg[d as usize] =
+                        Value::bool(reg[a as usize].as_bool() || reg[b as usize].as_bool());
                 }
 
                 // === Bitwise ===
                 Op::BitAnd(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    reg[*d as usize] =
-                        Value::int(reg[*a as usize].as_int() & reg[*b as usize].as_int());
+                    reg[d as usize] =
+                        Value::int(reg[a as usize].as_int() & reg[b as usize].as_int());
                 }
                 Op::BitOr(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    reg[*d as usize] =
-                        Value::int(reg[*a as usize].as_int() | reg[*b as usize].as_int());
+                    reg[d as usize] =
+                        Value::int(reg[a as usize].as_int() | reg[b as usize].as_int());
                 }
                 Op::BitXor(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    reg[*d as usize] =
-                        Value::int(reg[*a as usize].as_int() ^ reg[*b as usize].as_int());
+                    reg[d as usize] =
+                        Value::int(reg[a as usize].as_int() ^ reg[b as usize].as_int());
                 }
                 Op::ShiftLeft(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    let shift = reg[*b as usize].as_int();
+                    let shift = reg[b as usize].as_int();
                     if shift < 0 || shift > 63 {
                         return Err(format!("shift amount {} out of range", shift));
                     }
-                    reg[*d as usize] = Value::int(reg[*a as usize].as_int() << shift);
+                    reg[d as usize] = Value::int(reg[a as usize].as_int() << shift);
                 }
                 Op::ShiftRight(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    let shift = reg[*b as usize].as_int();
+                    let shift = reg[b as usize].as_int();
                     if shift < 0 || shift > 63 {
                         return Err(format!("shift amount {} out of range", shift));
                     }
-                    reg[*d as usize] = Value::int(reg[*a as usize].as_int() >> shift);
+                    reg[d as usize] = Value::int(reg[a as usize].as_int() >> shift);
                 }
 
                 // === Type Conversions ===
                 Op::IntToFloat(d, s) => {
-                    self.ensure(reg, (*d).max(*s));
-                    reg[*d as usize] = Value::float(reg[*s as usize].as_int() as f64);
+                    reg[d as usize] = Value::float(reg[s as usize].as_int() as f64);
                 }
                 Op::FloatToInt(d, s) => {
-                    self.ensure(reg, (*d).max(*s));
-                    let f = reg[*s as usize].as_float();
+                    let f = reg[s as usize].as_float();
                     if f.is_nan() || f.is_infinite() {
                         return Err("cannot convert NaN/Infinity to integer".to_string());
                     }
-                    reg[*d as usize] = Value::int(f as i64);
+                    reg[d as usize] = Value::int(f as i64);
                 }
                 Op::IntToString(d, s) => {
-                    self.ensure(reg, (*d).max(*s));
-                    reg[*d as usize] = Value::string(reg[*s as usize].as_int().to_string());
+                    reg[d as usize] = Value::string(reg[s as usize].as_int().to_string());
                 }
                 Op::FloatToString(d, s) => {
-                    self.ensure(reg, (*d).max(*s));
-                    reg[*d as usize] = Value::string(format_float_val(reg[*s as usize].as_float()));
+                    reg[d as usize] = Value::string(format_float(reg[s as usize].as_float()));
                 }
                 Op::BoolToString(d, s) => {
-                    self.ensure(reg, (*d).max(*s));
-                    reg[*d as usize] = Value::string(
-                        if reg[*s as usize].as_bool() {
+                    reg[d as usize] = Value::string(
+                        if reg[s as usize].as_bool() {
                             "true"
                         } else {
                             "false"
@@ -442,53 +382,46 @@ impl VM {
                     );
                 }
                 Op::StringToInt(d, s) => {
-                    self.ensure(reg, (*d).max(*s));
-                    let sv = self.val_to_string(&reg[*s as usize]);
-                    reg[*d as usize] = Value::int(
+                    let sv = self.val_to_string(&reg[s as usize]);
+                    reg[d as usize] = Value::int(
                         sv.trim()
                             .parse::<i64>()
                             .map_err(|_| format!("cannot convert '{}' to i64", sv))?,
                     );
                 }
                 Op::StringToFloat(d, s) => {
-                    self.ensure(reg, (*d).max(*s));
-                    let sv = self.val_to_string(&reg[*s as usize]);
-                    reg[*d as usize] = Value::float(
+                    let sv = self.val_to_string(&reg[s as usize]);
+                    reg[d as usize] = Value::float(
                         sv.trim()
                             .parse::<f64>()
                             .map_err(|_| format!("cannot convert '{}' to f64", sv))?,
                     );
                 }
                 Op::StringToIntSafe(d, s) => {
-                    self.ensure(reg, (*d).max(*s));
-                    let sv = self.val_to_string(&reg[*s as usize]);
-                    reg[*d as usize] = match sv.trim().parse::<i64>() {
+                    let sv = self.val_to_string(&reg[s as usize]);
+                    reg[d as usize] = match sv.trim().parse::<i64>() {
                         Ok(n) => Value::int(n),
                         Err(_) => Value::Nil,
                     };
                 }
                 Op::StringToFloatSafe(d, s) => {
-                    self.ensure(reg, (*d).max(*s));
-                    let sv = self.val_to_string(&reg[*s as usize]);
-                    reg[*d as usize] = match sv.trim().parse::<f64>() {
+                    let sv = self.val_to_string(&reg[s as usize]);
+                    reg[d as usize] = match sv.trim().parse::<f64>() {
                         Ok(f) => Value::float(f),
                         Err(_) => Value::Nil,
                     };
                 }
                 Op::IntNarrow(d, s, it) => {
-                    self.ensure(reg, (*d).max(*s));
-                    reg[*d as usize] = Value::int(narrow_int(reg[*s as usize].as_int(), *it)?);
+                    reg[d as usize] = Value::int(narrow_int(reg[s as usize].as_int(), it)?);
                 }
                 Op::IntNarrowSafe(d, s, it) => {
-                    self.ensure(reg, (*d).max(*s));
-                    reg[*d as usize] = match narrow_int(reg[*s as usize].as_int(), *it) {
+                    reg[d as usize] = match narrow_int(reg[s as usize].as_int(), it) {
                         Ok(v) => Value::int(v),
                         Err(_) => Value::Nil,
                     };
                 }
                 Op::IntWiden(d, s) => {
-                    self.ensure(reg, (*d).max(*s));
-                    reg[*d as usize] = reg[*s as usize].clone();
+                    reg[d as usize] = reg[s as usize].clone();
                 }
 
                 // === Control Flow ===
@@ -496,450 +429,357 @@ impl VM {
                     pc = (pc as i32 + off - 1) as usize;
                 }
                 Op::JumpIfTrue(r, off) => {
-                    self.ensure(reg, *r);
-                    if reg[*r as usize].as_bool() {
+                    if reg[r as usize].as_bool() {
                         pc = (pc as i32 + off - 1) as usize;
                     }
                 }
                 Op::JumpIfFalse(r, off) => {
-                    self.ensure(reg, *r);
-                    if !reg[*r as usize].as_bool() {
+                    if !reg[r as usize].as_bool() {
                         pc = (pc as i32 + off - 1) as usize;
                     }
                 }
                 Op::JumpIfNil(r, off) => {
-                    self.ensure(reg, *r);
-                    if reg[*r as usize].is_nil() {
+                    if reg[r as usize].is_nil() {
                         pc = (pc as i32 + off - 1) as usize;
                     }
                 }
                 Op::JumpIfNotNil(r, off) => {
-                    self.ensure(reg, *r);
-                    if !reg[*r as usize].is_nil() {
+                    if !reg[r as usize].is_nil() {
                         pc = (pc as i32 + off - 1) as usize;
                     }
                 }
                 Op::JumpIfError(r, off) => {
-                    self.ensure(reg, *r);
-                    if reg[*r as usize].is_error() {
+                    if reg[r as usize].is_error() {
                         pc = (pc as i32 + off - 1) as usize;
                     }
                 }
 
                 // === Function Calls ===
                 Op::Call(d, fr, ac) => {
-                    self.ensure(reg, *d);
-                    self.ensure(reg, *fr);
-                    let func_idx = reg[*fr as usize].as_int() as usize;
-                    let mut args = Vec::new();
-                    let start = *fr as usize + 1;
-                    for i in 0..*ac as usize {
-                        if start + i < reg.len() {
-                            args.push(reg[start + i].clone());
-                        }
+                    let func_call_idx = reg[fr as usize].as_int() as usize;
+                    let mut args = Vec::with_capacity(ac as usize);
+                    let start = fr as usize + 1;
+                    for i in 0..ac as usize {
+                        args.push(reg[start + i].clone());
                     }
-                    if func_idx < self.program.functions.len() {
-                        reg[*d as usize] = self.call_function(func_idx, &args)?;
+                    if func_call_idx < self.program.functions.len() {
+                        reg[d as usize] = self.call_function(func_call_idx, &args)?;
                     } else {
-                        reg[*d as usize] = Value::Nil;
+                        reg[d as usize] = Value::Nil;
                     }
                 }
                 Op::Return(r) => {
-                    self.ensure(reg, *r);
-                    return Ok(reg[*r as usize].clone());
+                    return Ok(reg[r as usize].clone());
                 }
                 Op::ReturnNil => {
                     return Ok(Value::Nil);
                 }
                 Op::ReturnError(r) => {
-                    self.ensure(reg, *r);
-                    return Ok(reg[*r as usize].clone());
+                    return Ok(reg[r as usize].clone());
                 }
 
                 // === Collections ===
                 Op::MakeArray(d, start, count) => {
-                    self.ensure(reg, *d);
-                    let mut vals = Vec::new();
-                    for i in 0..*count {
-                        let idx = *start as usize + i as usize;
-                        if idx < reg.len() {
-                            vals.push(reg[idx].clone());
-                        }
+                    let mut vals = Vec::with_capacity(count as usize);
+                    for i in 0..count as usize {
+                        vals.push(reg[start as usize + i].clone());
                     }
-                    reg[*d as usize] = Value::array(vals);
+                    reg[d as usize] = Value::array(vals);
                 }
                 Op::MakeMap(d, start, count) => {
-                    self.ensure(reg, *d);
                     let mut map = IndexMap::new();
-                    for i in 0..*count {
-                        let ki = *start as usize + (i as usize * 2);
+                    for i in 0..count as usize {
+                        let ki = start as usize + (i * 2);
                         let vi = ki + 1;
-                        if ki < reg.len() && vi < reg.len() {
-                            let key = val_to_map_key(&reg[ki])?;
-                            map.insert(key, reg[vi].clone());
-                        }
+                        let key = val_to_map_key(&reg[ki])?;
+                        map.insert(key, reg[vi].clone());
                     }
-                    reg[*d as usize] = Value::map(map);
+                    reg[d as usize] = Value::map(map);
                 }
                 Op::MakeTuple(d, start, count) => {
-                    self.ensure(reg, *d);
-                    let mut vals = Vec::new();
-                    for i in 0..*count {
-                        let idx = *start as usize + i as usize;
-                        if idx < reg.len() {
-                            vals.push(reg[idx].clone());
-                        }
+                    let mut vals = Vec::with_capacity(count as usize);
+                    for i in 0..count as usize {
+                        vals.push(reg[start as usize + i].clone());
                     }
-                    reg[*d as usize] = Value::tuple(vals);
+                    reg[d as usize] = Value::tuple(vals);
                 }
 
                 // === Struct ===
                 Op::MakeStruct(d, tid, fc) => {
-                    self.ensure(reg, *d);
-                    let tn = self.program.type_ids[*tid as usize].clone();
-                    let start = (*d as usize).saturating_sub(*fc as usize);
-                    let mut fields = Vec::new();
-                    for i in 0..*fc as usize {
-                        if start + i < reg.len() {
-                            fields.push(reg[start + i].clone());
-                        }
+                    let tn = self.program.type_ids[tid as usize].clone();
+                    let start = (d as usize).saturating_sub(fc as usize);
+                    let mut fields = Vec::with_capacity(fc as usize);
+                    for i in 0..fc as usize {
+                        fields.push(reg[start + i].clone());
                     }
-                    reg[*d as usize] = Value::new_struct(tn, fields);
+                    reg[d as usize] = Value::new_struct(tn, fields);
                 }
                 Op::GetField(d, o, fi) => {
-                    self.ensure(reg, (*d).max(*o));
-                    let val = if let Some(href) = reg[*o as usize].as_heap_ref().cloned() {
-                        let obj = href.borrow();
-                        match &*obj {
-                            HeapObject::Struct(s) => {
-                                s.fields.get(*fi as usize).cloned().unwrap_or(Value::Nil)
-                            }
-                            HeapObject::Tuple(vals) => {
-                                vals.get(*fi as usize).cloned().unwrap_or(Value::Nil)
-                            }
-                            _ => return Err("GetField on non-struct".to_string()),
-                        }
-                    } else {
-                        return Err("GetField on non-heap value".to_string());
+                    let href = reg[o as usize]
+                        .as_heap_ref()
+                        .expect("GetField on non-heap")
+                        .clone();
+                    let obj = href.borrow();
+                    reg[d as usize] = match &*obj {
+                        HeapObject::Struct(s) => s.fields[fi as usize].clone(),
+                        HeapObject::Tuple(vals) => vals[fi as usize].clone(),
+                        _ => panic!("GetField on non-struct/tuple"),
                     };
-                    reg[*d as usize] = val;
                 }
                 Op::SetField(o, fi, v) => {
-                    self.ensure(reg, (*o).max(*v));
-                    let value = reg[*v as usize].clone();
-                    if let Some(href) = reg[*o as usize].as_heap_ref() {
-                        let mut obj = href.borrow_mut();
-                        if let HeapObject::Struct(s) = &mut *obj {
-                            if (*fi as usize) < s.fields.len() {
-                                s.fields[*fi as usize] = value;
-                            }
-                        }
+                    let value = reg[v as usize].clone();
+                    let href = reg[o as usize].as_heap_ref().expect("SetField on non-heap");
+                    let mut obj = href.borrow_mut();
+                    match &mut *obj {
+                        HeapObject::Struct(s) => s.fields[fi as usize] = value,
+                        _ => panic!("SetField on non-struct"),
                     }
                 }
 
                 // === Enum ===
                 Op::MakeEnum(d, tid, vi, fc) => {
-                    self.ensure(reg, *d);
-                    let tn = self.program.type_ids[*tid as usize].clone();
-                    let start = (*d as usize).saturating_sub(*fc as usize);
-                    let mut fields = Vec::new();
-                    for i in 0..*fc as usize {
-                        if start + i < reg.len() {
-                            fields.push(reg[start + i].clone());
-                        }
+                    let tn = self.program.type_ids[tid as usize].clone();
+                    let start = (d as usize).saturating_sub(fc as usize);
+                    let mut fields = Vec::with_capacity(fc as usize);
+                    for i in 0..fc as usize {
+                        fields.push(reg[start + i].clone());
                     }
-                    reg[*d as usize] = Value::new_enum(tn, *vi, fields);
+                    reg[d as usize] = Value::new_enum(tn, vi, fields);
                 }
                 Op::GetEnumTag(d, s) => {
-                    self.ensure(reg, (*d).max(*s));
-                    let val = if let Some(href) = reg[*s as usize].as_heap_ref().cloned() {
-                        let obj = href.borrow();
-                        if let HeapObject::Enum(e) = &*obj {
-                            Value::int(e.variant_index as i64)
-                        } else {
-                            Value::int(-1)
-                        }
-                    } else {
-                        Value::int(-1)
+                    let href = reg[s as usize]
+                        .as_heap_ref()
+                        .expect("GetEnumTag on non-heap")
+                        .clone();
+                    let obj = href.borrow();
+                    reg[d as usize] = match &*obj {
+                        HeapObject::Enum(e) => Value::int(e.variant_index as i64),
+                        _ => panic!("GetEnumTag on non-enum"),
                     };
-                    reg[*d as usize] = val;
                 }
                 Op::GetEnumField(d, s, fi) => {
-                    self.ensure(reg, (*d).max(*s));
-                    let val = if let Some(href) = reg[*s as usize].as_heap_ref().cloned() {
-                        let obj = href.borrow();
-                        if let HeapObject::Enum(e) = &*obj {
-                            e.fields.get(*fi as usize).cloned().unwrap_or(Value::Nil)
-                        } else {
-                            Value::Nil
-                        }
-                    } else {
-                        Value::Nil
+                    let href = reg[s as usize]
+                        .as_heap_ref()
+                        .expect("GetEnumField on non-heap")
+                        .clone();
+                    let obj = href.borrow();
+                    reg[d as usize] = match &*obj {
+                        HeapObject::Enum(e) => e.fields[fi as usize].clone(),
+                        _ => panic!("GetEnumField on non-enum"),
                     };
-                    reg[*d as usize] = val;
                 }
 
                 // === Index ===
                 Op::GetIndex(d, o, i) => {
-                    self.ensure3(reg, *d, *o, *i);
-                    reg[*d as usize] = self.get_index(&reg[*o as usize], &reg[*i as usize])?;
+                    reg[d as usize] = self.get_index(&reg[o as usize], &reg[i as usize])?;
                 }
                 Op::SetIndex(o, i, v) => {
-                    self.ensure3(reg, *o, *i, *v);
-                    self.set_index(
-                        &reg[*o as usize],
-                        &reg[*i as usize],
-                        reg[*v as usize].clone(),
-                    )?;
+                    self.set_index(&reg[o as usize], &reg[i as usize], reg[v as usize].clone())?;
                 }
                 Op::ArrayLen(d, s) => {
-                    self.ensure(reg, (*d).max(*s));
-                    let val = if let Some(href) = reg[*s as usize].as_heap_ref().cloned() {
-                        let obj = href.borrow();
-                        if let HeapObject::Array(v) = &*obj {
-                            Value::int(v.len() as i64)
-                        } else {
-                            Value::int(0)
-                        }
-                    } else {
-                        Value::int(0)
+                    let href = reg[s as usize]
+                        .as_heap_ref()
+                        .expect("ArrayLen on non-heap")
+                        .clone();
+                    let obj = href.borrow();
+                    reg[d as usize] = match &*obj {
+                        HeapObject::Array(v) => Value::int(v.len() as i64),
+                        _ => panic!("ArrayLen on non-array"),
                     };
-                    reg[*d as usize] = val;
                 }
                 Op::StringLen(d, s) => {
-                    self.ensure(reg, (*d).max(*s));
-                    let sv = self.val_to_string(&reg[*s as usize]);
-                    reg[*d as usize] = Value::int(sv.chars().count() as i64);
+                    let sv = self.val_to_string(&reg[s as usize]);
+                    reg[d as usize] = Value::int(sv.chars().count() as i64);
                 }
                 Op::MapLen(d, s) => {
-                    self.ensure(reg, (*d).max(*s));
-                    let val = if let Some(href) = reg[*s as usize].as_heap_ref().cloned() {
-                        let obj = href.borrow();
-                        if let HeapObject::Map(m) = &*obj {
-                            Value::int(m.len() as i64)
-                        } else {
-                            Value::int(0)
-                        }
-                    } else {
-                        Value::int(0)
+                    let href = reg[s as usize]
+                        .as_heap_ref()
+                        .expect("MapLen on non-heap")
+                        .clone();
+                    let obj = href.borrow();
+                    reg[d as usize] = match &*obj {
+                        HeapObject::Map(m) => Value::int(m.len() as i64),
+                        _ => panic!("MapLen on non-map"),
                     };
-                    reg[*d as usize] = val;
                 }
 
                 // === Method Calls ===
                 Op::CallMethod(d, o, mid, ac) => {
-                    self.ensure(reg, (*d).max(*o));
-                    let method = self.program.method_names[*mid as usize].clone();
-                    let mut args = Vec::new();
-                    let start = *o as usize + 1;
-                    for i in 0..*ac as usize {
-                        if start + i < reg.len() {
-                            args.push(reg[start + i].clone());
-                        }
+                    let method = self.program.method_names[mid as usize].clone();
+                    let mut args = Vec::with_capacity(ac as usize);
+                    let start = o as usize + 1;
+                    for i in 0..ac as usize {
+                        args.push(reg[start + i].clone());
                     }
-                    let obj = reg[*o as usize].clone();
-                    reg[*d as usize] = self.call_method(&obj, &method, &args)?;
+                    let obj = reg[o as usize].clone();
+                    reg[d as usize] = self.call_method(&obj, &method, &args)?;
                 }
                 Op::CallCapability(d, c, mid, ac) => {
-                    self.ensure(reg, (*d).max(*c));
-                    let method = self.program.method_names[*mid as usize].clone();
-                    let mut args = Vec::new();
-                    let start = *c as usize + 1;
-                    for i in 0..*ac as usize {
-                        if start + i < reg.len() {
-                            args.push(reg[start + i].clone());
-                        }
+                    let method = self.program.method_names[mid as usize].clone();
+                    let mut args = Vec::with_capacity(ac as usize);
+                    let start = c as usize + 1;
+                    for i in 0..ac as usize {
+                        args.push(reg[start + i].clone());
                     }
-                    reg[*d as usize] = self.call_capability(&method, &args)?;
+                    reg[d as usize] = self.call_capability(&method, &args)?;
                 }
 
                 // === Error Handling ===
                 Op::MakeError(d, s) => {
-                    self.ensure(reg, (*d).max(*s));
-                    let v = reg[*s as usize].clone();
-                    reg[*d as usize] = Value::error(v);
+                    let v = reg[s as usize].clone();
+                    reg[d as usize] = Value::error(v);
                 }
                 Op::UnwrapError(d, s) => {
-                    self.ensure(reg, (*d).max(*s));
-                    let val = if let Some(href) = reg[*s as usize].as_heap_ref().cloned() {
-                        let obj = href.borrow();
-                        if let HeapObject::Error(inner) = &*obj {
-                            (**inner).clone()
-                        } else {
-                            reg[*s as usize].clone()
-                        }
-                    } else {
-                        reg[*s as usize].clone()
+                    let href = reg[s as usize]
+                        .as_heap_ref()
+                        .expect("UnwrapError on non-heap")
+                        .clone();
+                    let obj = href.borrow();
+                    reg[d as usize] = match &*obj {
+                        HeapObject::Error(inner) => (**inner).clone(),
+                        _ => panic!("UnwrapError on non-error"),
                     };
-                    reg[*d as usize] = val;
                 }
                 Op::IsError(d, s) => {
-                    self.ensure(reg, (*d).max(*s));
-                    reg[*d as usize] = Value::bool(reg[*s as usize].is_error());
+                    reg[d as usize] = Value::bool(reg[s as usize].is_error());
                 }
                 Op::IsNil(d, s) => {
-                    self.ensure(reg, (*d).max(*s));
-                    reg[*d as usize] = Value::bool(reg[*s as usize].is_nil());
+                    reg[d as usize] = Value::bool(reg[s as usize].is_nil());
                 }
 
                 // === Type Testing ===
-                Op::IsType(d, s, _tid) => {
-                    self.ensure(reg, (*d).max(*s));
-                    reg[*d as usize] = Value::bool(false); /* TODO */
+                Op::IsType(d, _s, _tid) => {
+                    reg[d as usize] = Value::bool(false); /* TODO */
                 }
                 Op::IsEnumVariant(d, s, vi) => {
-                    self.ensure(reg, (*d).max(*s));
-                    let is_match = if let Some(href) = reg[*s as usize].as_heap_ref() {
-                        let obj = href.borrow();
-                        if let HeapObject::Enum(e) = &*obj {
-                            e.variant_index == *vi
-                        } else {
-                            false
-                        }
-                    } else {
-                        false
+                    let href = reg[s as usize]
+                        .as_heap_ref()
+                        .expect("IsEnumVariant on non-heap")
+                        .clone();
+                    let obj = href.borrow();
+                    let is_match = match &*obj {
+                        HeapObject::Enum(e) => e.variant_index == vi,
+                        _ => panic!("IsEnumVariant on non-enum"),
                     };
-                    reg[*d as usize] = Value::bool(is_match);
+                    drop(obj);
+                    reg[d as usize] = Value::bool(is_match);
                 }
-                Op::IsIdentical(d, a, b) => {
-                    self.ensure3(reg, *d, *a, *b);
-                    let identical = match (&reg[*a as usize], &reg[*b as usize]) {
-                        (Value::Heap(a), Value::Heap(b)) => Arc::ptr_eq(a, b),
-                        (a, b) => a.deep_eq(b),
-                    };
-                    reg[*d as usize] = Value::bool(identical);
-                }
-
                 // === Range ===
                 Op::MakeRange(d, s, e) => {
-                    self.ensure3(reg, *d, *s, *e);
-                    reg[*d as usize] =
-                        Value::range(reg[*s as usize].as_int(), reg[*e as usize].as_int());
+                    reg[d as usize] =
+                        Value::range(reg[s as usize].as_int(), reg[e as usize].as_int());
                 }
 
                 // === Iterators ===
                 Op::IterInit(d, s) => {
-                    self.ensure(reg, (*d).max(*s));
-                    let iter = self.create_iterator(&reg[*s as usize])?;
-                    reg[*d as usize] =
+                    let iter = self.create_iterator(&reg[s as usize])?;
+                    reg[d as usize] =
                         Value::Heap(Arc::new(RefCell::new(HeapObject::Iterator(iter))));
                 }
                 Op::IterNext(vd, dd, ir) => {
-                    self.ensure(reg, (*vd).max(*dd).max(*ir));
-                    if let Some(href) = reg[*ir as usize].as_heap_ref().cloned() {
-                        let mut obj = href.borrow_mut();
-                        if let HeapObject::Iterator(iter) = &mut *obj {
-                            match iter {
-                                IterState::Array { values, index } => {
-                                    if *index < values.len() {
-                                        reg[*vd as usize] = values[*index].clone();
-                                        reg[*dd as usize] = Value::bool(false);
-                                        *index += 1;
-                                    } else {
-                                        reg[*dd as usize] = Value::bool(true);
-                                    }
-                                }
-                                IterState::String { chars, index } => {
-                                    if *index < chars.len() {
-                                        reg[*vd as usize] = Value::string(chars[*index].clone());
-                                        reg[*dd as usize] = Value::bool(false);
-                                        *index += 1;
-                                    } else {
-                                        reg[*dd as usize] = Value::bool(true);
-                                    }
-                                }
-                                IterState::Range { current, end } => {
-                                    if *current < *end {
-                                        reg[*vd as usize] = Value::int(*current);
-                                        reg[*dd as usize] = Value::bool(false);
-                                        *current += 1;
-                                    } else {
-                                        reg[*dd as usize] = Value::bool(true);
-                                    }
-                                }
-                                IterState::Map {
-                                    keys,
-                                    values: _,
-                                    index,
-                                } => {
-                                    if *index < keys.len() {
-                                        reg[*vd as usize] = map_key_to_value(&keys[*index]);
-                                        reg[*dd as usize] = Value::bool(false);
-                                        *index += 1;
-                                    } else {
-                                        reg[*dd as usize] = Value::bool(true);
-                                    }
-                                }
+                    let href = reg[ir as usize]
+                        .as_heap_ref()
+                        .expect("IterNext on non-heap")
+                        .clone();
+                    let mut obj = href.borrow_mut();
+                    let iter = match &mut *obj {
+                        HeapObject::Iterator(iter) => iter,
+                        _ => panic!("IterNext on non-iterator"),
+                    };
+                    match iter {
+                        IterState::Array { values, index } => {
+                            if *index < values.len() {
+                                reg[vd as usize] = values[*index].clone();
+                                reg[dd as usize] = Value::bool(false);
+                                *index += 1;
+                            } else {
+                                reg[dd as usize] = Value::bool(true);
+                            }
+                        }
+                        IterState::String { chars, index } => {
+                            if *index < chars.len() {
+                                reg[vd as usize] = Value::string(chars[*index].clone());
+                                reg[dd as usize] = Value::bool(false);
+                                *index += 1;
+                            } else {
+                                reg[dd as usize] = Value::bool(true);
+                            }
+                        }
+                        IterState::Range { current, end } => {
+                            if *current < *end {
+                                reg[vd as usize] = Value::int(*current);
+                                reg[dd as usize] = Value::bool(false);
+                                *current += 1;
+                            } else {
+                                reg[dd as usize] = Value::bool(true);
+                            }
+                        }
+                        IterState::Map {
+                            keys,
+                            values: _,
+                            index,
+                        } => {
+                            if *index < keys.len() {
+                                reg[vd as usize] = map_key_to_value(&keys[*index]);
+                                reg[dd as usize] = Value::bool(false);
+                                *index += 1;
+                            } else {
+                                reg[dd as usize] = Value::bool(true);
                             }
                         }
                     }
                 }
                 Op::IterNextKV(kd, vd, dd, ir) => {
-                    self.ensure(reg, (*kd).max(*vd).max(*dd).max(*ir));
-                    if let Some(href) = reg[*ir as usize].as_heap_ref().cloned() {
-                        let mut obj = href.borrow_mut();
-                        if let HeapObject::Iterator(iter) = &mut *obj {
-                            match iter {
-                                IterState::Array { values, index } => {
-                                    if *index < values.len() {
-                                        reg[*kd as usize] = values[*index].clone();
-                                        reg[*vd as usize] = Value::int(*index as i64);
-                                        reg[*dd as usize] = Value::bool(false);
-                                        *index += 1;
-                                    } else {
-                                        reg[*dd as usize] = Value::bool(true);
-                                    }
-                                }
-                                IterState::Map {
-                                    keys,
-                                    values,
-                                    index,
-                                } => {
-                                    if *index < keys.len() {
-                                        reg[*kd as usize] = map_key_to_value(&keys[*index]);
-                                        reg[*vd as usize] = values[*index].clone();
-                                        reg[*dd as usize] = Value::bool(false);
-                                        *index += 1;
-                                    } else {
-                                        reg[*dd as usize] = Value::bool(true);
-                                    }
-                                }
-                                _ => {
-                                    reg[*dd as usize] = Value::bool(true);
-                                }
+                    let href = reg[ir as usize]
+                        .as_heap_ref()
+                        .expect("IterNextKV on non-heap")
+                        .clone();
+                    let mut obj = href.borrow_mut();
+                    let iter = match &mut *obj {
+                        HeapObject::Iterator(iter) => iter,
+                        _ => panic!("IterNextKV on non-iterator"),
+                    };
+                    match iter {
+                        IterState::Array { values, index } => {
+                            if *index < values.len() {
+                                reg[kd as usize] = values[*index].clone();
+                                reg[vd as usize] = Value::int(*index as i64);
+                                reg[dd as usize] = Value::bool(false);
+                                *index += 1;
+                            } else {
+                                reg[dd as usize] = Value::bool(true);
                             }
                         }
+                        IterState::Map {
+                            keys,
+                            values,
+                            index,
+                        } => {
+                            if *index < keys.len() {
+                                reg[kd as usize] = map_key_to_value(&keys[*index]);
+                                reg[vd as usize] = values[*index].clone();
+                                reg[dd as usize] = Value::bool(false);
+                                *index += 1;
+                            } else {
+                                reg[dd as usize] = Value::bool(true);
+                            }
+                        }
+                        _ => panic!("IterNextKV on non-array/map iterator"),
                     }
                 }
 
                 // === Misc ===
                 Op::Panic(r) => {
-                    self.ensure(reg, *r);
-                    return Err(format!("panic: {}", self.val_to_string(&reg[*r as usize])));
+                    return Err(format!("panic: {}", self.val_to_string(&reg[r as usize])));
                 }
                 Op::Nop => {}
                 Op::Halt => {
                     return Ok(Value::Nil);
                 }
-
-                // Remaining ops
-                _ => {
-                    return Err(format!("unimplemented op: {:?}", op));
-                }
             }
         }
 
         Ok(Value::Nil)
-    }
-
-    fn ensure(&self, reg: &mut Vec<Value>, r: u16) {
-        while reg.len() <= r as usize {
-            reg.push(Value::Nil);
-        }
-    }
-
-    fn ensure3(&self, reg: &mut Vec<Value>, a: u16, b: u16, c: u16) {
-        self.ensure(reg, a.max(b).max(c));
     }
 
     fn val_to_string(&self, val: &Value) -> String {
@@ -957,88 +797,79 @@ impl VM {
     }
 
     fn get_index(&self, obj: &Value, idx: &Value) -> Result<Value, String> {
-        if let Some(href) = obj.as_heap_ref() {
-            let o = href.borrow();
-            match &*o {
-                HeapObject::Array(vals) => {
-                    let mut i = idx.as_int();
-                    if i < 0 {
-                        i += vals.len() as i64;
-                    }
-                    vals.get(i as usize).cloned().ok_or_else(|| {
-                        format!(
-                            "array index {} out of bounds (length {})",
-                            idx.as_int(),
-                            vals.len()
-                        )
-                    })
+        let href = obj.as_heap_ref().expect("GetIndex on non-heap");
+        let o = href.borrow();
+        match &*o {
+            HeapObject::Array(vals) => {
+                let mut i = idx.as_int();
+                if i < 0 {
+                    i += vals.len() as i64;
                 }
-                HeapObject::Map(entries) => {
-                    let key = val_to_map_key(idx)?;
-                    entries
-                        .get(&key)
-                        .cloned()
-                        .ok_or("key not found in map".to_string())
-                }
-                _ => Err("cannot index into this value".to_string()),
+                vals.get(i as usize).cloned().ok_or_else(|| {
+                    format!(
+                        "array index {} out of bounds (length {})",
+                        idx.as_int(),
+                        vals.len()
+                    )
+                })
             }
-        } else {
-            Err("cannot index into non-heap value".to_string())
+            HeapObject::Map(entries) => {
+                let key = val_to_map_key(idx)?;
+                entries
+                    .get(&key)
+                    .cloned()
+                    .ok_or("key not found in map".to_string())
+            }
+            _ => panic!("GetIndex on non-indexable value"),
         }
     }
 
     fn set_index(&self, obj: &Value, idx: &Value, val: Value) -> Result<(), String> {
-        if let Some(href) = obj.as_heap_ref() {
-            let mut o = href.borrow_mut();
-            match &mut *o {
-                HeapObject::Array(vals) => {
-                    let mut i = idx.as_int();
-                    if i < 0 {
-                        i += vals.len() as i64;
-                    }
-                    if i < 0 || i as usize >= vals.len() {
-                        return Err(format!("array index out of bounds"));
-                    }
-                    vals[i as usize] = val;
-                    Ok(())
+        let href = obj.as_heap_ref().expect("SetIndex on non-heap");
+        let mut o = href.borrow_mut();
+        match &mut *o {
+            HeapObject::Array(vals) => {
+                let mut i = idx.as_int();
+                if i < 0 {
+                    i += vals.len() as i64;
                 }
-                HeapObject::Map(entries) => {
-                    let key = val_to_map_key(idx)?;
-                    entries.insert(key, val);
-                    Ok(())
+                if i < 0 || i as usize >= vals.len() {
+                    return Err("array index out of bounds".to_string());
                 }
-                _ => Err("cannot set index on this value".to_string()),
+                vals[i as usize] = val;
+                Ok(())
             }
-        } else {
-            Err("cannot set index on non-heap value".to_string())
+            HeapObject::Map(entries) => {
+                let key = val_to_map_key(idx)?;
+                entries.insert(key, val);
+                Ok(())
+            }
+            _ => panic!("SetIndex on non-indexable value"),
         }
     }
 
     fn create_iterator(&self, val: &Value) -> Result<IterState, String> {
-        if let Some(href) = val.as_heap_ref() {
-            let obj = href.borrow();
-            match &*obj {
-                HeapObject::Array(v) => Ok(IterState::Array {
-                    values: v.clone(),
-                    index: 0,
-                }),
-                HeapObject::Map(m) => Ok(IterState::Map {
-                    keys: m.keys().cloned().collect(),
-                    values: m.values().cloned().collect(),
-                    index: 0,
-                }),
-                HeapObject::String(s) => Ok(IterState::String {
-                    chars: s.chars().map(|c| c.to_string()).collect(),
-                    index: 0,
-                }),
-                HeapObject::Range(s, e) => Ok(IterState::Range {
-                    current: *s,
-                    end: *e,
-                }),
-                _ => Err("cannot iterate over this value".to_string()),
-            }
-        } else {
-            Err("cannot iterate over non-iterable value".to_string())
+        let href = val.as_heap_ref().expect("IterInit on non-heap");
+        let obj = href.borrow();
+        match &*obj {
+            HeapObject::Array(v) => Ok(IterState::Array {
+                values: v.clone(),
+                index: 0,
+            }),
+            HeapObject::Map(m) => Ok(IterState::Map {
+                keys: m.keys().cloned().collect(),
+                values: m.values().cloned().collect(),
+                index: 0,
+            }),
+            HeapObject::String(s) => Ok(IterState::String {
+                chars: s.chars().map(|c| c.to_string()).collect(),
+                index: 0,
+            }),
+            HeapObject::Range(s, e) => Ok(IterState::Range {
+                current: *s,
+                end: *e,
+            }),
+            _ => panic!("IterInit on non-iterable value"),
         }
     }
 
@@ -1090,10 +921,10 @@ impl VM {
                     }
                     return Err(format!("unknown method '{}' on '{}'", method, type_name));
                 }
-                _ => {}
+                _ => panic!("CallMethod on unsupported heap type"),
             }
         }
-        Err(format!("cannot call method '{}' on this value", method))
+        panic!("CallMethod on non-heap value for method '{}'", method)
     }
 
     fn call_capability(&mut self, method: &str, args: &[Value]) -> Result<Value, String> {
@@ -1472,13 +1303,5 @@ fn narrow_int(val: i64, target: IntType) -> Result<i64, String> {
                 Ok(val)
             }
         }
-    }
-}
-
-fn format_float_val(f: f64) -> String {
-    if f == f.floor() && f.is_finite() && f.abs() < 1e15 {
-        format!("{:.1}", f)
-    } else {
-        format!("{}", f)
     }
 }

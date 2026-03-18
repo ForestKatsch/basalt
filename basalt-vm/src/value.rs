@@ -37,8 +37,6 @@ pub enum HeapObject {
     Error(Box<Value>),
     Range(i64, i64),
     Iterator(IterState),
-    Closure(ClosureObj),
-    HostObject(Arc<dyn HostObject>),
 }
 
 #[derive(Debug, Clone)]
@@ -52,12 +50,6 @@ pub struct EnumObj {
     pub type_name: String,
     pub variant_index: u8,
     pub fields: Vec<Value>,
-}
-
-#[derive(Debug, Clone)]
-pub struct ClosureObj {
-    pub func_index: usize,
-    pub upvalues: Vec<Value>,
 }
 
 #[derive(Debug, Clone)]
@@ -89,17 +81,10 @@ pub enum MapKey {
     String(String),
 }
 
-pub trait HostObject: std::fmt::Debug + Send + Sync {
-    fn call_method(&self, name: &str, args: &[Value]) -> Result<Value, String>;
-    fn type_name(&self) -> &str;
-}
-
 /// A reference-counted pointer to a heap object.
 pub type HeapRef = Arc<RefCell<HeapObject>>;
 
 impl Value {
-    pub const NIL: Value = Value::Nil;
-
     pub fn int(n: i64) -> Value {
         Value::Int(n)
     }
@@ -115,39 +100,36 @@ impl Value {
     pub fn as_int(&self) -> i64 {
         match self {
             Value::Int(n) => *n,
-            Value::Bool(b) => {
-                if *b {
-                    1
-                } else {
-                    0
-                }
-            }
-            _ => 0,
+            _ => panic!("expected Int, got {:?}", self.type_tag()),
         }
     }
 
     pub fn as_float(&self) -> f64 {
         match self {
             Value::Float(f) => *f,
-            Value::Int(n) => *n as f64,
-            _ => 0.0,
+            _ => panic!("expected Float, got {:?}", self.type_tag()),
         }
     }
 
     pub fn as_bool(&self) -> bool {
         match self {
             Value::Bool(b) => *b,
-            Value::Int(n) => *n != 0,
-            _ => false,
+            _ => panic!("expected Bool, got {:?}", self.type_tag()),
+        }
+    }
+
+    fn type_tag(&self) -> &'static str {
+        match self {
+            Value::Int(_) => "Int",
+            Value::Float(_) => "Float",
+            Value::Bool(_) => "Bool",
+            Value::Nil => "Nil",
+            Value::Heap(_) => "Heap",
         }
     }
 
     pub fn is_nil(&self) -> bool {
         matches!(self, Value::Nil)
-    }
-
-    pub fn is_heap(&self) -> bool {
-        matches!(self, Value::Heap(_))
     }
 
     pub fn as_heap_ref(&self) -> Option<&HeapRef> {
@@ -194,12 +176,6 @@ impl Value {
 
     pub fn range(start: i64, end: i64) -> Value {
         Value::Heap(Arc::new(RefCell::new(HeapObject::Range(start, end))))
-    }
-
-    pub fn host_object(obj: impl HostObject + 'static) -> Value {
-        Value::Heap(Arc::new(RefCell::new(HeapObject::HostObject(Arc::new(
-            obj,
-        )))))
     }
 
     pub fn is_error(&self) -> bool {
@@ -268,14 +244,14 @@ impl Value {
                     HeapObject::Enum(e) => format!("{}::variant_{}", e.type_name, e.variant_index),
                     HeapObject::Error(inner) => format!("Error({})", inner.display_as_string()),
                     HeapObject::Range(s, e) => format!("{}..{}", s, e),
-                    _ => "<object>".to_string(),
+                    HeapObject::Iterator(_) => "<iterator>".to_string(),
                 }
             }
         }
     }
 }
 
-fn format_float(f: f64) -> String {
+pub fn format_float(f: f64) -> String {
     if f == f.floor() && f.is_finite() && f.abs() < 1e15 {
         format!("{:.1}", f)
     } else {

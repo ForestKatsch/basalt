@@ -48,42 +48,8 @@ impl Type {
         )
     }
 
-    pub fn is_signed(&self) -> bool {
-        matches!(self, Type::I8 | Type::I16 | Type::I32 | Type::I64)
-    }
-
-    pub fn is_unsigned(&self) -> bool {
-        matches!(self, Type::U8 | Type::U16 | Type::U32 | Type::U64)
-    }
-
     pub fn is_numeric(&self) -> bool {
         self.is_integer() || matches!(self, Type::F64)
-    }
-
-    pub fn is_value_type(&self) -> bool {
-        match self {
-            Type::I8
-            | Type::I16
-            | Type::I32
-            | Type::I64
-            | Type::U8
-            | Type::U16
-            | Type::U32
-            | Type::U64
-            | Type::F64
-            | Type::Bool
-            | Type::String
-            | Type::Nil => true,
-            Type::Tuple(_) | Type::Function(_, _) => true,
-            _ => false,
-        }
-    }
-
-    pub fn is_reference_type(&self) -> bool {
-        match self {
-            Type::Struct(_) | Type::Array(_) | Type::Map(_, _) => true,
-            _ => false,
-        }
     }
 
     pub fn display_name(&self) -> String {
@@ -479,14 +445,14 @@ impl TypeChecker {
         }
 
         match (&from, &to) {
-            // T is compatible with T?
-            (_, Type::Optional(inner)) => self.is_assignable(&from, inner),
             // nil is compatible with T?
             (Type::Nil, Type::Optional(_)) => true,
-            // T is compatible with T!E (success)
-            (_, Type::Result(ok, _)) => self.is_assignable(&from, ok),
+            // T is compatible with T?
+            (_, Type::Optional(inner)) => self.is_assignable(&from, inner),
             // Error(E) is compatible with T!E
             (Type::Error(e1), Type::Result(_, e2)) => self.is_assignable(e1, e2),
+            // T is compatible with T!E (success)
+            (_, Type::Result(ok, _)) => self.is_assignable(&from, ok),
             // T is compatible with union containing T
             (_, Type::Union(members)) => members.iter().any(|m| self.is_assignable(&from, m)),
             // Union member is extractable
@@ -861,47 +827,6 @@ impl TypeChecker {
 
         Ok(TypedFnDef {
             name: fdef.name.clone(),
-            params: info.params,
-            return_type: info.return_type,
-            body,
-        })
-    }
-
-    fn check_method_def(&mut self, mdef: &FnDef, type_name: &str) -> Result<TypedFnDef, String> {
-        let info = if let Some(sinfo) = self.type_info.structs.get(type_name) {
-            sinfo
-                .methods
-                .get(&mdef.name)
-                .cloned()
-                .ok_or_else(|| format!("unknown method '{}' on '{}'", mdef.name, type_name))?
-        } else if let Some(einfo) = self.type_info.enums.get(type_name) {
-            einfo
-                .methods
-                .get(&mdef.name)
-                .cloned()
-                .ok_or_else(|| format!("unknown method '{}' on '{}'", mdef.name, type_name))?
-        } else {
-            return Err(format!("unknown type '{}'", type_name));
-        };
-
-        self.push_scope();
-        let old_return = self.current_fn_return.take();
-        let old_type_name = self.current_type_name.take();
-        self.current_fn_return = Some(info.return_type.clone());
-        self.current_type_name = Some(type_name.to_string());
-
-        for (name, ty) in &info.params {
-            self.define_var(name, ty.clone(), false);
-        }
-
-        let body = self.check_block(&mdef.body)?;
-
-        self.current_fn_return = old_return;
-        self.current_type_name = old_type_name;
-        self.pop_scope();
-
-        Ok(TypedFnDef {
-            name: mdef.name.clone(),
             params: info.params,
             return_type: info.return_type,
             body,
@@ -2114,7 +2039,7 @@ impl TypeChecker {
                 });
             }
             // Could be module.Type(args) - enum variant with single field
-            if let Some(enum_info) = mod_info.enums.get(method) {
+            if let Some(_enum_info) = mod_info.enums.get(method) {
                 // This is actually accessing a type, not calling a function
                 return Err(format!("'{}' is a type, not a function", method));
             }
@@ -2317,7 +2242,7 @@ impl TypeChecker {
         }
     }
 
-    fn check_conversion(&self, from: &Type, to: &Type, is_safe: bool) -> Result<(), String> {
+    fn check_conversion(&self, from: &Type, to: &Type, _is_safe: bool) -> Result<(), String> {
         // Integer to integer
         if from.is_integer() && to.is_integer() {
             return Ok(());
@@ -2484,7 +2409,7 @@ impl TypeChecker {
             }
             Pattern::IsType(ty) => {
                 // Type narrowing in match
-                if let Ok(resolved) = self.resolve_type_expr(ty) {
+                if let Ok(_resolved) = self.resolve_type_expr(ty) {
                     // No new binding, but the scrutinee gets narrowed
                 }
             }
