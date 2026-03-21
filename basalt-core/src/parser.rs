@@ -1275,6 +1275,9 @@ impl Parser {
         self.skip_newlines();
         let then_block = self.parse_block()?;
 
+        // Allow newline(s) between } and else — peek ahead without consuming
+        let saved_pos = self.pos;
+        self.skip_newlines();
         let else_expr = if *self.peek() == Token::Else {
             self.advance();
             if *self.peek() == Token::If {
@@ -1285,6 +1288,8 @@ impl Parser {
                 Some(Box::new(Expr::Block(block)))
             }
         } else {
+            // No else — restore position so newlines aren't consumed
+            self.pos = saved_pos;
             None
         };
 

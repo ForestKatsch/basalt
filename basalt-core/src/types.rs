@@ -704,24 +704,37 @@ impl TypeChecker {
         match &td.kind {
             TypeDefKind::Struct(sdef) => {
                 self.current_type_name = Some(td.name.clone());
+                // Pre-register with empty fields so recursive types can resolve
+                self.type_info.structs.insert(
+                    td.name.clone(),
+                    StructInfo {
+                        name: td.name.clone(),
+                        fields: Vec::new(),
+                        methods: HashMap::new(),
+                        parent: td.parent.clone(),
+                    },
+                );
+                // Now resolve field types (can reference Self / own type name)
                 let fields: Vec<(String, Type)> = sdef
                     .fields
                     .iter()
                     .map(|f| Ok((f.name.clone(), self.resolve_type_expr(&f.ty)?)))
                     .collect::<Result<_, String>>()?;
-                self.type_info.structs.insert(
-                    td.name.clone(),
-                    StructInfo {
-                        name: td.name.clone(),
-                        fields,
-                        methods: HashMap::new(),
-                        parent: td.parent.clone(),
-                    },
-                );
+                self.type_info.structs.get_mut(&td.name).unwrap().fields = fields;
                 self.current_type_name = None;
             }
             TypeDefKind::Enum(edef) => {
                 self.current_type_name = Some(td.name.clone());
+                // Pre-register with empty variants so recursive types can resolve
+                self.type_info.enums.insert(
+                    td.name.clone(),
+                    EnumInfo {
+                        name: td.name.clone(),
+                        variants: Vec::new(),
+                        methods: HashMap::new(),
+                    },
+                );
+                // Now resolve variant field types (can reference own type)
                 let variants: Vec<VariantInfo> = edef
                     .variants
                     .iter()
@@ -734,14 +747,7 @@ impl TypeChecker {
                         })
                     })
                     .collect::<Result<_, String>>()?;
-                self.type_info.enums.insert(
-                    td.name.clone(),
-                    EnumInfo {
-                        name: td.name.clone(),
-                        variants,
-                        methods: HashMap::new(),
-                    },
-                );
+                self.type_info.enums.get_mut(&td.name).unwrap().variants = variants;
                 self.current_type_name = None;
             }
             TypeDefKind::Alias(ty) => {
@@ -2387,6 +2393,12 @@ impl TypeChecker {
         // Optional to string (displays "nil" or the inner value)
         if matches!(from, Type::Optional(_)) && *to == Type::String {
             return Ok(());
+        }
+        // Optional unwrap: T? as T (panics on nil)
+        if let Type::Optional(inner) = from {
+            if self.is_assignable(inner, to) {
+                return Ok(());
+            }
         }
         // Enum/Struct/Error to string (display representation)
         if matches!(
