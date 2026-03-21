@@ -1819,3 +1819,67 @@ fn main(stdout: Stdout) {
         &["3", "true", "1,2,3"],
     );
 }
+
+// ==================== Closures ====================
+
+#[test]
+fn test_closure_captures_variable() {
+    run_expect_output(
+        r#"
+fn main(stdout: Stdout) {
+    let x = 10
+    let add_x = fn(n: i64) -> i64 { return n + x }
+    stdout.println(add_x(5) as string)
+    stdout.println(add_x(20) as string)
+}
+"#,
+        &["15", "30"],
+    );
+}
+
+#[test]
+fn test_closure_multiple_captures() {
+    run_expect_output(
+        r#"
+fn main(stdout: Stdout) {
+    let a = 10
+    let b = 20
+    let sum = fn(x: i64) -> i64 { return x + a + b }
+    stdout.println(sum(5) as string)
+}
+"#,
+        &["35"],
+    );
+}
+
+#[test]
+fn test_closure_as_callback() {
+    run_expect_output(
+        r#"
+fn apply(f: fn(i64) -> i64, x: i64) -> i64 { return f(x) }
+fn main(stdout: Stdout) {
+    let factor = 3
+    let mul = fn(x: i64) -> i64 { return x * factor }
+    stdout.println(apply(mul, 7) as string)
+}
+"#,
+        &["21"],
+    );
+}
+
+#[test]
+fn test_nested_closure() {
+    run_expect_output(
+        r#"
+fn main(stdout: Stdout) {
+    let x = 10
+    let make_adder = fn(y: i64) -> fn(i64) -> i64 {
+        return fn(z: i64) -> i64 { return x + y + z }
+    }
+    let add15 = make_adder(5)
+    stdout.println(add15(100) as string)
+}
+"#,
+        &["115"],
+    );
+}

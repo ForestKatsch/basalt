@@ -496,16 +496,32 @@ impl VM {
 
                 // === Function Calls ===
                 Op::Call(d, fr, ac) => {
-                    let func_call_idx = reg[fr as usize].as_int() as usize;
+                    let func_val = &reg[fr as usize];
                     let mut args = Vec::with_capacity(ac as usize);
                     let start = fr as usize + 1;
                     for i in 0..ac as usize {
                         args.push(reg[start + i].clone());
                     }
-                    if func_call_idx < self.program.functions.len() {
-                        reg[d as usize] = self.call_function(func_call_idx, &args)?;
+
+                    // Check if calling a closure or a plain function index
+                    if let Some(href) = func_val.as_heap_ref() {
+                        let obj = href.borrow();
+                        if let HeapObject::Closure(closure) = &*obj {
+                            let func_idx = closure.func_idx;
+                            let mut full_args = closure.captures.clone();
+                            full_args.extend(args);
+                            drop(obj);
+                            reg[d as usize] = self.call_function(func_idx, &full_args)?;
+                        } else {
+                            return Err("cannot call non-function value".to_string());
+                        }
                     } else {
-                        reg[d as usize] = Value::Nil;
+                        let func_call_idx = func_val.as_int() as usize;
+                        if func_call_idx < self.program.functions.len() {
+                            reg[d as usize] = self.call_function(func_call_idx, &args)?;
+                        } else {
+                            reg[d as usize] = Value::Nil;
+                        }
                     }
                 }
                 Op::Return(r) => {
@@ -788,6 +804,17 @@ impl VM {
                         }
                         _ => return Err("IterNextKV requires array or map iterator".to_string()),
                     }
+                }
+
+                // === Closures ===
+                Op::MakeClosure(d, func_reg, capture_count) => {
+                    let func_idx = reg[func_reg as usize].as_int() as usize;
+                    let cap_start = func_reg as usize + 1;
+                    let mut captures = Vec::with_capacity(capture_count as usize);
+                    for i in 0..capture_count as usize {
+                        captures.push(reg[cap_start + i].clone());
+                    }
+                    reg[d as usize] = Value::closure(func_idx, captures);
                 }
 
                 // === Display ===

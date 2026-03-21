@@ -37,6 +37,13 @@ pub enum HeapObject {
     Error(Box<Value>),
     Range(i64, i64),
     Iterator(IterState),
+    Closure(ClosureObj),
+}
+
+#[derive(Debug, Clone)]
+pub struct ClosureObj {
+    pub func_idx: usize,
+    pub captures: Vec<Value>,
 }
 
 #[derive(Debug, Clone)]
@@ -174,6 +181,13 @@ impl Value {
         Value::Heap(Arc::new(RefCell::new(HeapObject::Error(Box::new(val)))))
     }
 
+    pub fn closure(func_idx: usize, captures: Vec<Value>) -> Value {
+        Value::Heap(Arc::new(RefCell::new(HeapObject::Closure(ClosureObj {
+            func_idx,
+            captures,
+        }))))
+    }
+
     pub fn range(start: i64, end: i64) -> Value {
         Value::Heap(Arc::new(RefCell::new(HeapObject::Range(start, end))))
     }
@@ -244,6 +258,7 @@ impl Value {
                     HeapObject::Enum(e) => format!("{}::variant_{}", e.type_name, e.variant_index),
                     HeapObject::Error(inner) => format!("Error({})", inner.display_as_string()),
                     HeapObject::Range(s, e) => format!("{}..{}", s, e),
+                    HeapObject::Closure(c) => format!("<closure func_{}>", c.func_idx),
                     HeapObject::Iterator(_) => "<iterator>".to_string(),
                 }
             }
