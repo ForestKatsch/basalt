@@ -169,7 +169,10 @@ impl Lexer {
                 }
                 Some('\n') => {
                     self.advance();
-                    if !last_was_newline {
+                    if !last_was_newline
+                        && !Self::continues_on_next_line(tokens.last())
+                        && !self.next_line_continues()
+                    {
                         tokens.push(self.make_token(Token::Newline, line, col));
                         last_was_newline = true;
                     }
@@ -195,6 +198,71 @@ impl Lexer {
         }
 
         Ok(tokens)
+    }
+
+    /// Returns true if the given token at end-of-line implies the expression
+    /// continues on the next line (suppress the newline token).
+    fn continues_on_next_line(last: Option<&SpannedToken>) -> bool {
+        match last {
+            None => false,
+            Some(st) => matches!(
+                st.token,
+                // Binary operators
+                Token::Plus
+                    | Token::Minus
+                    | Token::Star
+                    | Token::Slash
+                    | Token::Percent
+                    | Token::StarStar
+                    | Token::Ampersand
+                    | Token::Pipe
+                    | Token::Caret
+                    | Token::Tilde
+                    | Token::ShiftLeft
+                    | Token::ShiftRight
+                    | Token::AmpAmp
+                    | Token::PipePipe
+                    | Token::EqEq
+                    | Token::BangEq
+                    | Token::Lt
+                    | Token::LtEq
+                    | Token::Gt
+                    | Token::GtEq
+                    | Token::DotDot
+                    // Assignment and arrows
+                    | Token::Eq
+                    | Token::Arrow
+                    | Token::FatArrow
+                    // Punctuation that implies continuation
+                    | Token::Comma
+                    | Token::Dot
+                    | Token::Colon
+                    // Open brackets
+                    | Token::LParen
+                    | Token::LBracket
+                    | Token::LBrace
+            ),
+        }
+    }
+
+    /// Peek ahead (without consuming) to check if the next non-whitespace
+    /// character starts a continuation token (like `.` for method chaining).
+    fn next_line_continues(&self) -> bool {
+        let mut i = self.pos;
+        // Skip whitespace and newlines
+        while i < self.chars.len() {
+            let ch = self.chars[i];
+            if ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n' {
+                i += 1;
+            } else {
+                break;
+            }
+        }
+        if i >= self.chars.len() {
+            return false;
+        }
+        // Check if the next non-whitespace char is a continuation prefix
+        matches!(self.chars[i], '.')
     }
 
     fn skip_whitespace_not_newline(&mut self) {
