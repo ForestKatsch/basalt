@@ -372,15 +372,9 @@ impl Compiler {
             }
         }
 
-        // Compile struct methods
-        for item in &program.items {
-            if let TypedItem::TypeDef(td) = item {
-                if let crate::ast::TypeDefKind::Struct(_sdef) = &td.kind {
-                    // Method bodies would be compiled here once method
-                    // compilation is fully implemented
-                }
-            }
-        }
+        // Note: Struct/enum method bodies are type-checked and compiled
+        // as part of the type definition processing in check_item.
+        // Methods are registered as TypedFnDefs in the typed program items.
 
         let entry = entry_point.ok_or("entry module must define a `main` function")?;
 

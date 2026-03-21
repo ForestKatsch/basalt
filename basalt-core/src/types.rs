@@ -530,6 +530,41 @@ impl TypeChecker {
             typed_items.push(typed);
         }
 
+        // Third pass: type-check and compile method bodies as functions
+        for item in &program.items {
+            if let Item::TypeDef(td) = item {
+                let methods = match &td.kind {
+                    TypeDefKind::Struct(sdef) => &sdef.methods,
+                    TypeDefKind::Enum(edef) => &edef.methods,
+                    _ => continue,
+                };
+                for method in methods {
+                    // Look up the method's registered type info
+                    let method_info = match &td.kind {
+                        TypeDefKind::Struct(_) => self
+                            .type_info
+                            .structs
+                            .get(&td.name)
+                            .and_then(|s| s.methods.get(&method.name))
+                            .cloned(),
+                        TypeDefKind::Enum(_) => self
+                            .type_info
+                            .enums
+                            .get(&td.name)
+                            .and_then(|e| e.methods.get(&method.name))
+                            .cloned(),
+                        _ => None,
+                    };
+                    if let Some(info) = method_info {
+                        self.current_type_name = Some(td.name.clone());
+                        let typed_fn = self.check_method_def(method, &info)?;
+                        self.current_type_name = None;
+                        typed_items.push(TypedItem::Function(typed_fn));
+                    }
+                }
+            }
+        }
+
         Ok(TypedProgram {
             items: typed_items,
             type_info: self.type_info.clone(),
@@ -537,9 +572,16 @@ impl TypeChecker {
     }
 
     fn register_types(&mut self, program: &Program) -> Result<(), String> {
+        // Phase 1: Register type names and fields (no methods yet)
         for item in &program.items {
             if let Item::TypeDef(td) = item {
-                self.register_type_def(td)?;
+                self.register_type_def_skeleton(td)?;
+            }
+        }
+        // Phase 2: Register methods (can now reference all types)
+        for item in &program.items {
+            if let Item::TypeDef(td) = item {
+                self.register_type_def_methods(td)?;
             }
         }
         Ok(())
@@ -657,7 +699,8 @@ impl TypeChecker {
         Ok(())
     }
 
-    fn register_type_def(&mut self, td: &TypeDef) -> Result<(), String> {
+    /// Phase 1: Register type name, fields, and variants (no methods).
+    fn register_type_def_skeleton(&mut self, td: &TypeDef) -> Result<(), String> {
         match &td.kind {
             TypeDefKind::Struct(sdef) => {
                 self.current_type_name = Some(td.name.clone());
@@ -666,6 +709,54 @@ impl TypeChecker {
                     .iter()
                     .map(|f| Ok((f.name.clone(), self.resolve_type_expr(&f.ty)?)))
                     .collect::<Result<_, String>>()?;
+                self.type_info.structs.insert(
+                    td.name.clone(),
+                    StructInfo {
+                        name: td.name.clone(),
+                        fields,
+                        methods: HashMap::new(),
+                        parent: td.parent.clone(),
+                    },
+                );
+                self.current_type_name = None;
+            }
+            TypeDefKind::Enum(edef) => {
+                self.current_type_name = Some(td.name.clone());
+                let variants: Vec<VariantInfo> = edef
+                    .variants
+                    .iter()
+                    .map(|v| {
+                        let fields: Result<Vec<Type>, String> =
+                            v.fields.iter().map(|t| self.resolve_type_expr(t)).collect();
+                        Ok(VariantInfo {
+                            name: v.name.clone(),
+                            fields: fields?,
+                        })
+                    })
+                    .collect::<Result<_, String>>()?;
+                self.type_info.enums.insert(
+                    td.name.clone(),
+                    EnumInfo {
+                        name: td.name.clone(),
+                        variants,
+                        methods: HashMap::new(),
+                    },
+                );
+                self.current_type_name = None;
+            }
+            TypeDefKind::Alias(ty) => {
+                let resolved = self.resolve_type_expr(ty)?;
+                self.type_info.aliases.insert(td.name.clone(), resolved);
+            }
+        }
+        Ok(())
+    }
+
+    /// Phase 2: Register methods on already-registered types.
+    fn register_type_def_methods(&mut self, td: &TypeDef) -> Result<(), String> {
+        self.current_type_name = Some(td.name.clone());
+        match &td.kind {
+            TypeDefKind::Struct(sdef) => {
                 let mut methods = HashMap::new();
                 for m in &sdef.methods {
                     let params: Vec<(String, Type)> = m
@@ -690,31 +781,11 @@ impl TypeChecker {
                         },
                     );
                 }
-                self.type_info.structs.insert(
-                    td.name.clone(),
-                    StructInfo {
-                        name: td.name.clone(),
-                        fields,
-                        methods,
-                        parent: td.parent.clone(),
-                    },
-                );
-                self.current_type_name = None;
+                if let Some(info) = self.type_info.structs.get_mut(&td.name) {
+                    info.methods = methods;
+                }
             }
             TypeDefKind::Enum(edef) => {
-                self.current_type_name = Some(td.name.clone());
-                let variants: Vec<VariantInfo> = edef
-                    .variants
-                    .iter()
-                    .map(|v| {
-                        let fields: Result<Vec<Type>, String> =
-                            v.fields.iter().map(|t| self.resolve_type_expr(t)).collect();
-                        Ok(VariantInfo {
-                            name: v.name.clone(),
-                            fields: fields?,
-                        })
-                    })
-                    .collect::<Result<_, String>>()?;
                 let mut methods = HashMap::new();
                 for m in &edef.methods {
                     let params: Vec<(String, Type)> = m
@@ -739,21 +810,13 @@ impl TypeChecker {
                         },
                     );
                 }
-                self.type_info.enums.insert(
-                    td.name.clone(),
-                    EnumInfo {
-                        name: td.name.clone(),
-                        variants,
-                        methods,
-                    },
-                );
-                self.current_type_name = None;
+                if let Some(info) = self.type_info.enums.get_mut(&td.name) {
+                    info.methods = methods;
+                }
             }
-            TypeDefKind::Alias(ty) => {
-                let resolved = self.resolve_type_expr(ty)?;
-                self.type_info.aliases.insert(td.name.clone(), resolved);
-            }
+            TypeDefKind::Alias(_) => {} // No methods on aliases
         }
+        self.current_type_name = None;
         Ok(())
     }
 
@@ -792,7 +855,7 @@ impl TypeChecker {
                 Ok(TypedItem::Function(typed))
             }
             Item::TypeDef(td) => {
-                // Type defs are already registered; just pass through
+                // Type-check method bodies are handled separately
                 Ok(TypedItem::TypeDef(td.clone()))
             }
             Item::Let(decl) => {
@@ -829,6 +892,29 @@ impl TypeChecker {
             name: fdef.name.clone(),
             params: info.params,
             return_type: info.return_type,
+            body,
+        })
+    }
+
+    fn check_method_def(&mut self, method: &FnDef, info: &FuncInfo) -> Result<TypedFnDef, String> {
+        self.push_scope();
+        let old_return = self.current_fn_return.take();
+        self.current_fn_return = Some(info.return_type.clone());
+
+        // Bind parameters
+        for (name, ty) in &info.params {
+            self.define_var(name, ty.clone(), false);
+        }
+
+        let body = self.check_block(&method.body)?;
+
+        self.current_fn_return = old_return;
+        self.pop_scope();
+
+        Ok(TypedFnDef {
+            name: method.name.clone(),
+            params: info.params.clone(),
+            return_type: info.return_type.clone(),
             body,
         })
     }
@@ -1733,6 +1819,11 @@ impl TypeChecker {
         method: &str,
         args: &[Expr],
     ) -> Result<TypedExpr, String> {
+        // If obj is a TypeIdent, this is a static method call: Type.method(args)
+        if let Expr::TypeIdent(type_name) = obj {
+            return self.check_static_method_call(type_name, method, args);
+        }
+
         let typed_obj = self.check_expr(obj)?;
         let mut typed_args = Vec::new();
         for arg in args {

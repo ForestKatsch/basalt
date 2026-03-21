@@ -1552,3 +1552,70 @@ fn main() { f(0) }
         "expected stack overflow error"
     );
 }
+
+// ==================== Struct Methods ====================
+
+#[test]
+fn test_instance_method() {
+    run_expect_output(
+        r#"
+type Counter {
+    count: i64
+    fn increment(self: Self) -> Counter {
+        return Counter { count: self.count + 1 }
+    }
+}
+fn main(stdout: Stdout) {
+    let c = Counter { count: 0 }
+    let c2 = c.increment()
+    let c3 = c2.increment()
+    stdout.println(c3.count as string)
+}
+"#,
+        &["2"],
+    );
+}
+
+#[test]
+fn test_static_method() {
+    run_expect_output(
+        r#"
+type Point {
+    x: f64
+    y: f64
+    fn origin() -> Point {
+        return Point { x: 0.0, y: 0.0 }
+    }
+}
+fn main(stdout: Stdout) {
+    let p = Point.origin()
+    stdout.println(p.x as string)
+    stdout.println(p.y as string)
+}
+"#,
+        &["0.0", "0.0"],
+    );
+}
+
+#[test]
+fn test_method_with_args() {
+    run_expect_output(
+        r#"
+type Vec2 {
+    x: f64
+    y: f64
+    fn add(self: Self, other: Vec2) -> Vec2 {
+        return Vec2 { x: self.x + other.x, y: self.y + other.y }
+    }
+}
+fn main(stdout: Stdout) {
+    let a = Vec2 { x: 1.0, y: 2.0 }
+    let b = Vec2 { x: 3.0, y: 4.0 }
+    let c = a.add(b)
+    stdout.println(c.x as string)
+    stdout.println(c.y as string)
+}
+"#,
+        &["4.0", "6.0"],
+    );
+}
