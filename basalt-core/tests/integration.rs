@@ -382,3 +382,68 @@ fn main() {
     );
     assert!(result.is_err(), "Should have failed: wrong arg count");
 }
+
+// Forward references
+#[test]
+fn test_forward_function_ref() {
+    let result = compile_and_check(
+        r#"
+fn a() -> i64 { return b() }
+fn b() -> i64 { return 42 }
+fn main(stdout: Stdout) { stdout.println(a() as string) }
+"#,
+    );
+    assert!(result.is_ok(), "Failed: {:?}", result.err());
+}
+
+// Match exhaustiveness
+#[test]
+fn test_non_exhaustive_enum_match() {
+    let result = compile_and_check(
+        r#"
+type Color { Red, Green, Blue }
+fn main() {
+    let c = Color.Red
+    match c {
+        Color.Red => return
+    }
+}
+"#,
+    );
+    assert!(result.is_err(), "Should fail: non-exhaustive match");
+}
+
+// Guard divergence
+#[test]
+fn test_guard_must_diverge() {
+    let result = compile_and_check(
+        r#"
+fn main() {
+    guard true else { let x = 1 }
+}
+"#,
+    );
+    assert!(result.is_err(), "Should fail: guard else doesn't diverge");
+}
+
+// Literal range checks
+#[test]
+fn test_u8_range_check() {
+    let result = compile_and_check(
+        r#"
+fn main() { let x: u8 = 256 }
+"#,
+    );
+    assert!(result.is_err(), "Should fail: 256 out of range for u8");
+}
+
+// Reserved keywords
+#[test]
+fn test_reserved_async() {
+    let result = compile_and_check(
+        r#"
+fn main() { let async = 1 }
+"#,
+    );
+    assert!(result.is_err(), "Should fail: async is reserved");
+}

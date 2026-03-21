@@ -1249,3 +1249,306 @@ fn main(stdout: Stdout) {
         &["1,1,3,4,5", "5,4,3,1,1"],
     );
 }
+
+// ==================== Forward References ====================
+
+#[test]
+fn test_forward_function_reference() {
+    run_expect_output(
+        r#"
+fn first(n: i64) -> i64 { return second(n) + 1 }
+fn second(n: i64) -> i64 { return n * 2 }
+fn main(stdout: Stdout) { stdout.println(first(5) as string) }
+"#,
+        &["11"],
+    );
+}
+
+#[test]
+fn test_mutual_recursion() {
+    run_expect_output(
+        r#"
+fn is_even(n: i64) -> bool {
+    if n == 0 { return true }
+    return is_odd(n - 1)
+}
+fn is_odd(n: i64) -> bool {
+    if n == 0 { return false }
+    return is_even(n - 1)
+}
+fn main(stdout: Stdout) {
+    stdout.println(is_even(10) as string)
+    stdout.println(is_odd(7) as string)
+}
+"#,
+        &["true", "true"],
+    );
+}
+
+// ==================== Guard Divergence ====================
+
+#[test]
+fn test_guard_divergence_enforced() {
+    run_expect_compile_error(
+        r#"
+fn main() {
+    guard true else { let x = 1 }
+}
+"#,
+    );
+}
+
+#[test]
+fn test_guard_with_return_ok() {
+    run_expect_output(
+        r#"
+fn check(x: i64, stdout: Stdout) {
+    guard x > 0 else {
+        stdout.println("neg")
+        return
+    }
+    stdout.println("pos")
+}
+fn main(stdout: Stdout) {
+    check(5, stdout)
+    check(-1, stdout)
+}
+"#,
+        &["pos", "neg"],
+    );
+}
+
+// ==================== Literal Range Checks ====================
+
+#[test]
+fn test_u8_literal_in_range() {
+    run_expect_output(
+        r#"
+fn main(stdout: Stdout) {
+    let b: u8 = 255
+    stdout.println(b as string)
+}
+"#,
+        &["255"],
+    );
+}
+
+#[test]
+fn test_u8_literal_out_of_range() {
+    run_expect_compile_error(
+        r#"
+fn main() {
+    let b: u8 = 256
+}
+"#,
+    );
+}
+
+#[test]
+fn test_i8_negative_literal_in_range() {
+    run_expect_output(
+        r#"
+fn main(stdout: Stdout) {
+    let b: i8 = -128
+    stdout.println(b as string)
+}
+"#,
+        &["-128"],
+    );
+}
+
+#[test]
+fn test_i8_negative_literal_out_of_range() {
+    run_expect_compile_error(
+        r#"
+fn main() {
+    let b: i8 = -129
+}
+"#,
+    );
+}
+
+// ==================== Reserved Keywords ====================
+
+#[test]
+fn test_async_reserved() {
+    run_expect_compile_error(
+        r#"
+fn main() {
+    let async = 1
+}
+"#,
+    );
+}
+
+// ==================== Optional as String ====================
+
+#[test]
+fn test_optional_as_string_nil() {
+    run_expect_output(
+        r#"
+fn main(stdout: Stdout) {
+    let x = "hello".find("xyz")
+    stdout.println(x as string)
+}
+"#,
+        &["nil"],
+    );
+}
+
+#[test]
+fn test_optional_as_string_value() {
+    run_expect_output(
+        r#"
+fn main(stdout: Stdout) {
+    let x = "hello world".find("world")
+    stdout.println(x as string)
+}
+"#,
+        &["6"],
+    );
+}
+
+// ==================== String Sort ====================
+
+#[test]
+fn test_string_array_sort() {
+    run_expect_output(
+        r#"
+fn main(stdout: Stdout) {
+    let arr = ["banana", "apple", "cherry"]
+    arr.sort()
+    stdout.println(arr.join(", "))
+}
+"#,
+        &["apple, banana, cherry"],
+    );
+}
+
+// ==================== Array Bounds ====================
+
+#[test]
+fn test_array_insert_out_of_bounds() {
+    run_expect_panic(
+        r#"
+fn main() {
+    let arr = [1, 2, 3]
+    arr.insert(99, 42)
+}
+"#,
+        "insert index 99 out of bounds",
+    );
+}
+
+#[test]
+fn test_array_remove_out_of_bounds() {
+    run_expect_panic(
+        r#"
+fn main() {
+    let arr = [1, 2, 3]
+    arr.remove(5)
+}
+"#,
+        "remove index 5 out of bounds",
+    );
+}
+
+// ==================== Nil as String ====================
+
+#[test]
+fn test_nil_as_string() {
+    run_expect_output(
+        r#"
+fn main(stdout: Stdout) {
+    stdout.println(nil as string)
+}
+"#,
+        &["nil"],
+    );
+}
+
+// ==================== Result Type Chain ====================
+
+#[test]
+fn test_result_try_propagation() {
+    run_expect_output(
+        r#"
+fn step1(x: i64) -> i64!string {
+    if x < 0 { return !("negative") }
+    return x + 10
+}
+fn step2(x: i64) -> i64!string {
+    let v = step1(x)?
+    return v * 2
+}
+fn main(stdout: Stdout) {
+    match step2(5) {
+        !e => stdout.println("err: " + e)
+        v => stdout.println(v as string)
+    }
+    match step2(-1) {
+        !e => stdout.println("err: " + e)
+        v => stdout.println(v as string)
+    }
+}
+"#,
+        &["30", "err: negative"],
+    );
+}
+
+// ==================== Nested Struct Access ====================
+
+#[test]
+fn test_nested_struct_field() {
+    run_expect_output(
+        r#"
+type Inner { val: i64 }
+type Outer { inner: Inner }
+fn main(stdout: Stdout) {
+    let o = Outer { inner: Inner { val: 42 } }
+    stdout.println(o.inner.val as string)
+}
+"#,
+        &["42"],
+    );
+}
+
+// ==================== Security Limits ====================
+
+#[test]
+fn test_string_repeat_bomb() {
+    run_expect_panic(
+        r#"
+fn main() {
+    let x = "A".repeat(999999999)
+}
+"#,
+        "string repeat too large",
+    );
+}
+
+#[test]
+fn test_deep_recursion_caught() {
+    // Run in a thread with extra stack space — debug builds use significant
+    // Rust stack per VM frame, so the host can overflow before our limit.
+    let result = std::thread::Builder::new()
+        .stack_size(8 * 1024 * 1024)
+        .spawn(|| {
+            run_and_capture(
+                r#"
+fn f(n: i64) -> i64 {
+    return f(n + 1)
+}
+fn main() { f(0) }
+"#,
+            )
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+    assert!(result.is_err());
+    assert!(
+        result.unwrap_err().contains("stack overflow"),
+        "expected stack overflow error"
+    );
+}

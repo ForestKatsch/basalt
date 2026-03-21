@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use std::cell::RefCell;
 use std::sync::Arc;
 
-const MAX_CALL_DEPTH: usize = 512;
+const MAX_CALL_DEPTH: usize = 256;
 const MAX_INSTRUCTIONS: u64 = 100_000_000;
 const MAX_STRING_REPEAT: usize = 16 * 1024 * 1024;
 
@@ -105,12 +105,6 @@ impl VM {
         let mut pc = 0;
 
         while pc < code_len {
-            // Instruction budget — checked every 1024 instructions (amortized)
-            self.instruction_count += 1;
-            if self.instruction_count & 0x3FF == 0 && self.instruction_count > MAX_INSTRUCTIONS {
-                return Err("execution limit exceeded".to_string());
-            }
-
             // Copy the instruction out (Op is Copy) to release borrow on self
             let op = self.program.functions[func_idx].code[pc];
             pc += 1;
@@ -462,6 +456,13 @@ impl VM {
 
                 // === Control Flow ===
                 Op::Jump(off) => {
+                    if off <= 0 {
+                        // Backward jump (loop) — check instruction budget
+                        self.instruction_count += 1;
+                        if self.instruction_count > MAX_INSTRUCTIONS {
+                            return Err("execution limit exceeded".to_string());
+                        }
+                    }
                     pc = (pc as i32 + off - 1) as usize;
                 }
                 Op::JumpIfTrue(r, off) => {
