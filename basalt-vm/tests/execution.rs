@@ -1925,3 +1925,117 @@ fn main(stdout: Stdout) {
         &["10", "42", "42"],
     );
 }
+
+// ==================== Union Exhaustiveness ====================
+
+#[test]
+fn test_union_match_exhaustive_ok() {
+    run_expect_output(
+        r#"
+type Val = i64 | f64 | string
+fn describe(v: Val) -> string {
+    match v {
+        is i64 => return "int"
+        is f64 => return "float"
+        is string => return "string"
+    }
+}
+fn main(stdout: Stdout) {
+    stdout.println(describe(42))
+}
+"#,
+        &["int"],
+    );
+}
+
+#[test]
+fn test_union_match_non_exhaustive_error() {
+    run_expect_compile_error(
+        r#"
+type Val = i64 | f64 | string
+fn main() {
+    let v: Val = 42
+    match v {
+        is i64 => return
+    }
+}
+"#,
+    );
+}
+
+// ==================== Newline Continuation ====================
+
+#[test]
+fn test_multiline_binary_op() {
+    run_expect_output(
+        r#"
+fn main(stdout: Stdout) {
+    let x = 1 +
+        2 +
+        3
+    stdout.println(x as string)
+}
+"#,
+        &["6"],
+    );
+}
+
+#[test]
+fn test_multiline_method_chain() {
+    run_expect_output(
+        r#"
+fn main(stdout: Stdout) {
+    let x = "  Hello World  "
+        .trim()
+        .lower()
+    stdout.println(x)
+}
+"#,
+        &["hello world"],
+    );
+}
+
+// ==================== Identity Test ====================
+
+#[test]
+fn test_is_identity_same_object() {
+    run_expect_output(
+        r#"
+fn main(stdout: Stdout) {
+    let a = [1, 2, 3]
+    let b = a
+    stdout.println((a is b) as string)
+}
+"#,
+        &["true"],
+    );
+}
+
+#[test]
+fn test_is_identity_different_objects() {
+    run_expect_output(
+        r#"
+fn main(stdout: Stdout) {
+    let a = [1, 2, 3]
+    let c = [1, 2, 3]
+    stdout.println((a is c) as string)
+    stdout.println((a == c) as string)
+}
+"#,
+        &["false", "true"],
+    );
+}
+
+#[test]
+fn test_is_identity_value_types() {
+    run_expect_output(
+        r#"
+fn main(stdout: Stdout) {
+    let a = 42
+    let b = 42
+    stdout.println((a is b) as string)
+}
+"#,
+        &["true"],
+    );
+}

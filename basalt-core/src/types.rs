@@ -2681,6 +2681,32 @@ impl TypeChecker {
                     );
                 }
             }
+            Type::Union(members) => {
+                let mut covered = vec![false; members.len()];
+                for arm in arms {
+                    if let Pattern::IsType(ty_expr) = &arm.pattern {
+                        if let Ok(resolved) = self.resolve_type_expr(ty_expr) {
+                            for (i, member) in members.iter().enumerate() {
+                                if *member == resolved {
+                                    covered[i] = true;
+                                }
+                            }
+                        }
+                    }
+                }
+                let missing: Vec<String> = members
+                    .iter()
+                    .zip(covered.iter())
+                    .filter(|(_, &c)| !c)
+                    .map(|(t, _)| t.display_name())
+                    .collect();
+                if !missing.is_empty() {
+                    return Err(format!(
+                        "non-exhaustive match on union type: missing type(s) {}",
+                        missing.join(", ")
+                    ));
+                }
+            }
             // For integers, strings, etc. we can't check exhaustiveness
             // without a wildcard, but we don't error — they may use guard/return patterns
             _ => {}
