@@ -18,6 +18,24 @@ pub struct VM {
     stdin_pos: usize,
 }
 
+/// Helper to extract a heap reference, returning a runtime error instead of panicking.
+fn heap_ref<'a>(val: &'a Value, context: &str) -> Result<&'a HeapRef, String> {
+    val.as_heap_ref()
+        .ok_or_else(|| format!("runtime error: expected heap value for {}, got {}", context, val.type_tag()))
+}
+
+/// Helper to extract a heap object and match on it, producing a runtime error on mismatch.
+macro_rules! with_heap {
+    ($val:expr, $ctx:expr, $pat:pat => $body:expr) => {{
+        let href = heap_ref($val, $ctx)?;
+        let obj = href.borrow();
+        match &*obj {
+            $pat => $body,
+            _ => return Err(format!("runtime error: unexpected heap type for {}", $ctx)),
+        }
+    }};
+}
+
 impl VM {
     pub fn new(program: Program) -> Self {
         VM {
@@ -87,6 +105,12 @@ impl VM {
         let mut pc = 0;
 
         while pc < code_len {
+            // Instruction budget — checked every 1024 instructions (amortized)
+            self.instruction_count += 1;
+            if self.instruction_count & 0x3FF == 0 && self.instruction_count > MAX_INSTRUCTIONS {
+                return Err("execution limit exceeded".to_string());
+            }
+
             // Copy the instruction out (Op is Copy) to release borrow on self
             let op = self.program.functions[func_idx].code[pc];
             pc += 1;
@@ -341,14 +365,14 @@ impl VM {
                 }
                 Op::ShiftLeft(d, a, b) => {
                     let shift = reg[b as usize].as_int();
-                    if shift < 0 || shift > 63 {
+                    if !(0..=63).contains(&shift) {
                         return Err(format!("shift amount {} out of range", shift));
                     }
                     reg[d as usize] = Value::int(reg[a as usize].as_int() << shift);
                 }
                 Op::ShiftRight(d, a, b) => {
                     let shift = reg[b as usize].as_int();
-                    if shift < 0 || shift > 63 {
+                    if !(0..=63).contains(&shift) {
                         return Err(format!("shift amount {} out of range", shift));
                     }
                     reg[d as usize] = Value::int(reg[a as usize].as_int() >> shift);
@@ -364,6 +388,18 @@ impl VM {
                         return Err("cannot convert NaN/Infinity to integer".to_string());
                     }
                     reg[d as usize] = Value::int(f as i64);
+                }
+                Op::FloatToIntSafe(d, s) => {
+                    let f = reg[s as usize].as_float();
+                    if f.is_nan()
+                        || f.is_infinite()
+                        || f > i64::MAX as f64
+                        || f < i64::MIN as f64
+                    {
+                        reg[d as usize] = Value::Nil;
+                    } else {
+                        reg[d as usize] = Value::int(f as i64);
+                    }
                 }
                 Op::IntToString(d, s) => {
                     reg[d as usize] = Value::string(reg[s as usize].as_int().to_string());
@@ -515,24 +551,35 @@ impl VM {
                     reg[d as usize] = Value::new_struct(tn, fields);
                 }
                 Op::GetField(d, o, fi) => {
-                    let href = reg[o as usize]
-                        .as_heap_ref()
-                        .expect("GetField on non-heap")
-                        .clone();
+                    let href = heap_ref(&reg[o as usize], "field access")?.clone();
                     let obj = href.borrow();
                     reg[d as usize] = match &*obj {
-                        HeapObject::Struct(s) => s.fields[fi as usize].clone(),
-                        HeapObject::Tuple(vals) => vals[fi as usize].clone(),
-                        _ => panic!("GetField on non-struct/tuple"),
+                        HeapObject::Struct(s) => {
+                            s.fields.get(fi as usize).cloned().ok_or_else(|| {
+                                format!("field index {} out of bounds on struct '{}'", fi, s.type_name)
+                            })?
+                        }
+                        HeapObject::Tuple(vals) => {
+                            vals.get(fi as usize).cloned().ok_or_else(|| {
+                                format!("tuple index {} out of bounds (length {})", fi, vals.len())
+                            })?
+                        }
+                        _ => return Err("field access on non-struct/tuple".to_string()),
                     };
                 }
                 Op::SetField(o, fi, v) => {
                     let value = reg[v as usize].clone();
-                    let href = reg[o as usize].as_heap_ref().expect("SetField on non-heap");
+                    let href = heap_ref(&reg[o as usize], "field assignment")?.clone();
                     let mut obj = href.borrow_mut();
                     match &mut *obj {
-                        HeapObject::Struct(s) => s.fields[fi as usize] = value,
-                        _ => panic!("SetField on non-struct"),
+                        HeapObject::Struct(s) => {
+                            if (fi as usize) < s.fields.len() {
+                                s.fields[fi as usize] = value;
+                            } else {
+                                return Err(format!("field index {} out of bounds", fi));
+                            }
+                        }
+                        _ => return Err("field assignment on non-struct".to_string()),
                     }
                 }
 
@@ -547,25 +594,19 @@ impl VM {
                     reg[d as usize] = Value::new_enum(tn, vi, fields);
                 }
                 Op::GetEnumTag(d, s) => {
-                    let href = reg[s as usize]
-                        .as_heap_ref()
-                        .expect("GetEnumTag on non-heap")
-                        .clone();
-                    let obj = href.borrow();
-                    reg[d as usize] = match &*obj {
-                        HeapObject::Enum(e) => Value::int(e.variant_index as i64),
-                        _ => panic!("GetEnumTag on non-enum"),
-                    };
+                    reg[d as usize] = with_heap!(&reg[s as usize], "enum tag",
+                        HeapObject::Enum(e) => Value::int(e.variant_index as i64));
                 }
                 Op::GetEnumField(d, s, fi) => {
-                    let href = reg[s as usize]
-                        .as_heap_ref()
-                        .expect("GetEnumField on non-heap")
-                        .clone();
+                    let href = heap_ref(&reg[s as usize], "enum field")?.clone();
                     let obj = href.borrow();
                     reg[d as usize] = match &*obj {
-                        HeapObject::Enum(e) => e.fields[fi as usize].clone(),
-                        _ => panic!("GetEnumField on non-enum"),
+                        HeapObject::Enum(e) => {
+                            e.fields.get(fi as usize).cloned().ok_or_else(|| {
+                                format!("enum field index {} out of bounds", fi)
+                            })?
+                        }
+                        _ => return Err("enum field access on non-enum".to_string()),
                     };
                 }
 
@@ -577,30 +618,16 @@ impl VM {
                     self.set_index(&reg[o as usize], &reg[i as usize], reg[v as usize].clone())?;
                 }
                 Op::ArrayLen(d, s) => {
-                    let href = reg[s as usize]
-                        .as_heap_ref()
-                        .expect("ArrayLen on non-heap")
-                        .clone();
-                    let obj = href.borrow();
-                    reg[d as usize] = match &*obj {
-                        HeapObject::Array(v) => Value::int(v.len() as i64),
-                        _ => panic!("ArrayLen on non-array"),
-                    };
+                    reg[d as usize] = with_heap!(&reg[s as usize], "array length",
+                        HeapObject::Array(v) => Value::int(v.len() as i64));
                 }
                 Op::StringLen(d, s) => {
                     let sv = self.val_to_string(&reg[s as usize]);
                     reg[d as usize] = Value::int(sv.chars().count() as i64);
                 }
                 Op::MapLen(d, s) => {
-                    let href = reg[s as usize]
-                        .as_heap_ref()
-                        .expect("MapLen on non-heap")
-                        .clone();
-                    let obj = href.borrow();
-                    reg[d as usize] = match &*obj {
-                        HeapObject::Map(m) => Value::int(m.len() as i64),
-                        _ => panic!("MapLen on non-map"),
-                    };
+                    reg[d as usize] = with_heap!(&reg[s as usize], "map length",
+                        HeapObject::Map(m) => Value::int(m.len() as i64));
                 }
 
                 // === Method Calls ===
@@ -630,14 +657,11 @@ impl VM {
                     reg[d as usize] = Value::error(v);
                 }
                 Op::UnwrapError(d, s) => {
-                    let href = reg[s as usize]
-                        .as_heap_ref()
-                        .expect("UnwrapError on non-heap")
-                        .clone();
+                    let href = heap_ref(&reg[s as usize], "error unwrap")?.clone();
                     let obj = href.borrow();
                     reg[d as usize] = match &*obj {
-                        HeapObject::Error(inner) => (**inner).clone(),
-                        _ => panic!("UnwrapError on non-error"),
+                        HeapObject::Error(inner) => inner.as_ref().clone(),
+                        _ => return Err("unwrap on non-error value".to_string()),
                     };
                 }
                 Op::IsError(d, s) => {
@@ -648,20 +672,20 @@ impl VM {
                 }
 
                 // === Type Testing ===
-                Op::IsType(d, _s, _tid) => {
-                    reg[d as usize] = Value::bool(false); /* TODO */
+                Op::IsType(d, s, tid) => {
+                    let type_name = self.program.type_ids[tid as usize].clone();
+                    reg[d as usize] = Value::bool(value_is_type(&reg[s as usize], &type_name));
                 }
                 Op::IsEnumVariant(d, s, vi) => {
-                    let href = reg[s as usize]
-                        .as_heap_ref()
-                        .expect("IsEnumVariant on non-heap")
-                        .clone();
-                    let obj = href.borrow();
-                    let is_match = match &*obj {
-                        HeapObject::Enum(e) => e.variant_index == vi,
-                        _ => panic!("IsEnumVariant on non-enum"),
+                    let is_match = if let Some(href) = reg[s as usize].as_heap_ref() {
+                        let obj = href.borrow();
+                        match &*obj {
+                            HeapObject::Enum(e) => e.variant_index == vi,
+                            _ => false,
+                        }
+                    } else {
+                        false
                     };
-                    drop(obj);
                     reg[d as usize] = Value::bool(is_match);
                 }
                 // === Range ===
@@ -677,14 +701,11 @@ impl VM {
                         Value::Heap(Arc::new(RefCell::new(HeapObject::Iterator(iter))));
                 }
                 Op::IterNext(vd, dd, ir) => {
-                    let href = reg[ir as usize]
-                        .as_heap_ref()
-                        .expect("IterNext on non-heap")
-                        .clone();
+                    let href = heap_ref(&reg[ir as usize], "iterator next")?.clone();
                     let mut obj = href.borrow_mut();
                     let iter = match &mut *obj {
                         HeapObject::Iterator(iter) => iter,
-                        _ => panic!("IterNext on non-iterator"),
+                        _ => return Err("IterNext on non-iterator".to_string()),
                     };
                     match iter {
                         IterState::Array { values, index } => {
@@ -730,14 +751,11 @@ impl VM {
                     }
                 }
                 Op::IterNextKV(kd, vd, dd, ir) => {
-                    let href = reg[ir as usize]
-                        .as_heap_ref()
-                        .expect("IterNextKV on non-heap")
-                        .clone();
+                    let href = heap_ref(&reg[ir as usize], "iterator next_kv")?.clone();
                     let mut obj = href.borrow_mut();
                     let iter = match &mut *obj {
                         HeapObject::Iterator(iter) => iter,
-                        _ => panic!("IterNextKV on non-iterator"),
+                        _ => return Err("IterNextKV on non-iterator".to_string()),
                     };
                     match iter {
                         IterState::Array { values, index } => {
@@ -764,8 +782,13 @@ impl VM {
                                 reg[dd as usize] = Value::bool(true);
                             }
                         }
-                        _ => panic!("IterNextKV on non-array/map iterator"),
+                        _ => return Err("IterNextKV requires array or map iterator".to_string()),
                     }
+                }
+
+                // === Display ===
+                Op::DisplayToString(d, s) => {
+                    reg[d as usize] = Value::string(reg[s as usize].display_as_string());
                 }
 
                 // === Misc ===
@@ -797,7 +820,7 @@ impl VM {
     }
 
     fn get_index(&self, obj: &Value, idx: &Value) -> Result<Value, String> {
-        let href = obj.as_heap_ref().expect("GetIndex on non-heap");
+        let href = heap_ref(obj, "index access")?;
         let o = href.borrow();
         match &*o {
             HeapObject::Array(vals) => {
@@ -820,12 +843,12 @@ impl VM {
                     .cloned()
                     .ok_or("key not found in map".to_string())
             }
-            _ => panic!("GetIndex on non-indexable value"),
+            _ => Err(format!("cannot index into {}", obj.display_as_string())),
         }
     }
 
     fn set_index(&self, obj: &Value, idx: &Value, val: Value) -> Result<(), String> {
-        let href = obj.as_heap_ref().expect("SetIndex on non-heap");
+        let href = heap_ref(obj, "index assignment")?;
         let mut o = href.borrow_mut();
         match &mut *o {
             HeapObject::Array(vals) => {
@@ -844,12 +867,12 @@ impl VM {
                 entries.insert(key, val);
                 Ok(())
             }
-            _ => panic!("SetIndex on non-indexable value"),
+            _ => Err(format!("cannot index into {}", obj.display_as_string())),
         }
     }
 
     fn create_iterator(&self, val: &Value) -> Result<IterState, String> {
-        let href = val.as_heap_ref().expect("IterInit on non-heap");
+        let href = heap_ref(val, "iteration")?;
         let obj = href.borrow();
         match &*obj {
             HeapObject::Array(v) => Ok(IterState::Array {
@@ -865,11 +888,11 @@ impl VM {
                 chars: s.chars().map(|c| c.to_string()).collect(),
                 index: 0,
             }),
-            HeapObject::Range(s, e) => Ok(IterState::Range {
-                current: *s,
-                end: *e,
+            &HeapObject::Range(s, e) => Ok(IterState::Range {
+                current: s,
+                end: e,
             }),
-            _ => panic!("IterInit on non-iterable value"),
+            _ => Err(format!("cannot iterate over {}", val.display_as_string())),
         }
     }
 
@@ -921,10 +944,19 @@ impl VM {
                     }
                     return Err(format!("unknown method '{}' on '{}'", method, type_name));
                 }
-                _ => panic!("CallMethod on unsupported heap type"),
+                _ => {
+                    return Err(format!(
+                        "cannot call method '{}' on {}",
+                        method,
+                        obj.display_as_string()
+                    ));
+                }
             }
         }
-        panic!("CallMethod on non-heap value for method '{}'", method)
+        Err(format!(
+            "cannot call method '{}' on non-object value",
+            method
+        ))
     }
 
     fn call_capability(&mut self, method: &str, args: &[Value]) -> Result<Value, String> {
@@ -990,14 +1022,14 @@ impl VM {
             )),
             "min" => {
                 let (a, b) = (
-                    args.get(0).map(|v| v.as_float()).unwrap_or(0.0),
+                    args.first().map(|v| v.as_float()).unwrap_or(0.0),
                     args.get(1).map(|v| v.as_float()).unwrap_or(0.0),
                 );
                 Ok(Value::float(a.min(b)))
             }
             "max" => {
                 let (a, b) = (
-                    args.get(0).map(|v| v.as_float()).unwrap_or(0.0),
+                    args.first().map(|v| v.as_float()).unwrap_or(0.0),
                     args.get(1).map(|v| v.as_float()).unwrap_or(0.0),
                 );
                 Ok(Value::float(a.max(b)))
@@ -1032,9 +1064,17 @@ impl VM {
                 }
             }
             "substring" => {
-                let start = args[0].as_int() as usize;
-                let len = args[1].as_int() as usize;
-                Ok(Value::string(s.chars().skip(start).take(len).collect()))
+                let start = args[0].as_int();
+                let len = args[1].as_int();
+                if start < 0 || len < 0 {
+                    return Err(format!(
+                        "substring: start ({}) and length ({}) must be non-negative",
+                        start, len
+                    ));
+                }
+                Ok(Value::string(
+                    s.chars().skip(start as usize).take(len as usize).collect(),
+                ))
             }
             "starts_with" => Ok(Value::bool(s.starts_with(&self.val_to_string(&args[0])))),
             "ends_with" => Ok(Value::bool(s.ends_with(&self.val_to_string(&args[0])))),
@@ -1058,7 +1098,7 @@ impl VM {
                     i += len;
                 }
                 if i < 0 || i >= len {
-                    return Err(format!("char_at index out of bounds"));
+                    return Err("char_at index out of bounds".to_string());
                 }
                 Ok(Value::string(
                     s.chars().nth(i as usize).unwrap().to_string(),
@@ -1091,25 +1131,51 @@ impl VM {
                 }
             }
             "insert" => {
-                let i = args[0].as_int() as usize;
+                let i = args[0].as_int();
                 let mut o = href.borrow_mut();
                 if let HeapObject::Array(v) = &mut *o {
-                    v.insert(i, args[1].clone());
+                    if i < 0 || i as usize > v.len() {
+                        return Err(format!(
+                            "insert index {} out of bounds (length {})",
+                            i,
+                            v.len()
+                        ));
+                    }
+                    v.insert(i as usize, args[1].clone());
                 }
                 Ok(Value::Nil)
             }
             "remove" => {
-                let i = args[0].as_int() as usize;
+                let i = args[0].as_int();
                 let mut o = href.borrow_mut();
                 if let HeapObject::Array(v) = &mut *o {
-                    v.remove(i);
+                    if i < 0 || i as usize >= v.len() {
+                        return Err(format!(
+                            "remove index {} out of bounds (length {})",
+                            i,
+                            v.len()
+                        ));
+                    }
+                    v.remove(i as usize);
                 }
                 Ok(Value::Nil)
             }
             "sort" => {
                 let mut o = href.borrow_mut();
                 if let HeapObject::Array(v) = &mut *o {
-                    v.sort_by(|a, b| a.as_int().cmp(&b.as_int()));
+                    // Determine sort type from first element
+                    let is_string = v.first().is_some_and(|e| {
+                        matches!(e, Value::Heap(h) if matches!(&*h.borrow(), HeapObject::String(_)))
+                    });
+                    if is_string {
+                        v.sort_by(|a, b| {
+                            let sa = a.display_as_string();
+                            let sb = b.display_as_string();
+                            sa.cmp(&sb)
+                        });
+                    } else {
+                        v.sort_by_key(|a| a.as_int());
+                    }
                 }
                 Ok(Value::Nil)
             }
@@ -1301,6 +1367,44 @@ fn narrow_int(val: i64, target: IntType) -> Result<i64, String> {
                 Err(format!("{} out of range for u64", val))
             } else {
                 Ok(val)
+            }
+        }
+    }
+}
+
+fn value_is_type(val: &Value, type_name: &str) -> bool {
+    match type_name {
+        "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" => {
+            matches!(val, Value::Int(_))
+        }
+        "f64" => matches!(val, Value::Float(_)),
+        "bool" => matches!(val, Value::Bool(_)),
+        "nil" => val.is_nil(),
+        "string" => {
+            if let Value::Heap(href) = val {
+                matches!(&*href.borrow(), HeapObject::String(_))
+            } else {
+                false
+            }
+        }
+        name => {
+            // Check for optional type: T?
+            if let Some(inner) = name.strip_suffix('?') {
+                return val.is_nil() || value_is_type(val, inner);
+            }
+            // Struct or enum name
+            if let Value::Heap(href) = val {
+                match &*href.borrow() {
+                    HeapObject::Struct(s) => s.type_name == name,
+                    HeapObject::Enum(e) => e.type_name == name,
+                    HeapObject::Array(_) => name.starts_with('[') && name.ends_with(']'),
+                    HeapObject::Map(..) => name.starts_with('[') && name.contains(':'),
+                    HeapObject::Error(_) => false,
+                    HeapObject::Range(_, _) => name == "Range",
+                    _ => false,
+                }
+            } else {
+                false
             }
         }
     }

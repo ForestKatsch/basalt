@@ -106,7 +106,7 @@ pub struct TypedProgram {
     pub type_info: TypeInfo,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct TypeInfo {
     pub structs: HashMap<String, StructInfo>,
     pub enums: HashMap<String, EnumInfo>,
@@ -177,7 +177,7 @@ pub struct TypedBlock {
 #[derive(Debug, Clone)]
 pub enum TypedStmt {
     Let(TypedLetDecl),
-    Assign(TypedAssignTarget, TypedExpr),
+    Assign(Box<TypedAssignTarget>, Box<TypedExpr>),
     Return(Option<TypedExpr>),
     ReturnError(TypedExpr),
     Break,
@@ -838,14 +838,21 @@ impl TypeChecker {
 
         let ty = if let Some(ref type_expr) = decl.ty {
             let declared = self.resolve_type_expr(type_expr)?;
-            // Check that value is assignable to declared type
-            if !self.is_assignable(&value.ty, &declared) {
+            // Special case: integer literal (or negated literal) assigned to narrow integer type
+            let int_literal_value = Self::extract_int_literal(&value);
+            let is_int_literal_narrowing =
+                int_literal_value.is_some() && value.ty.is_integer() && declared.is_integer();
+            if !is_int_literal_narrowing && !self.is_assignable(&value.ty, &declared) {
                 return Err(format!(
                     "type mismatch in let '{}': expected {}, got {}",
                     decl.name,
                     declared.display_name(),
                     value.ty.display_name()
                 ));
+            }
+            // Compile-time range check for integer literals assigned to narrow types
+            if let Some(n) = int_literal_value {
+                Self::check_int_literal_range(n, &declared, &decl.name)?;
             }
             declared
         } else {
@@ -938,7 +945,7 @@ impl TypeChecker {
                         TypedAssignTarget::Index(typed_obj, typed_idx, elem_ty)
                     }
                 };
-                Ok(TypedStmt::Assign(typed_target, typed_value))
+                Ok(TypedStmt::Assign(Box::new(typed_target), Box::new(typed_value)))
             }
             Stmt::Return(expr) => {
                 if let Some(expr) = expr {
@@ -960,18 +967,13 @@ impl TypeChecker {
             Stmt::ReturnError(expr) => {
                 let typed = self.check_expr(expr)?;
                 // Check that enclosing function returns a result type
-                if let Some(ref ret_ty) = self.current_fn_return {
-                    match ret_ty {
-                        Type::Result(_, err_ty) => {
-                            if !self.is_assignable(&typed.ty, err_ty) {
-                                return Err(format!(
-                                    "error type mismatch: expected {}, got {}",
-                                    err_ty.display_name(),
-                                    typed.ty.display_name()
-                                ));
-                            }
-                        }
-                        _ => {} // Allow for now; will be caught at runtime
+                if let Some(Type::Result(_, err_ty)) = &self.current_fn_return {
+                    if !self.is_assignable(&typed.ty, err_ty) {
+                        return Err(format!(
+                            "error type mismatch: expected {}, got {}",
+                            err_ty.display_name(),
+                            typed.ty.display_name()
+                        ));
                     }
                 }
                 Ok(TypedStmt::ReturnError(typed))
@@ -1428,6 +1430,9 @@ impl TypeChecker {
                     });
                 }
 
+                // Exhaustiveness check for enums and booleans
+                self.check_match_exhaustiveness(&typed_scrutinee.ty, arms)?;
+
                 Ok(TypedExpr {
                     kind: TypedExprKind::Match(Box::new(typed_scrutinee), typed_arms),
                     ty: result_ty.unwrap_or(Type::Nil),
@@ -1516,6 +1521,14 @@ impl TypeChecker {
                     let typed_expr = self.check_expr(expr)?;
                     let typed_else = self.check_block(else_block)?;
 
+                    // The else block MUST diverge (return, break, continue, panic)
+                    if !Self::block_diverges(&typed_else) {
+                        return Err(
+                            "guard else block must diverge (return, break, continue, or panic)"
+                                .to_string(),
+                        );
+                    }
+
                     // Determine unwrapped type
                     let unwrapped_ty = match &typed_expr.ty {
                         Type::Optional(inner) => *inner.clone(),
@@ -1544,6 +1557,15 @@ impl TypeChecker {
                         ));
                     }
                     let typed_else = self.check_block(else_block)?;
+
+                    // The else block MUST diverge
+                    if !Self::block_diverges(&typed_else) {
+                        return Err(
+                            "guard else block must diverge (return, break, continue, or panic)"
+                                .to_string(),
+                        );
+                    }
+
                     Ok(TypedExpr {
                         kind: TypedExprKind::Guard(None, Box::new(typed_cond), typed_else),
                         ty: Type::Nil,
@@ -1763,7 +1785,7 @@ impl TypeChecker {
                 }
                 // Check module structs
                 for mod_info in self.type_info.modules.values() {
-                    if let Some(info) = mod_info.structs.get(name.split('.').last().unwrap_or(name))
+                    if let Some(info) = mod_info.structs.get(name.split('.').next_back().unwrap_or(name))
                     {
                         if let Some(method_info) = info.methods.get(method) {
                             return Ok(method_info.return_type.clone());
@@ -2336,6 +2358,144 @@ impl TypeChecker {
             }
             _ => Err(format!("cannot index into {}", obj_ty.display_name())),
         }
+    }
+
+    /// Extract an integer literal value, including through unary negation.
+    fn extract_int_literal(expr: &TypedExpr) -> Option<i64> {
+        match &expr.kind {
+            TypedExprKind::IntLit(n) => Some(*n),
+            TypedExprKind::UnaryOp(crate::ast::UnaryOp::Neg, inner) => {
+                if let TypedExprKind::IntLit(n) = &inner.kind {
+                    n.checked_neg()
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+
+    /// Check that an integer literal fits within a declared narrow integer type.
+    fn check_int_literal_range(n: i64, ty: &Type, name: &str) -> Result<(), String> {
+        let (min, max): (i64, i64) = match ty {
+            Type::I8 => (i8::MIN as i64, i8::MAX as i64),
+            Type::I16 => (i16::MIN as i64, i16::MAX as i64),
+            Type::I32 => (i32::MIN as i64, i32::MAX as i64),
+            Type::U8 => (0, u8::MAX as i64),
+            Type::U16 => (0, u16::MAX as i64),
+            Type::U32 => (0, u32::MAX as i64),
+            _ => return Ok(()), // i64, u64, or non-integer — no check needed
+        };
+        if n < min || n > max {
+            return Err(format!(
+                "integer literal {} out of range for {} in '{}'",
+                n,
+                ty.display_name(),
+                name
+            ));
+        }
+        Ok(())
+    }
+
+    /// Check whether a block always diverges (return, break, continue, panic).
+    fn block_diverges(block: &TypedBlock) -> bool {
+        if let Some(last) = block.stmts.last() {
+            match last {
+                TypedStmt::Return(_) | TypedStmt::ReturnError(_) | TypedStmt::Break
+                | TypedStmt::Continue => true,
+                TypedStmt::Expr(expr) => matches!(&expr.kind, TypedExprKind::Panic(_)),
+                _ => false,
+            }
+        } else {
+            false
+        }
+    }
+
+    fn check_match_exhaustiveness(
+        &self,
+        scrutinee_ty: &Type,
+        arms: &[MatchArm],
+    ) -> Result<(), String> {
+        // Check if any arm is a catch-all (wildcard or binding)
+        let has_catch_all = arms.iter().any(|arm| {
+            matches!(
+                arm.pattern,
+                Pattern::Wildcard | Pattern::Binding(_)
+            )
+        });
+        if has_catch_all {
+            return Ok(());
+        }
+
+        match scrutinee_ty {
+            Type::Enum(name) => {
+                let enum_info = if let Some(info) = self.type_info.enums.get(name) {
+                    info
+                } else {
+                    return Ok(()); // Unknown enum, skip check
+                };
+                let variant_count = enum_info.variants.len();
+                let mut covered = vec![false; variant_count];
+                for arm in arms {
+                    match &arm.pattern {
+                        Pattern::EnumVariant(_, variant, _)
+                        | Pattern::QualifiedEnumVariant(_, _, variant, _) => {
+                            if let Some(idx) = enum_info
+                                .variants
+                                .iter()
+                                .position(|v| v.name == *variant)
+                            {
+                                covered[idx] = true;
+                            }
+                        }
+                        Pattern::IsEnumVariant(_, variant) => {
+                            if let Some(idx) = enum_info
+                                .variants
+                                .iter()
+                                .position(|v| v.name == *variant)
+                            {
+                                covered[idx] = true;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                let missing: Vec<&str> = enum_info
+                    .variants
+                    .iter()
+                    .zip(covered.iter())
+                    .filter(|(_, &c)| !c)
+                    .map(|(v, _)| v.name.as_str())
+                    .collect();
+                if !missing.is_empty() {
+                    return Err(format!(
+                        "non-exhaustive match on '{}': missing variant(s) {}",
+                        name,
+                        missing.join(", ")
+                    ));
+                }
+            }
+            Type::Bool => {
+                let mut has_true = false;
+                let mut has_false = false;
+                for arm in arms {
+                    match &arm.pattern {
+                        Pattern::BoolLit(true) => has_true = true,
+                        Pattern::BoolLit(false) => has_false = true,
+                        _ => {}
+                    }
+                }
+                if !has_true || !has_false {
+                    return Err(
+                        "non-exhaustive match on bool: missing true or false branch".to_string(),
+                    );
+                }
+            }
+            // For integers, strings, etc. we can't check exhaustiveness
+            // without a wildcard, but we don't error — they may use guard/return patterns
+            _ => {}
+        }
+        Ok(())
     }
 
     fn check_pattern(

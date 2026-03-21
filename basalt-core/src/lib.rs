@@ -65,7 +65,7 @@ fn resolve_imports(program: &mut ast::Program, base_dir: &Path) -> Result<(), St
     
     // Store imported modules in the program
     for (alias, item) in imported_items {
-        program.modules.entry(alias).or_insert_with(Vec::new).push(item);
+        program.modules.entry(alias).or_default().push(item);
     }
     
     Ok(())

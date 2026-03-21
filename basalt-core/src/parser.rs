@@ -9,15 +9,34 @@ pub fn parse(tokens: Vec<SpannedToken>) -> Result<Program, String> {
 
 struct Parser {
     tokens: Vec<Token>,
+    lines: Vec<usize>,
+    cols: Vec<usize>,
     pos: usize,
 }
 
 impl Parser {
     fn new(tokens: Vec<SpannedToken>) -> Self {
+        let lines: Vec<usize> = tokens.iter().map(|st| st.line).collect();
+        let cols: Vec<usize> = tokens.iter().map(|st| st.col).collect();
         Parser {
             tokens: tokens.into_iter().map(|st| st.token).collect(),
+            lines,
+            cols,
             pos: 0,
         }
+    }
+
+    fn current_span(&self) -> (usize, usize) {
+        let idx = self.pos.min(self.lines.len().saturating_sub(1));
+        (
+            self.lines.get(idx).copied().unwrap_or(0),
+            self.cols.get(idx).copied().unwrap_or(0),
+        )
+    }
+
+    fn error(&self, msg: impl std::fmt::Display) -> String {
+        let (line, col) = self.current_span();
+        format!("[line {}:{}] {}", line, col, msg)
     }
 
     fn peek(&self) -> &Token {
@@ -39,21 +58,21 @@ impl Parser {
         if std::mem::discriminant(&tok) == std::mem::discriminant(expected) {
             Ok(())
         } else {
-            Err(format!("expected {:?}, got {:?}", expected, tok))
+            Err(self.error(format!("expected {:?}, got {:?}", expected, tok)))
         }
     }
 
     fn expect_ident(&mut self) -> Result<String, String> {
         match self.advance() {
             Token::Ident(name) => Ok(name),
-            tok => Err(format!("expected identifier, got {:?}", tok)),
+            tok => Err(self.error(format!("expected identifier, got {:?}", tok))),
         }
     }
 
     fn expect_type_ident(&mut self) -> Result<String, String> {
         match self.advance() {
             Token::TypeIdent(name) => Ok(name),
-            tok => Err(format!("expected type identifier, got {:?}", tok)),
+            tok => Err(self.error(format!("expected type identifier, got {:?}", tok))),
         }
     }
 
@@ -71,7 +90,7 @@ impl Parser {
             }
             Token::Eof => Ok(()),
             Token::RBrace => Ok(()), // Allow statements before closing brace
-            tok => Err(format!("expected newline, got {:?}", tok)),
+            tok => Err(self.error(format!("expected newline, got {:?}", tok))),
         }
     }
 
@@ -111,10 +130,10 @@ impl Parser {
                 self.expect_newline_or_eof()?;
                 Ok(Item::Import(imp))
             }
-            tok => Err(format!(
+            tok => Err(self.error(format!(
                 "expected item (fn, type, let, import), got {:?}",
                 tok
-            )),
+            ))),
         }
     }
 
@@ -122,7 +141,7 @@ impl Parser {
         self.expect(&Token::Import)?;
         let path = match self.advance() {
             Token::StringLit(s) => s,
-            tok => return Err(format!("expected string after import, got {:?}", tok)),
+            tok => return Err(self.error(format!("expected string after import, got {:?}", tok))),
         };
         let alias = if *self.peek() == Token::As {
             self.advance();
@@ -238,7 +257,7 @@ impl Parser {
             Token::LBracket => {
                 self.advance();
                 if *self.peek() == Token::RBracket {
-                    return Err("empty array type needs element type: [T]".to_string());
+                    return Err(self.error("empty array type needs element type: [T]"));
                 }
                 let inner = self.parse_type_expr()?;
                 if *self.peek() == Token::Colon {
@@ -295,7 +314,7 @@ impl Parser {
                 };
                 TypeExpr::Function(param_types, Box::new(ret))
             }
-            tok => return Err(format!("expected type, got {:?}", tok)),
+            tok => return Err(self.error(format!("expected type, got {:?}", tok))),
         };
 
         // Check for postfix type operators: ?, !
@@ -408,7 +427,7 @@ impl Parser {
                     }
                     self.skip_newlines();
                 }
-                tok => return Err(format!("unexpected token in type body: {:?}", tok)),
+                tok => return Err(self.error(format!("unexpected token in type body: {:?}", tok))),
             }
         }
 
@@ -431,7 +450,7 @@ impl Parser {
 
         while *self.peek() != Token::RBrace {
             if *self.peek() == Token::Eof {
-                return Err("unterminated block".to_string());
+                return Err(self.error("unterminated block"));
             }
 
             let stmt = self.parse_stmt()?;
@@ -501,7 +520,7 @@ impl Parser {
             Expr::Ident(name) => Ok(AssignTarget::Variable(name)),
             Expr::FieldAccess(obj, field) => Ok(AssignTarget::Field(obj, field)),
             Expr::Index(obj, idx) => Ok(AssignTarget::Index(obj, idx)),
-            _ => Err("invalid assignment target".to_string()),
+            _ => Err(self.error("invalid assignment target")),
         }
     }
 
@@ -885,7 +904,7 @@ impl Parser {
                             self.advance();
                             expr = Expr::FieldAccess(Box::new(expr), idx.to_string());
                         }
-                        tok => return Err(format!("expected field name after '.', got {:?}", tok)),
+                        tok => return Err(self.error(format!("expected field name after '.', got {:?}", tok))),
                     }
                 }
                 Token::LParen => {
@@ -1122,10 +1141,10 @@ impl Parser {
                     self.expect(&Token::RBracket)?;
                     Ok(Expr::ArrayLit(elements))
                 } else {
-                    return Err(format!(
+                    Err(self.error(format!(
                         "expected ',' or ']' in array literal, got {:?}",
                         self.peek()
-                    ));
+                    )))
                 }
             }
             Token::LBrace => {
@@ -1169,7 +1188,7 @@ impl Parser {
             Token::Loop => self.parse_loop_expr(),
             Token::Guard => self.parse_guard_expr(),
             Token::Fn => self.parse_lambda(),
-            tok => Err(format!("unexpected token in expression: {:?}", tok)),
+            tok => Err(self.error(format!("unexpected token in expression: {:?}", tok))),
         }
     }
 
@@ -1372,7 +1391,7 @@ impl Parser {
                         }
                         Ok(Pattern::IsType(ty))
                     }
-                    tok => Err(format!("expected type after 'is', got {:?}", tok)),
+                    tok => Err(self.error(format!("expected type after 'is', got {:?}", tok))),
                 }
             }
             Token::TypeIdent(type_name) => {
@@ -1400,10 +1419,10 @@ impl Parser {
                         Ok(Pattern::EnumVariant(type_name, variant, vec![]))
                     }
                 } else {
-                    Err(format!(
+                    Err(self.error(format!(
                         "expected '.Variant' after type name in pattern, got {:?}",
                         self.peek()
-                    ))
+                    )))
                 }
             }
             Token::Ident(name) => {
@@ -1448,7 +1467,7 @@ impl Parser {
                 }
                 Ok(Pattern::Binding(name))
             }
-            tok => Err(format!("unexpected token in pattern: {:?}", tok)),
+            tok => Err(self.error(format!("unexpected token in pattern: {:?}", tok))),
         }
     }
 

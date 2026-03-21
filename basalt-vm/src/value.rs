@@ -118,7 +118,7 @@ impl Value {
         }
     }
 
-    fn type_tag(&self) -> &'static str {
+    pub fn type_tag(&self) -> &'static str {
         match self {
             Value::Int(_) => "Int",
             Value::Float(_) => "Float",

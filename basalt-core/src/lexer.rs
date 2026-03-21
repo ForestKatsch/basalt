@@ -704,6 +704,12 @@ impl Lexer {
             "true" => Token::True,
             "false" => Token::False,
             "nil" => Token::Nil,
+            "async" | "await" => {
+                return Err(format!(
+                    "'{}' is reserved for future use at line {} col {}",
+                    ident, self.line, self.col
+                ))
+            }
             "_" => Token::Ident("_".to_string()), // wildcard
             _ => Token::Ident(ident),
         };

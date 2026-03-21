@@ -78,6 +78,7 @@ pub enum Op {
     // Type conversions
     IntToFloat(u16, u16),
     FloatToInt(u16, u16),
+    FloatToIntSafe(u16, u16), // dst = float-to-int, nil on NaN/Infinity/overflow
     IntToString(u16, u16),
     FloatToString(u16, u16),
     BoolToString(u16, u16),
@@ -149,6 +150,9 @@ pub enum Op {
     IterInit(u16, u16),             // iter = init_iterator(collection)
     IterNext(u16, u16, u16),        // (value, done) = next(iter), done_reg
     IterNextKV(u16, u16, u16, u16), // (key, value, done) = next(iter)
+
+    // Generic display
+    DisplayToString(u16, u16), // dst = display_as_string(src)
 
     // Panic
     Panic(u16), // panic with message in reg
@@ -351,14 +355,9 @@ impl Compiler {
         // Compile struct methods
         for item in &program.items {
             if let TypedItem::TypeDef(td) = item {
-                match &td.kind {
-                    crate::ast::TypeDefKind::Struct(sdef) => {
-                        for _method in &sdef.methods {
-                            // Method bodies aren't type-checked yet in this pass,
-                            // but we still need to register them
-                        }
-                    }
-                    _ => {}
+                if let crate::ast::TypeDefKind::Struct(_sdef) = &td.kind {
+                    // Method bodies would be compiled here once method
+                    // compilation is fully implemented
                 }
             }
         }
@@ -366,13 +365,13 @@ impl Compiler {
         let entry = entry_point.ok_or("entry module must define a `main` function")?;
 
         Ok(Program {
-            functions: self.functions.clone(),
-            strings: self.strings.clone(),
+            functions: std::mem::take(&mut self.functions),
+            strings: std::mem::take(&mut self.strings),
             entry_point: entry,
-            type_info: self.type_info.clone(),
-            method_names: self.method_names.clone(),
-            type_ids: self.type_ids.clone(),
-            globals: self.globals.clone(),
+            type_info: std::mem::take(&mut self.type_info),
+            method_names: std::mem::take(&mut self.method_names),
+            type_ids: std::mem::take(&mut self.type_ids),
+            globals: std::mem::take(&mut self.globals),
         })
     }
 
@@ -448,7 +447,7 @@ impl Compiler {
             }
             TypedStmt::Assign(target, value) => {
                 let value_reg = self.compile_expr(fc, value)?;
-                match target {
+                match &**target {
                     TypedAssignTarget::Variable(name, _) => {
                         if let Some(&reg) = fc.locals.get(name) {
                             fc.emit(Op::Move(reg, value_reg));
@@ -616,35 +615,38 @@ impl Compiler {
             }
             TypedExprKind::Call(func, args) => {
                 let func_reg = self.compile_expr(fc, func)?;
-                // Compile args and move to consecutive positions after func_reg
                 let mut arg_regs = Vec::new();
                 for arg in args {
                     arg_regs.push(self.compile_expr(fc, arg)?);
                 }
-                // Move args to be consecutive after func_reg
-                for (i, &ar) in arg_regs.iter().enumerate() {
-                    let target = func_reg + 1 + i as u16;
-                    if ar != target {
-                        fc.emit(Op::Move(target, ar));
+                // Allocate a fresh contiguous call frame to avoid clobbering
+                let frame_func = fc.alloc_reg();
+                fc.emit(Op::Move(frame_func, func_reg));
+                for &ar in &arg_regs {
+                    let slot = fc.alloc_reg();
+                    if ar != slot {
+                        fc.emit(Op::Move(slot, ar));
                     }
                 }
                 let dst = fc.alloc_reg();
-                fc.emit(Op::Call(dst, func_reg, args.len() as u8));
+                fc.emit(Op::Call(dst, frame_func, args.len() as u8));
                 Ok(dst)
             }
             TypedExprKind::MethodCall(obj, method, args) => {
                 let obj_reg = self.compile_expr(fc, obj)?;
                 let method_id = self.intern_method(method);
 
-                // Compile args and move to be consecutive after obj_reg
                 let mut arg_regs = Vec::new();
                 for arg in args {
                     arg_regs.push(self.compile_expr(fc, arg)?);
                 }
-                for (i, &ar) in arg_regs.iter().enumerate() {
-                    let target = obj_reg + 1 + i as u16;
-                    if ar != target {
-                        fc.emit(Op::Move(target, ar));
+                // Allocate a fresh contiguous frame: [obj, arg0, arg1, ...]
+                let frame_obj = fc.alloc_reg();
+                fc.emit(Op::Move(frame_obj, obj_reg));
+                for &ar in &arg_regs {
+                    let slot = fc.alloc_reg();
+                    if ar != slot {
+                        fc.emit(Op::Move(slot, ar));
                     }
                 }
 
@@ -655,13 +657,13 @@ impl Compiler {
                     Type::Capability(_) => {
                         fc.emit(Op::CallCapability(
                             dst,
-                            obj_reg,
+                            frame_obj,
                             method_id,
                             args.len() as u8,
                         ));
                     }
                     _ => {
-                        fc.emit(Op::CallMethod(dst, obj_reg, method_id, args.len() as u8));
+                        fc.emit(Op::CallMethod(dst, frame_obj, method_id, args.len() as u8));
                     }
                 }
                 Ok(dst)
@@ -673,35 +675,68 @@ impl Compiler {
                     let r = self.compile_expr(fc, arg)?;
                     arg_regs.push(r);
                 }
+                // Allocate a fresh contiguous frame for args
+                let frame_start = fc.alloc_reg(); // placeholder for obj/func slot
+                fc.emit(Op::LoadNil(frame_start));
+                for &ar in &arg_regs {
+                    let slot = fc.alloc_reg();
+                    if ar != slot {
+                        fc.emit(Op::Move(slot, ar));
+                    }
+                }
 
                 let dst = fc.alloc_reg();
                 let method_id = self.intern_method(&format!("{}.{}", type_name, method));
-                fc.emit(Op::CallMethod(dst, 0, method_id, args.len() as u8));
+                fc.emit(Op::CallMethod(dst, frame_start, method_id, args.len() as u8));
                 Ok(dst)
             }
             TypedExprKind::ArrayLit(elems) => {
-                let start_reg = fc.registers;
+                let mut elem_regs = Vec::new();
                 for elem in elems {
-                    self.compile_expr(fc, elem)?;
+                    elem_regs.push(self.compile_expr(fc, elem)?);
+                }
+                // Move to consecutive registers
+                let start_reg = fc.registers;
+                for &er in &elem_regs {
+                    let slot = fc.alloc_reg();
+                    if er != slot {
+                        fc.emit(Op::Move(slot, er));
+                    }
                 }
                 let dst = fc.alloc_reg();
                 fc.emit(Op::MakeArray(dst, start_reg, elems.len() as u16));
                 Ok(dst)
             }
             TypedExprKind::MapLit(entries) => {
-                let start_reg = fc.registers;
+                let mut kv_regs = Vec::new();
                 for (key, val) in entries {
-                    self.compile_expr(fc, key)?;
-                    self.compile_expr(fc, val)?;
+                    kv_regs.push(self.compile_expr(fc, key)?);
+                    kv_regs.push(self.compile_expr(fc, val)?);
+                }
+                // Move to consecutive registers (key0, val0, key1, val1, ...)
+                let start_reg = fc.registers;
+                for &r in &kv_regs {
+                    let slot = fc.alloc_reg();
+                    if r != slot {
+                        fc.emit(Op::Move(slot, r));
+                    }
                 }
                 let dst = fc.alloc_reg();
                 fc.emit(Op::MakeMap(dst, start_reg, entries.len() as u16));
                 Ok(dst)
             }
             TypedExprKind::TupleLit(elems) => {
-                let start_reg = fc.registers;
+                let mut elem_regs = Vec::new();
                 for elem in elems {
-                    self.compile_expr(fc, elem)?;
+                    elem_regs.push(self.compile_expr(fc, elem)?);
+                }
+                // Move to consecutive registers
+                let start_reg = fc.registers;
+                for &er in &elem_regs {
+                    let slot = fc.alloc_reg();
+                    if er != slot {
+                        fc.emit(Op::Move(slot, er));
+                    }
                 }
                 let dst = fc.alloc_reg();
                 fc.emit(Op::MakeTuple(dst, start_reg, elems.len() as u16));
@@ -709,12 +744,19 @@ impl Compiler {
             }
             TypedExprKind::StructLit(type_name, fields) => {
                 let type_id = self.intern_type(type_name);
-                let _start_reg = fc.registers;
-                // Compile fields in order of declaration
+                // Compile field expressions first, collecting result registers
                 let field_order = self.get_field_order(type_name);
+                let mut field_regs = Vec::new();
                 for field_name in &field_order {
                     if let Some((_, expr)) = fields.iter().find(|(n, _)| n == field_name) {
-                        self.compile_expr(fc, expr)?;
+                        field_regs.push(self.compile_expr(fc, expr)?);
+                    }
+                }
+                // Move to consecutive registers right before dst
+                for &fr in &field_regs {
+                    let slot = fc.alloc_reg();
+                    if fr != slot {
+                        fc.emit(Op::Move(slot, fr));
                     }
                 }
                 let dst = fc.alloc_reg();
@@ -724,9 +766,16 @@ impl Compiler {
             TypedExprKind::EnumVariant(type_name, variant, args) => {
                 let type_id = self.intern_type(type_name);
                 let variant_idx = self.get_variant_index(type_name, variant)?;
-                let _start_reg = fc.registers;
+                // Compile args, then move to consecutive registers before dst
+                let mut arg_regs = Vec::new();
                 for arg in args {
-                    self.compile_expr(fc, arg)?;
+                    arg_regs.push(self.compile_expr(fc, arg)?);
+                }
+                for &ar in &arg_regs {
+                    let slot = fc.alloc_reg();
+                    if ar != slot {
+                        fc.emit(Op::Move(slot, ar));
+                    }
                 }
                 let dst = fc.alloc_reg();
                 fc.emit(Op::MakeEnum(dst, type_id, variant_idx, args.len() as u8));
@@ -920,7 +969,7 @@ impl Compiler {
                 let dst = fc.alloc_reg();
                 match target {
                     IsTarget::Type(ty_expr) => {
-                        let type_name = format!("{:?}", ty_expr);
+                        let type_name = canonical_type_name(ty_expr);
                         let type_id = self.intern_type(&type_name);
                         fc.emit(Op::IsType(dst, src, type_id));
                     }
@@ -1256,7 +1305,7 @@ impl Compiler {
                 Ok(Some(jump))
             }
             Pattern::IsType(ty_expr) => {
-                let type_name = format!("{:?}", ty_expr);
+                let type_name = canonical_type_name(ty_expr);
                 let type_id = self.intern_type(&type_name);
                 let cmp_reg = fc.alloc_reg();
                 fc.emit(Op::IsType(cmp_reg, scrutinee_reg, type_id));
@@ -1415,9 +1464,16 @@ impl Compiler {
                             fc.emit(Op::BoolToString(str_reg, reg));
                             str_reg
                         }
-                        _ => {
+                        Type::Nil => {
                             let str_reg = fc.alloc_reg();
-                            fc.emit(Op::IntToString(str_reg, reg));
+                            let idx = self.intern_string("nil");
+                            fc.emit(Op::LoadString(str_reg, idx));
+                            str_reg
+                        }
+                        _ => {
+                            // Generic display for structs, enums, etc.
+                            let str_reg = fc.alloc_reg();
+                            fc.emit(Op::DisplayToString(str_reg, reg));
                             str_reg
                         }
                     }
@@ -1451,7 +1507,7 @@ impl Compiler {
             }
             (Type::F64, t) if t.is_integer() => {
                 if safe {
-                    fc.emit(Op::FloatToInt(dst, src)); // TODO: safe version
+                    fc.emit(Op::FloatToIntSafe(dst, src));
                 } else {
                     fc.emit(Op::FloatToInt(dst, src));
                 }
@@ -1464,6 +1520,10 @@ impl Compiler {
             }
             (Type::Bool, Type::String) => {
                 fc.emit(Op::BoolToString(dst, src));
+            }
+            (Type::Nil, Type::String) => {
+                let idx = self.intern_string("nil");
+                fc.emit(Op::LoadString(dst, idx));
             }
             (Type::String, t) if t.is_integer() => {
                 if safe {
@@ -1561,6 +1621,42 @@ impl Compiler {
             }
         }
         Err(format!("unknown variant '{}.{}'", type_name, variant))
+    }
+}
+
+fn canonical_type_name(ty: &crate::ast::TypeExpr) -> String {
+    use crate::ast::TypeExpr;
+    match ty {
+        TypeExpr::Named(n) => n.clone(),
+        TypeExpr::Qualified(m, n) => format!("{}.{}", m, n),
+        TypeExpr::Array(inner) => format!("[{}]", canonical_type_name(inner)),
+        TypeExpr::Map(k, v) => format!("[{}: {}]", canonical_type_name(k), canonical_type_name(v)),
+        TypeExpr::Tuple(ts) => format!(
+            "({})",
+            ts.iter()
+                .map(canonical_type_name)
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        TypeExpr::Optional(inner) => format!("{}?", canonical_type_name(inner)),
+        TypeExpr::Result(ok, err) => {
+            format!("{}!{}", canonical_type_name(ok), canonical_type_name(err))
+        }
+        TypeExpr::Function(params, ret) => format!(
+            "fn({}) -> {}",
+            params
+                .iter()
+                .map(canonical_type_name)
+                .collect::<Vec<_>>()
+                .join(", "),
+            canonical_type_name(ret)
+        ),
+        TypeExpr::Union(ms) => ms
+            .iter()
+            .map(canonical_type_name)
+            .collect::<Vec<_>>()
+            .join(" | "),
+        TypeExpr::SelfType => "Self".to_string(),
     }
 }
 
