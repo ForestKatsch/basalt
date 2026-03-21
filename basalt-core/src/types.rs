@@ -1084,6 +1084,14 @@ impl TypeChecker {
             }
             Stmt::Expr(expr) => {
                 let typed = self.check_expr(expr)?;
+                // Spec: "Errors cannot be silently ignored."
+                // Result types used as expression statements must be consumed.
+                if let Type::Result(_, _) = &typed.ty {
+                    return Err(
+                        "result type must be used: assign to a variable, match, or use '?'"
+                            .to_string(),
+                    );
+                }
                 Ok(TypedStmt::Expr(typed))
             }
         }

@@ -579,6 +579,7 @@ impl Compiler {
                             fc.emit(Op::NegFloat(dst, src));
                         } else {
                             fc.emit(Op::NegInt(dst, src));
+                            Self::emit_narrow_check(fc, dst, &expr.ty);
                         }
                     }
                     UnaryOp::Not => {
@@ -1054,7 +1055,7 @@ impl Compiler {
         left: &TypedExpr,
         op: &BinOp,
         right: &TypedExpr,
-        _result_ty: &Type,
+        result_ty: &Type,
     ) -> Result<u16, String> {
         // Short-circuit for && and ||
         match op {
@@ -1208,7 +1209,28 @@ impl Compiler {
             BinOp::And | BinOp::Or => unreachable!("handled above"),
         };
 
+        // Narrow integer range check: if the result type is a narrow integer,
+        // the spec requires overflow to panic. The i64 arithmetic may have
+        // produced a value outside the narrow type's range.
+        Self::emit_narrow_check(fc, dst, result_ty);
+
         Ok(dst)
+    }
+
+    /// If `ty` is a narrow integer type (not i64), emit IntNarrow to enforce
+    /// the type's range. This is a no-op for i64, f64, bool, etc.
+    fn emit_narrow_check(fc: &mut FnCompiler, reg: u16, ty: &Type) {
+        let int_ty = match ty {
+            Type::I8 => IntType::I8,
+            Type::I16 => IntType::I16,
+            Type::I32 => IntType::I32,
+            Type::U8 => IntType::U8,
+            Type::U16 => IntType::U16,
+            Type::U32 => IntType::U32,
+            Type::U64 => IntType::U64,
+            _ => return, // i64, f64, bool, etc. — no narrowing needed
+        };
+        fc.emit(Op::IntNarrow(reg, reg, int_ty));
     }
 
     fn compile_match(

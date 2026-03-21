@@ -1619,3 +1619,96 @@ fn main(stdout: Stdout) {
         &["4.0", "6.0"],
     );
 }
+
+// ==================== Integer Type Soundness ====================
+// The spec says: "Integer arithmetic uses checked operations —
+// overflow is a runtime panic." For narrow types, exceeding the
+// type's range IS overflow.
+
+#[test]
+fn test_u8_overflow_panics() {
+    run_expect_panic(
+        r#"
+fn main() {
+    let a: u8 = 200
+    let b: u8 = 200
+    let c = a + b
+}
+"#,
+        "out of range",
+    );
+}
+
+#[test]
+fn test_u8_subtraction_underflow_panics() {
+    run_expect_panic(
+        r#"
+fn main() {
+    let a: u8 = 10
+    let b: u8 = 20
+    let c = a - b
+}
+"#,
+        "out of range",
+    );
+}
+
+#[test]
+fn test_i8_overflow_panics() {
+    run_expect_panic(
+        r#"
+fn main() {
+    let a: i8 = 100
+    let b: i8 = 100
+    let c = a + b
+}
+"#,
+        "out of range",
+    );
+}
+
+#[test]
+fn test_u8_arithmetic_in_range_ok() {
+    run_expect_output(
+        r#"
+fn main(stdout: Stdout) {
+    let a: u8 = 100
+    let b: u8 = 55
+    let c = a + b
+    stdout.println(c as string)
+}
+"#,
+        &["155"],
+    );
+}
+
+#[test]
+fn test_i16_multiply_overflow() {
+    run_expect_panic(
+        r#"
+fn main() {
+    let a: i16 = 200
+    let b: i16 = 200
+    let c = a * b
+}
+"#,
+        "out of range",
+    );
+}
+
+// ==================== Result Type Must Be Used ====================
+// The spec says: "Errors cannot be silently ignored."
+
+#[test]
+fn test_unused_result_is_error() {
+    run_expect_compile_error(
+        r#"
+fn might_fail() -> i64!string {
+    return 42
+}
+fn main() {
+    might_fail()
+}
+"#,
+    );
+}
