@@ -1992,6 +1992,13 @@ impl TypeChecker {
                 if args.len() != 1 {
                     return Err("push takes 1 argument".to_string());
                 }
+                if !self.is_assignable(&args[0].ty, elem_ty) {
+                    return Err(format!(
+                        "push type mismatch: array is [{}], got {}",
+                        elem_ty.display_name(),
+                        args[0].ty.display_name()
+                    ));
+                }
                 Ok(Type::Nil)
             }
             "pop" => {
