@@ -1012,6 +1012,7 @@ impl TypeChecker {
                         TypedAssignTarget::Variable(name.clone(), var_ty)
                     }
                     AssignTarget::Field(obj, field) => {
+                        self.check_mutable_target(obj, "assign to field")?;
                         let typed_obj = self.check_expr(obj)?;
                         let field_ty = self.get_field_type(&typed_obj.ty, field)?;
                         if !self.is_assignable(&typed_value.ty, &field_ty) {
@@ -1024,6 +1025,7 @@ impl TypeChecker {
                         TypedAssignTarget::Field(typed_obj, field.clone(), field_ty)
                     }
                     AssignTarget::Index(obj, idx) => {
+                        self.check_mutable_target(obj, "assign to index")?;
                         let typed_obj = self.check_expr(obj)?;
                         let typed_idx = self.check_expr(idx)?;
                         let elem_ty = self.get_index_type(&typed_obj.ty, &typed_idx.ty)?;
@@ -1847,6 +1849,11 @@ impl TypeChecker {
             return self.check_static_method_call(type_name, method, args);
         }
 
+        // Check mutability for mutating methods
+        if is_mutating_method(method) {
+            self.check_mutable_target(obj, &format!("call mutating method '{}'", method))?;
+        }
+
         let typed_obj = self.check_expr(obj)?;
         let mut typed_args = Vec::new();
         for arg in args {
@@ -2499,6 +2506,31 @@ impl TypeChecker {
         }
     }
 
+    /// Check that the root variable of an expression is mutable.
+    /// Returns Ok(()) if mutable or if the expression has no named root (e.g. function return).
+    /// Returns Err if the root variable is immutable.
+    fn check_mutable_target(&self, expr: &Expr, action: &str) -> Result<(), String> {
+        match expr {
+            Expr::Ident(name) => {
+                if let Some((_, mutable)) = self.lookup_var(name) {
+                    if !mutable {
+                        return Err(format!(
+                            "cannot {} on immutable binding '{}' (declare with 'let mut')",
+                            action, name
+                        ));
+                    }
+                }
+                Ok(())
+            }
+            Expr::FieldAccess(inner, _) | Expr::Index(inner, _) => {
+                self.check_mutable_target(inner, action)
+            }
+            // For method call returns, function returns, etc. — allow mutation
+            // (the value is a temporary, not bound to any variable)
+            _ => Ok(()),
+        }
+    }
+
     /// Extract an integer literal value, including through unary negation.
     fn extract_int_literal(expr: &TypedExpr) -> Option<i64> {
         match &expr.kind {
@@ -2717,4 +2749,12 @@ impl TypeChecker {
 
         Ok((bindings, pattern.clone()))
     }
+}
+
+/// Methods that mutate the receiver object in place.
+fn is_mutating_method(name: &str) -> bool {
+    matches!(
+        name,
+        "push" | "pop" | "insert" | "remove" | "sort" | "reverse"
+    )
 }

@@ -578,7 +578,7 @@ fn test_array_push_pop() {
     run_expect_output(
         r#"
 fn main(stdout: Stdout) {
-    let arr = [1, 2, 3]
+    let mut arr = [1, 2, 3]
     arr.push(4)
     stdout.println(arr.length as string)
     let last = arr.pop()
@@ -595,8 +595,8 @@ fn test_array_reference_semantics() {
     run_expect_output(
         r#"
 fn main(stdout: Stdout) {
-    let a = [1, 2, 3]
-    let b = a
+    let mut a = [1, 2, 3]
+    let mut b = a
     b.push(4)
     stdout.println(a.length as string)
 }
@@ -611,7 +611,7 @@ fn test_array_clone() {
         r#"
 fn main(stdout: Stdout) {
     let a = [1, 2, 3]
-    let b = a.clone()
+    let mut b = a.clone()
     b.push(4)
     stdout.println(a.length as string)
     stdout.println(b.length as string)
@@ -1047,7 +1047,7 @@ fn test_struct_field_assignment() {
         r#"
 type Point { x: f64, y: f64 }
 fn main(stdout: Stdout) {
-    let p = Point { x: 1.0, y: 2.0 }
+    let mut p = Point { x: 1.0, y: 2.0 }
     p.x = 10.0
     stdout.println(p.x as string)
 }
@@ -1224,7 +1224,7 @@ fn test_map_set_and_get() {
     run_expect_output(
         r#"
 fn main(stdout: Stdout) {
-    let m = {"a": 1, "b": 2}
+    let mut m = {"a": 1, "b": 2}
     m["c"] = 3
     stdout.println(m.length as string)
     stdout.println(m["c"] as string)
@@ -1239,7 +1239,7 @@ fn test_array_sort_reverse() {
     run_expect_output(
         r#"
 fn main(stdout: Stdout) {
-    let arr = [3, 1, 4, 1, 5]
+    let mut arr = [3, 1, 4, 1, 5]
     arr.sort()
     stdout.println(arr.join(","))
     arr.reverse()
@@ -1416,7 +1416,7 @@ fn test_string_array_sort() {
     run_expect_output(
         r#"
 fn main(stdout: Stdout) {
-    let arr = ["banana", "apple", "cherry"]
+    let mut arr = ["banana", "apple", "cherry"]
     arr.sort()
     stdout.println(arr.join(", "))
 }
@@ -1432,7 +1432,7 @@ fn test_array_insert_out_of_bounds() {
     run_expect_panic(
         r#"
 fn main() {
-    let arr = [1, 2, 3]
+    let mut arr = [1, 2, 3]
     arr.insert(99, 42)
 }
 "#,
@@ -1445,7 +1445,7 @@ fn test_array_remove_out_of_bounds() {
     run_expect_panic(
         r#"
 fn main() {
-    let arr = [1, 2, 3]
+    let mut arr = [1, 2, 3]
     arr.remove(5)
 }
 "#,
@@ -1710,5 +1710,112 @@ fn main() {
     might_fail()
 }
 "#,
+    );
+}
+
+// ==================== Mut Gates All Mutation ====================
+
+#[test]
+fn test_immutable_array_push_rejected() {
+    run_expect_compile_error(
+        r#"
+fn main() {
+    let arr = [1, 2, 3]
+    arr.push(4)
+}
+"#,
+    );
+}
+
+#[test]
+fn test_mutable_array_push_ok() {
+    run_expect_output(
+        r#"
+fn main(stdout: Stdout) {
+    let mut arr = [1, 2, 3]
+    arr.push(4)
+    stdout.println(arr.length as string)
+}
+"#,
+        &["4"],
+    );
+}
+
+#[test]
+fn test_immutable_field_assign_rejected() {
+    run_expect_compile_error(
+        r#"
+type Point { x: f64, y: f64 }
+fn main() {
+    let p = Point { x: 1.0, y: 2.0 }
+    p.x = 3.0
+}
+"#,
+    );
+}
+
+#[test]
+fn test_mutable_field_assign_ok() {
+    run_expect_output(
+        r#"
+type Point { x: f64, y: f64 }
+fn main(stdout: Stdout) {
+    let mut p = Point { x: 1.0, y: 2.0 }
+    p.x = 3.0
+    stdout.println(p.x as string)
+}
+"#,
+        &["3.0"],
+    );
+}
+
+#[test]
+fn test_immutable_index_assign_rejected() {
+    run_expect_compile_error(
+        r#"
+fn main() {
+    let arr = [1, 2, 3]
+    arr[0] = 99
+}
+"#,
+    );
+}
+
+#[test]
+fn test_immutable_map_assign_rejected() {
+    run_expect_compile_error(
+        r#"
+fn main() {
+    let m = {"a": 1}
+    m["b"] = 2
+}
+"#,
+    );
+}
+
+#[test]
+fn test_immutable_array_sort_rejected() {
+    run_expect_compile_error(
+        r#"
+fn main() {
+    let arr = [3, 1, 2]
+    arr.sort()
+}
+"#,
+    );
+}
+
+#[test]
+fn test_immutable_array_read_ok() {
+    run_expect_output(
+        r#"
+fn main(stdout: Stdout) {
+    let arr = [1, 2, 3]
+    stdout.println(arr.length as string)
+    stdout.println(arr.contains(2) as string)
+    stdout.println(arr.join(","))
+}
+"#,
+        &["3", "true", "1,2,3"],
     );
 }

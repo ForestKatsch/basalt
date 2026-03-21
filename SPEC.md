@@ -414,13 +414,13 @@ let a = 42
 let mut b = a
 b = 43              // a is still 42
 
-// Reference type — shared
-let a = [1, 2, 3]
-let b = a
+// Reference type — shared (mut required for mutation)
+let mut a = [1, 2, 3]
+let mut b = a
 b.push(4)           // a is now [1, 2, 3, 4] (same object)
 
 // Explicit copy
-let c = a.clone()
+let mut c = a.clone()
 c.push(5)           // a is unaffected
 ```
 
@@ -815,8 +815,10 @@ let name: string = "basalt"     // immutable, type annotated
 let mut counter = 0              // mutable
 ```
 
-Variables are immutable by default. The `mut` keyword allows reassignment.
-All variables must be initialized at declaration.
+Variables are immutable by default. The `mut` keyword allows reassignment
+**and mutation**. Without `mut`, you cannot reassign the variable, assign to
+its fields or indices, or call mutating methods (`push`, `pop`, `sort`, etc.)
+on it. All variables must be initialized at declaration.
 
 ### 4.2 Function Declarations
 
@@ -1039,20 +1041,25 @@ expression (if any), or `nil`.
 ### 5.12 Assignment
 
 ```
-x = 42                    // variable assignment (requires mut)
-arr[0] = 99               // index assignment
-map["key"] = value         // map entry assignment
-obj.field = value          // field assignment
+x = 42                    // variable reassignment (requires mut)
+arr[0] = 99               // index assignment (requires mut on arr)
+map["key"] = value         // map entry assignment (requires mut on map)
+obj.field = value          // field assignment (requires mut on obj)
 ```
+
+All forms of assignment require `mut` on the target binding. This applies
+to variable reassignment, field assignment, index assignment, and map entry
+assignment. Mutating methods (`push`, `pop`, `sort`, etc.) also require
+`mut`.
 
 Assignment is a statement, not an expression. It does not produce a value.
 
-For reference types, assignment to fields, indices, and map entries mutates
-the object in place. All references to the same object see the change:
+For reference types, mutation is visible through all references to the
+same object:
 
 ```
-let a = [1, 2, 3]
-let b = a
+let mut a = [1, 2, 3]
+let mut b = a
 a[0] = 99         // b[0] is now 99 too (same object)
 ```
 

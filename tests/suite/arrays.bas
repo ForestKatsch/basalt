@@ -1,5 +1,5 @@
 fn main(stdout: Stdout) {
-    let arr = [10, 20, 30, 40, 50]
+    let mut arr = [10, 20, 30, 40, 50]
 
     // Length
     stdout.println(arr.length as string)
@@ -15,12 +15,12 @@ fn main(stdout: Stdout) {
     stdout.println(last as string)
 
     // Reference semantics
-    let alias = arr
+    let mut alias = arr
     alias.push(99)
     stdout.println(arr.length as string)
 
     // Clone
-    let copy = arr.clone()
+    let mut copy = arr.clone()
     copy.push(100)
     stdout.println(arr.length as string)
     stdout.println(copy.length as string)

@@ -9,12 +9,12 @@ fn main(stdout: Stdout) {
     stdout.println(p.y as string)
 
     // Reference semantics
-    let q = p
+    let mut q = p
     q.x = 10.0
     stdout.println(p.x as string)
 
     // Clone for independent copy
-    let r = p.clone()
+    let mut r = p.clone()
     r.x = 99.0
     stdout.println(p.x as string)
     stdout.println(r.x as string)
