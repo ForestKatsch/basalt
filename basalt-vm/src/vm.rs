@@ -1004,6 +1004,18 @@ impl VM {
                     }
                     return Err(format!("unknown method '{}' on '{}'", method, type_name));
                 }
+                HeapObject::Enum(e) => {
+                    let type_name = e.type_name.clone();
+                    drop(obj_borrow);
+                    for (i, f) in self.program.functions.iter().enumerate() {
+                        if f.name == method {
+                            let mut call_args = vec![obj.clone()];
+                            call_args.extend_from_slice(args);
+                            return self.call_function(i, &call_args);
+                        }
+                    }
+                    return Err(format!("unknown method '{}' on '{}'", method, type_name));
+                }
                 _ => {
                     return Err(format!(
                         "cannot call method '{}' on {}",
