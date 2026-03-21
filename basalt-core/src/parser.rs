@@ -1209,9 +1209,9 @@ impl Parser {
                 break;
             }
         }
-        // Check for empty braces
+        // Check for empty braces — this IS a struct literal when preceded by TypeIdent
         if let Some(Token::RBrace) = self.tokens.get(self.pos + offset) {
-            return false; // empty block, not struct
+            return true; // empty struct: TypeName { }
         }
         // Check for ident:
         if let Some(Token::Ident(_)) = self.tokens.get(self.pos + offset) {

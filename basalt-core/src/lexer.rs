@@ -742,7 +742,7 @@ impl Lexer {
     fn lex_identifier(&mut self) -> Result<Token, String> {
         let start = self.pos;
         while let Some(ch) = self.peek() {
-            if ch.is_alphanumeric() || ch == '_' {
+            if ch.is_ascii_alphanumeric() || ch == '_' {
                 self.advance();
             } else {
                 break;
@@ -787,7 +787,7 @@ impl Lexer {
     fn lex_type_identifier(&mut self) -> Result<Token, String> {
         let start = self.pos;
         while let Some(ch) = self.peek() {
-            if ch.is_alphanumeric() || ch == '_' {
+            if ch.is_ascii_alphanumeric() || ch == '_' {
                 self.advance();
             } else {
                 break;
