@@ -830,7 +830,7 @@ impl VM {
                     let href = heap_ref(&reg[cell as usize], "cell write")?.clone();
                     let mut obj = href.borrow_mut();
                     match &mut *obj {
-                        HeapObject::CaptureCell(inner) => *inner = Box::new(new_val),
+                        HeapObject::CaptureCell(inner) => **inner = new_val,
                         _ => return Err("CellSet on non-cell".to_string()),
                     }
                 }

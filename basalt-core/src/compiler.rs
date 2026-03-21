@@ -405,11 +405,7 @@ impl Compiler {
         })
     }
 
-    fn compile_fn(&mut self, fdef: &TypedFnDef) -> Result<usize, String> {
-        self.compile_fn_with_cells(fdef, &[])
-    }
-
-    fn compile_fn_with_cells(
+    fn compile_fn(
         &mut self,
         fdef: &TypedFnDef,
         cell_params: &[String],
@@ -1057,7 +1053,7 @@ impl Compiler {
                     return_type: ret_type.clone(),
                     body: body.clone(),
                 };
-                let func_idx = self.compile_fn_with_cells(&typed_fndef, &cell_param_names)?;
+                let func_idx = self.compile_fn(&typed_fndef, &cell_param_names)?;
 
                 if captures.is_empty() {
                     // No captures — simple function reference
@@ -1519,14 +1515,38 @@ impl Compiler {
         let done_reg = fc.alloc_reg();
 
         if let Some(var2_name) = var2 {
-            // Two-variable form
+            let v1_captured = fc.captured_vars.contains(var1);
+            let v2_captured = fc.captured_vars.contains(var2_name);
             let key_reg = fc.declare_local(var1, &Type::Nil);
             let val_reg = fc.declare_local(var2_name, &Type::Nil);
-            fc.emit(Op::IterNextKV(key_reg, val_reg, done_reg, iter_reg));
+            if v1_captured || v2_captured {
+                // Use temp registers for IterNext, then write through cells
+                let tmp_k = fc.alloc_reg();
+                let tmp_v = fc.alloc_reg();
+                fc.emit(Op::IterNextKV(tmp_k, tmp_v, done_reg, iter_reg));
+                if v1_captured {
+                    fc.emit(Op::MakeCell(key_reg, tmp_k));
+                } else {
+                    fc.emit(Op::Move(key_reg, tmp_k));
+                }
+                if v2_captured {
+                    fc.emit(Op::MakeCell(val_reg, tmp_v));
+                } else {
+                    fc.emit(Op::Move(val_reg, tmp_v));
+                }
+            } else {
+                fc.emit(Op::IterNextKV(key_reg, val_reg, done_reg, iter_reg));
+            }
         } else {
-            // Single variable form
+            let v1_captured = fc.captured_vars.contains(var1);
             let val_reg = fc.declare_local(var1, &Type::Nil);
-            fc.emit(Op::IterNext(val_reg, done_reg, iter_reg));
+            if v1_captured {
+                let tmp = fc.alloc_reg();
+                fc.emit(Op::IterNext(tmp, done_reg, iter_reg));
+                fc.emit(Op::MakeCell(val_reg, tmp));
+            } else {
+                fc.emit(Op::IterNext(val_reg, done_reg, iter_reg));
+            }
         }
 
         let exit_jump = fc.emit(Op::JumpIfTrue(done_reg, 0));

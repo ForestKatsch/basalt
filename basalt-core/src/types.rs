@@ -580,13 +580,19 @@ impl TypeChecker {
     }
 
     fn register_types(&mut self, program: &Program) -> Result<(), String> {
-        // Phase 1: Register type names and fields (no methods yet)
+        // Phase 1a: Register all type NAMES (empty shells)
+        for item in &program.items {
+            if let Item::TypeDef(td) = item {
+                self.register_type_name(td);
+            }
+        }
+        // Phase 1b: Resolve fields and variants (all type names now visible)
         for item in &program.items {
             if let Item::TypeDef(td) = item {
                 self.register_type_def_skeleton(td)?;
             }
         }
-        // Phase 2: Register methods (can now reference all types)
+        // Phase 2: Register methods (can now reference all types and fields)
         for item in &program.items {
             if let Item::TypeDef(td) = item {
                 self.register_type_def_methods(td)?;
@@ -707,22 +713,41 @@ impl TypeChecker {
         Ok(())
     }
 
-    /// Phase 1: Register type name, fields, and variants (no methods).
+    /// Phase 1a: Register just the type name as an empty shell.
+    fn register_type_name(&mut self, td: &TypeDef) {
+        match &td.kind {
+            TypeDefKind::Struct(_) => {
+                self.type_info.structs.entry(td.name.clone()).or_insert_with(|| StructInfo {
+                    name: td.name.clone(),
+                    fields: Vec::new(),
+                    methods: HashMap::new(),
+                    parent: td.parent.clone(),
+                });
+            }
+            TypeDefKind::Enum(_) => {
+                self.type_info.enums.entry(td.name.clone()).or_insert_with(|| EnumInfo {
+                    name: td.name.clone(),
+                    variants: Vec::new(),
+                    methods: HashMap::new(),
+                });
+            }
+            TypeDefKind::Alias(ty) => {
+                // For aliases, we can try to resolve but it may fail if the alias
+                // references another not-yet-registered type. That's OK — skeleton phase
+                // will handle it.
+                if let Ok(resolved) = self.resolve_type_expr(ty) {
+                    self.type_info.aliases.insert(td.name.clone(), resolved);
+                }
+            }
+        }
+    }
+
+    /// Phase 1b: Register type fields and variants (all names now visible).
     fn register_type_def_skeleton(&mut self, td: &TypeDef) -> Result<(), String> {
         match &td.kind {
             TypeDefKind::Struct(sdef) => {
                 self.current_type_name = Some(td.name.clone());
-                // Pre-register with empty fields so recursive types can resolve
-                self.type_info.structs.insert(
-                    td.name.clone(),
-                    StructInfo {
-                        name: td.name.clone(),
-                        fields: Vec::new(),
-                        methods: HashMap::new(),
-                        parent: td.parent.clone(),
-                    },
-                );
-                // Now resolve field types (can reference Self / own type name)
+                // Name already registered in phase 1a. Now resolve field types.
                 let fields: Vec<(String, Type)> = sdef
                     .fields
                     .iter()
@@ -733,16 +758,7 @@ impl TypeChecker {
             }
             TypeDefKind::Enum(edef) => {
                 self.current_type_name = Some(td.name.clone());
-                // Pre-register with empty variants so recursive types can resolve
-                self.type_info.enums.insert(
-                    td.name.clone(),
-                    EnumInfo {
-                        name: td.name.clone(),
-                        variants: Vec::new(),
-                        methods: HashMap::new(),
-                    },
-                );
-                // Now resolve variant field types (can reference own type)
+                // Name already registered in phase 1a. Now resolve variant field types.
                 let variants: Vec<VariantInfo> = edef
                     .variants
                     .iter()
