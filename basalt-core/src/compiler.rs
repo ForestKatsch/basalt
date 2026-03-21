@@ -341,14 +341,34 @@ impl Compiler {
             }
         }
 
-        // Compile all functions
-        let mut entry_point = None;
+        // Pre-register all functions so forward references resolve
+        let mut fn_defs: Vec<&TypedFnDef> = Vec::new();
         for item in &program.items {
             if let TypedItem::Function(fdef) = item {
-                let idx = self.compile_fn(fdef)?;
+                let idx = self.functions.len();
+                self.functions.push(CompiledFunction {
+                    name: fdef.name.clone(),
+                    param_count: fdef.params.len() as u8,
+                    register_count: 0,
+                    code: Vec::new(),
+                    param_types: fdef.params.iter().map(|(_, t)| t.clone()).collect(),
+                    return_type: fdef.return_type.clone(),
+                });
+                fn_defs.push(fdef);
                 if fdef.name == "main" {
-                    entry_point = Some(idx);
+                    // entry_point assigned below after compile
                 }
+                let _ = idx;
+            }
+        }
+
+        // Now compile all function bodies (forward references work via self.functions)
+        let mut entry_point = None;
+        for fdef in &fn_defs {
+            let idx = self.functions.iter().position(|f| f.name == fdef.name).unwrap();
+            self.compile_fn_body(idx, fdef)?;
+            if fdef.name == "main" {
+                entry_point = Some(idx);
             }
         }
 
@@ -376,8 +396,8 @@ impl Compiler {
     }
 
     fn compile_fn(&mut self, fdef: &TypedFnDef) -> Result<usize, String> {
-        // Pre-register a placeholder so self-recursive and forward references
-        // can resolve the function index during body compilation.
+        // Register a placeholder then compile the body.
+        // Used for lambdas and other non-pre-registered functions.
         let idx = self.functions.len();
         self.functions.push(CompiledFunction {
             name: fdef.name.clone(),
@@ -387,7 +407,11 @@ impl Compiler {
             param_types: fdef.params.iter().map(|(_, t)| t.clone()).collect(),
             return_type: fdef.return_type.clone(),
         });
+        self.compile_fn_body(idx, fdef)?;
+        Ok(idx)
+    }
 
+    fn compile_fn_body(&mut self, idx: usize, fdef: &TypedFnDef) -> Result<(), String> {
         let mut fc = FnCompiler::new();
 
         // Allocate registers for parameters
@@ -416,7 +440,7 @@ impl Compiler {
             return_type: fdef.return_type.clone(),
         };
 
-        Ok(idx)
+        Ok(())
     }
 
     fn compile_block(
@@ -1546,6 +1570,10 @@ impl Compiler {
                 } else {
                     fc.emit(Op::IntNarrow(dst, src, type_to_int_type(to)));
                 }
+            }
+            (_, Type::String) => {
+                // Generic display conversion for Optional, Enum, Struct, etc.
+                fc.emit(Op::DisplayToString(dst, src));
             }
             _ => {
                 fc.emit(Op::Move(dst, src));

@@ -2293,6 +2293,18 @@ impl TypeChecker {
         if *from == Type::Nil && *to == Type::String {
             return Ok(());
         }
+        // Optional to string (displays "nil" or the inner value)
+        if matches!(from, Type::Optional(_)) && *to == Type::String {
+            return Ok(());
+        }
+        // Enum/Struct/Error to string (display representation)
+        if matches!(
+            from,
+            Type::Enum(_) | Type::Struct(_) | Type::Error(_) | Type::Result(_, _)
+        ) && *to == Type::String
+        {
+            return Ok(());
+        }
 
         Err(format!(
             "cannot convert {} to {}",
