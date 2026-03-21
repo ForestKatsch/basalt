@@ -161,6 +161,11 @@ pub enum Op {
     // Identity test
     IsIdentical(u16, u16, u16), // dst = a is b (reference identity)
 
+    // Capture cells (for by-reference closure capture)
+    MakeCell(u16, u16),  // dst = new cell wrapping value in src
+    CellGet(u16, u16),   // dst = read value from cell in src
+    CellSet(u16, u16),   // cell[src1] = src2 (write value into cell)
+
     // Closures
     MakeClosure(u16, u16, u16), // dst, func_idx_reg, capture_count (captures in consecutive regs before dst)
 
@@ -232,6 +237,9 @@ struct FnCompiler {
     loop_breaks: Vec<Vec<usize>>,    // jump indices to patch on break
     loop_continues: Vec<Vec<usize>>, // jump indices to patch on continue
     loop_starts: Vec<usize>,
+    /// Variables that are captured by closures — stored in heap cells.
+    /// Reads/writes to these go through CellGet/CellSet.
+    captured_vars: std::collections::HashSet<String>,
 }
 
 impl FnCompiler {
@@ -245,6 +253,7 @@ impl FnCompiler {
             loop_breaks: Vec::new(),
             loop_continues: Vec::new(),
             loop_starts: Vec::new(),
+            captured_vars: std::collections::HashSet::new(),
         }
     }
 
@@ -397,8 +406,15 @@ impl Compiler {
     }
 
     fn compile_fn(&mut self, fdef: &TypedFnDef) -> Result<usize, String> {
+        self.compile_fn_with_cells(fdef, &[])
+    }
+
+    fn compile_fn_with_cells(
+        &mut self,
+        fdef: &TypedFnDef,
+        cell_params: &[String],
+    ) -> Result<usize, String> {
         // Register a placeholder then compile the body.
-        // Used for lambdas and other non-pre-registered functions.
         let idx = self.functions.len();
         self.functions.push(CompiledFunction {
             name: fdef.name.clone(),
@@ -408,16 +424,40 @@ impl Compiler {
             param_types: fdef.params.iter().map(|(_, t)| t.clone()).collect(),
             return_type: fdef.return_type.clone(),
         });
-        self.compile_fn_body(idx, fdef)?;
+        self.compile_fn_body_with_cells(idx, fdef, cell_params)?;
         Ok(idx)
     }
 
     fn compile_fn_body(&mut self, idx: usize, fdef: &TypedFnDef) -> Result<(), String> {
+        self.compile_fn_body_with_cells(idx, fdef, &[])
+    }
+
+    fn compile_fn_body_with_cells(
+        &mut self,
+        idx: usize,
+        fdef: &TypedFnDef,
+        cell_params: &[String],
+    ) -> Result<(), String> {
         let mut fc = FnCompiler::new();
+
+        // Pre-scan: identify variables captured by lambdas in this function
+        let captured = find_captured_vars_in_block(&fdef.body, &fdef.params);
+        fc.captured_vars = captured;
+
+        // Also mark parameters that arrive as cells (from outer closure capture)
+        for name in cell_params {
+            fc.captured_vars.insert(name.clone());
+        }
 
         // Allocate registers for parameters
         for (name, ty) in &fdef.params {
             fc.declare_local(name, ty);
+            // If this param is captured by inner lambdas AND not already a cell,
+            // wrap it in a cell immediately
+            if fc.captured_vars.contains(name) && !cell_params.contains(name) {
+                let reg = *fc.locals.get(name).unwrap();
+                fc.emit(Op::MakeCell(reg, reg));
+            }
         }
 
         // Compile body
@@ -467,7 +507,12 @@ impl Compiler {
             TypedStmt::Let(decl) => {
                 let value_reg = self.compile_expr(fc, &decl.value)?;
                 let local_reg = fc.declare_local(&decl.name, &decl.ty);
-                fc.emit(Op::Move(local_reg, value_reg));
+                if fc.captured_vars.contains(&decl.name) {
+                    // Wrap in a capture cell for by-reference sharing
+                    fc.emit(Op::MakeCell(local_reg, value_reg));
+                } else {
+                    fc.emit(Op::Move(local_reg, value_reg));
+                }
                 Ok(None)
             }
             TypedStmt::Assign(target, value) => {
@@ -475,7 +520,11 @@ impl Compiler {
                 match &**target {
                     TypedAssignTarget::Variable(name, _) => {
                         if let Some(&reg) = fc.locals.get(name) {
-                            fc.emit(Op::Move(reg, value_reg));
+                            if fc.captured_vars.contains(name) {
+                                fc.emit(Op::CellSet(reg, value_reg));
+                            } else {
+                                fc.emit(Op::Move(reg, value_reg));
+                            }
                         } else {
                             return Err(format!("undefined variable '{}' in assignment", name));
                         }
@@ -561,9 +610,13 @@ impl Compiler {
             }
             TypedExprKind::Ident(name) => {
                 if let Some(&reg) = fc.locals.get(name) {
-                    // Return the local register directly
                     let dst = fc.alloc_reg();
-                    fc.emit(Op::Move(dst, reg));
+                    if fc.captured_vars.contains(name) {
+                        // Read through capture cell
+                        fc.emit(Op::CellGet(dst, reg));
+                    } else {
+                        fc.emit(Op::Move(dst, reg));
+                    }
                     Ok(dst)
                 } else if let Some(idx) = self.functions.iter().position(|f| f.name == *name) {
                     // Function reference (by index)
@@ -990,6 +1043,13 @@ impl Compiler {
                 }
                 all_params.extend(params.clone());
 
+                // Determine which captures are cells (from the enclosing scope)
+                let cell_param_names: Vec<String> = captures
+                    .iter()
+                    .filter(|(name, _)| fc.captured_vars.contains(name))
+                    .map(|(name, _)| name.clone())
+                    .collect();
+
                 let func_name = format!("__lambda_{}", self.functions.len());
                 let typed_fndef = TypedFnDef {
                     name: func_name.clone(),
@@ -997,7 +1057,7 @@ impl Compiler {
                     return_type: ret_type.clone(),
                     body: body.clone(),
                 };
-                let func_idx = self.compile_fn(&typed_fndef)?;
+                let func_idx = self.compile_fn_with_cells(&typed_fndef, &cell_param_names)?;
 
                 if captures.is_empty() {
                     // No captures — simple function reference
@@ -1708,6 +1768,116 @@ impl Compiler {
             }
         }
         Err(format!("unknown variant '{}.{}'", type_name, variant))
+    }
+}
+
+/// Find all variables in a function body that are captured by any nested lambda.
+fn find_captured_vars_in_block(
+    body: &TypedBlock,
+    params: &[(String, Type)],
+) -> std::collections::HashSet<String> {
+    let mut result = std::collections::HashSet::new();
+    find_lambdas_in_block(body, params, &mut result);
+    result
+}
+
+fn find_lambdas_in_block(
+    block: &TypedBlock,
+    outer_params: &[(String, Type)],
+    captured: &mut std::collections::HashSet<String>,
+) {
+    for stmt in &block.stmts {
+        find_lambdas_in_stmt(stmt, outer_params, captured);
+    }
+}
+
+fn find_lambdas_in_stmt(
+    stmt: &TypedStmt,
+    outer_params: &[(String, Type)],
+    captured: &mut std::collections::HashSet<String>,
+) {
+    match stmt {
+        TypedStmt::Let(decl) => find_lambdas_in_expr(&decl.value, outer_params, captured),
+        TypedStmt::Assign(_, value) => find_lambdas_in_expr(value, outer_params, captured),
+        TypedStmt::Return(Some(e)) | TypedStmt::ReturnError(e) | TypedStmt::Expr(e) => {
+            find_lambdas_in_expr(e, outer_params, captured)
+        }
+        _ => {}
+    }
+}
+
+fn find_lambdas_in_expr(
+    expr: &TypedExpr,
+    outer_params: &[(String, Type)],
+    captured: &mut std::collections::HashSet<String>,
+) {
+    match &expr.kind {
+        TypedExprKind::Lambda(params, _, body) => {
+            // This is a lambda — collect its free variables
+            let free = collect_free_vars(body, params);
+            // Variables that are free in the lambda AND defined in the outer scope are captured
+            for name in &free {
+                // Skip global function names — they're resolved by index, not captured
+                captured.insert(name.clone());
+            }
+            // Also recurse into the lambda body for nested lambdas
+            find_lambdas_in_block(body, params, captured);
+        }
+        TypedExprKind::BinOp(l, _, r) | TypedExprKind::Range(l, r) => {
+            find_lambdas_in_expr(l, outer_params, captured);
+            find_lambdas_in_expr(r, outer_params, captured);
+        }
+        TypedExprKind::UnaryOp(_, e)
+        | TypedExprKind::As(e, _)
+        | TypedExprKind::AsSafe(e, _)
+        | TypedExprKind::Try(e)
+        | TypedExprKind::ErrorLit(e) => find_lambdas_in_expr(e, outer_params, captured),
+        TypedExprKind::Call(f, args) => {
+            find_lambdas_in_expr(f, outer_params, captured);
+            for a in args {
+                find_lambdas_in_expr(a, outer_params, captured);
+            }
+        }
+        TypedExprKind::MethodCall(obj, _, args) => {
+            find_lambdas_in_expr(obj, outer_params, captured);
+            for a in args {
+                find_lambdas_in_expr(a, outer_params, captured);
+            }
+        }
+        TypedExprKind::If(cond, then_b, else_e) => {
+            find_lambdas_in_expr(cond, outer_params, captured);
+            find_lambdas_in_block(then_b, outer_params, captured);
+            if let Some(e) = else_e {
+                find_lambdas_in_expr(e, outer_params, captured);
+            }
+        }
+        TypedExprKind::Block(b) => find_lambdas_in_block(b, outer_params, captured),
+        TypedExprKind::For(_, _, iter, body) => {
+            find_lambdas_in_expr(iter, outer_params, captured);
+            find_lambdas_in_block(body, outer_params, captured);
+        }
+        TypedExprKind::While(cond, body) | TypedExprKind::Guard(_, cond, body) => {
+            find_lambdas_in_expr(cond, outer_params, captured);
+            find_lambdas_in_block(body, outer_params, captured);
+        }
+        TypedExprKind::Loop(body) => find_lambdas_in_block(body, outer_params, captured),
+        TypedExprKind::Match(scrut, arms) => {
+            find_lambdas_in_expr(scrut, outer_params, captured);
+            for arm in arms {
+                find_lambdas_in_expr(&arm.body, outer_params, captured);
+            }
+        }
+        TypedExprKind::ArrayLit(elems) | TypedExprKind::TupleLit(elems) => {
+            for e in elems {
+                find_lambdas_in_expr(e, outer_params, captured);
+            }
+        }
+        TypedExprKind::StructLit(_, fields) => {
+            for (_, e) in fields {
+                find_lambdas_in_expr(e, outer_params, captured);
+            }
+        }
+        _ => {}
     }
 }
 

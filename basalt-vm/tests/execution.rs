@@ -1883,3 +1883,45 @@ fn main(stdout: Stdout) {
         &["115"],
     );
 }
+
+// ==================== Capture By Reference ====================
+
+#[test]
+fn test_closure_counter_by_reference() {
+    run_expect_output(
+        r#"
+fn make_counter() -> fn() -> i64 {
+    let mut count = 0
+    return fn() -> i64 {
+        count = count + 1
+        return count
+    }
+}
+fn main(stdout: Stdout) {
+    let c = make_counter()
+    stdout.println(c() as string)
+    stdout.println(c() as string)
+    stdout.println(c() as string)
+}
+"#,
+        &["1", "2", "3"],
+    );
+}
+
+#[test]
+fn test_closure_shared_mutation() {
+    run_expect_output(
+        r#"
+fn main(stdout: Stdout) {
+    let mut x = 10
+    let set_x = fn(v: i64) { x = v }
+    let get_x = fn() -> i64 { return x }
+    stdout.println(get_x() as string)
+    set_x(42)
+    stdout.println(get_x() as string)
+    stdout.println(x as string)
+}
+"#,
+        &["10", "42", "42"],
+    );
+}

@@ -811,6 +811,30 @@ impl VM {
                     }
                 }
 
+                // === Capture Cells ===
+                Op::MakeCell(d, s) => {
+                    let val = reg[s as usize].clone();
+                    reg[d as usize] =
+                        Value::Heap(Arc::new(RefCell::new(HeapObject::CaptureCell(Box::new(val)))));
+                }
+                Op::CellGet(d, s) => {
+                    let href = heap_ref(&reg[s as usize], "cell read")?.clone();
+                    let obj = href.borrow();
+                    reg[d as usize] = match &*obj {
+                        HeapObject::CaptureCell(val) => val.as_ref().clone(),
+                        _ => return Err("CellGet on non-cell".to_string()),
+                    };
+                }
+                Op::CellSet(cell, val) => {
+                    let new_val = reg[val as usize].clone();
+                    let href = heap_ref(&reg[cell as usize], "cell write")?.clone();
+                    let mut obj = href.borrow_mut();
+                    match &mut *obj {
+                        HeapObject::CaptureCell(inner) => *inner = Box::new(new_val),
+                        _ => return Err("CellSet on non-cell".to_string()),
+                    }
+                }
+
                 // === Closures ===
                 Op::MakeClosure(d, func_reg, capture_count) => {
                     let func_idx = reg[func_reg as usize].as_int() as usize;

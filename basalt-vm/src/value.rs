@@ -38,6 +38,8 @@ pub enum HeapObject {
     Range(i64, i64),
     Iterator(IterState),
     Closure(ClosureObj),
+    /// A shared mutable cell for capture-by-reference closures.
+    CaptureCell(Box<Value>),
 }
 
 #[derive(Debug, Clone)]
@@ -259,6 +261,7 @@ impl Value {
                     HeapObject::Error(inner) => format!("Error({})", inner.display_as_string()),
                     HeapObject::Range(s, e) => format!("{}..{}", s, e),
                     HeapObject::Closure(c) => format!("<closure func_{}>", c.func_idx),
+                    HeapObject::CaptureCell(val) => val.display_as_string(),
                     HeapObject::Iterator(_) => "<iterator>".to_string(),
                 }
             }
