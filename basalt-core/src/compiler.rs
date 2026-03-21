@@ -72,6 +72,7 @@ pub enum Op {
     BitAnd(u16, u16, u16),
     BitOr(u16, u16, u16),
     BitXor(u16, u16, u16),
+    BitNot(u16, u16),
     ShiftLeft(u16, u16, u16),
     ShiftRight(u16, u16, u16),
 
@@ -584,6 +585,10 @@ impl Compiler {
                     }
                     UnaryOp::Not => {
                         fc.emit(Op::Not(dst, src));
+                    }
+                    UnaryOp::BitNot => {
+                        fc.emit(Op::BitNot(dst, src));
+                        Self::emit_narrow_check(fc, dst, &expr.ty);
                     }
                 }
                 Ok(dst)

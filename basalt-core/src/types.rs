@@ -1208,6 +1208,15 @@ impl TypeChecker {
                         }
                         Type::Bool
                     }
+                    UnaryOp::BitNot => {
+                        if !typed.ty.is_integer() {
+                            return Err(format!(
+                                "bitwise NOT requires integer, got {}",
+                                typed.ty.display_name()
+                            ));
+                        }
+                        typed.ty.clone()
+                    }
                 };
                 Ok(TypedExpr {
                     kind: TypedExprKind::UnaryOp(op.clone(), Box::new(typed)),

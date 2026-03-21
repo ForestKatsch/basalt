@@ -833,6 +833,11 @@ impl Parser {
                     Ok(Expr::UnaryOp(UnaryOp::Not, Box::new(expr)))
                 }
             }
+            Token::Tilde => {
+                self.advance();
+                let expr = self.parse_unary_expr()?;
+                Ok(Expr::UnaryOp(UnaryOp::BitNot, Box::new(expr)))
+            }
             _ => self.parse_postfix_expr(),
         }
     }

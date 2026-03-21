@@ -357,6 +357,9 @@ impl VM {
                     reg[d as usize] =
                         Value::int(reg[a as usize].as_int() ^ reg[b as usize].as_int());
                 }
+                Op::BitNot(d, s) => {
+                    reg[d as usize] = Value::int(!reg[s as usize].as_int());
+                }
                 Op::ShiftLeft(d, a, b) => {
                     let shift = reg[b as usize].as_int();
                     if !(0..=63).contains(&shift) {
