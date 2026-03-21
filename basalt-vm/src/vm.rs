@@ -708,6 +708,11 @@ impl VM {
                     };
                     reg[d as usize] = Value::bool(is_match);
                 }
+                // === Identity ===
+                Op::IsIdentical(d, a, b) => {
+                    reg[d as usize] = Value::bool(values_identical(&reg[a as usize], &reg[b as usize]));
+                }
+
                 // === Range ===
                 Op::MakeRange(d, s, e) => {
                     reg[d as usize] =
@@ -1400,6 +1405,19 @@ fn narrow_int(val: i64, target: IntType) -> Result<i64, String> {
                 Ok(val)
             }
         }
+    }
+}
+
+/// Reference identity test. For value types (Int, Float, Bool, Nil), this
+/// is equivalent to ==. For heap types, this checks pointer identity.
+fn values_identical(a: &Value, b: &Value) -> bool {
+    match (a, b) {
+        (Value::Int(x), Value::Int(y)) => x == y,
+        (Value::Float(x), Value::Float(y)) => x == y,
+        (Value::Bool(x), Value::Bool(y)) => x == y,
+        (Value::Nil, Value::Nil) => true,
+        (Value::Heap(ha), Value::Heap(hb)) => Arc::ptr_eq(ha, hb),
+        _ => false,
     }
 }
 

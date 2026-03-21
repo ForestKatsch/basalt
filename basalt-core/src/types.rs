@@ -246,7 +246,7 @@ pub enum TypedExprKind {
 
     As(Box<TypedExpr>, Type),
     AsSafe(Box<TypedExpr>, Type),
-    Is(Box<TypedExpr>, IsTarget),
+    Is(Box<TypedExpr>, TypedIsTarget),
     Try(Box<TypedExpr>),
     Range(Box<TypedExpr>, Box<TypedExpr>),
 
@@ -257,6 +257,14 @@ pub enum TypedExprKind {
 pub enum TypedStringPart {
     Literal(String),
     Expr(TypedExpr),
+}
+
+#[derive(Debug, Clone)]
+pub enum TypedIsTarget {
+    Type(crate::ast::TypeExpr),
+    EnumVariant(String, String),
+    QualifiedVariant(String, String, String),
+    Expr(Box<TypedExpr>),
 }
 
 #[derive(Debug, Clone)]
@@ -1740,8 +1748,19 @@ impl TypeChecker {
             }
             Expr::Is(expr, target) => {
                 let typed = self.check_expr(expr)?;
+                let typed_target = match target {
+                    IsTarget::Type(ty) => TypedIsTarget::Type(ty.clone()),
+                    IsTarget::EnumVariant(t, v) => TypedIsTarget::EnumVariant(t.clone(), v.clone()),
+                    IsTarget::QualifiedVariant(m, t, v) => {
+                        TypedIsTarget::QualifiedVariant(m.clone(), t.clone(), v.clone())
+                    }
+                    IsTarget::Expr(rhs) => {
+                        let typed_rhs = self.check_expr(rhs)?;
+                        TypedIsTarget::Expr(Box::new(typed_rhs))
+                    }
+                };
                 Ok(TypedExpr {
-                    kind: TypedExprKind::Is(Box::new(typed), target.clone()),
+                    kind: TypedExprKind::Is(Box::new(typed), typed_target),
                     ty: Type::Bool,
                 })
             }

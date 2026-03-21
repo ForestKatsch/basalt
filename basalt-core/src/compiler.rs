@@ -1,5 +1,5 @@
 /// Basalt Bytecode Compiler - Generates bytecode from typed AST.
-use crate::ast::{BinOp, IsTarget, Pattern, UnaryOp};
+use crate::ast::{BinOp, Pattern, UnaryOp};
 use crate::types::*;
 use std::collections::HashMap;
 
@@ -157,6 +157,9 @@ pub enum Op {
 
     // Panic
     Panic(u16), // panic with message in reg
+
+    // Identity test
+    IsIdentical(u16, u16, u16), // dst = a is b (reference identity)
 
     // Closures
     MakeClosure(u16, u16, u16), // dst, func_idx_reg, capture_count (captures in consecutive regs before dst)
@@ -1031,27 +1034,23 @@ impl Compiler {
                 let src = self.compile_expr(fc, inner)?;
                 let dst = fc.alloc_reg();
                 match target {
-                    IsTarget::Type(ty_expr) => {
+                    TypedIsTarget::Type(ty_expr) => {
                         let type_name = canonical_type_name(ty_expr);
                         let type_id = self.intern_type(&type_name);
                         fc.emit(Op::IsType(dst, src, type_id));
                     }
-                    IsTarget::EnumVariant(type_name, variant) => {
+                    TypedIsTarget::EnumVariant(type_name, variant) => {
                         let variant_idx = self.get_variant_index(type_name, variant).unwrap_or(0);
                         fc.emit(Op::IsEnumVariant(dst, src, variant_idx));
                     }
-                    IsTarget::QualifiedVariant(module, type_name, variant) => {
+                    TypedIsTarget::QualifiedVariant(module, type_name, variant) => {
                         let full_name = format!("{}.{}", module, type_name);
                         let variant_idx = self.get_variant_index(&full_name, variant).unwrap_or(0);
                         fc.emit(Op::IsEnumVariant(dst, src, variant_idx));
                     }
-                    IsTarget::Expr(_rhs_expr) => {
-                        // We need to compile the rhs expression.
-                        // For 'is' with an expression on the RHS, it's used as identity test.
-                        // But rhs_expr is an AST Expr, not TypedExpr.
-                        // We handle this case with IsIdentical at the VM level.
-                        // For now, just load false
-                        fc.emit(Op::LoadBool(dst, false));
+                    TypedIsTarget::Expr(rhs_expr) => {
+                        let rhs = self.compile_expr(fc, rhs_expr)?;
+                        fc.emit(Op::IsIdentical(dst, src, rhs));
                     }
                 }
                 Ok(dst)
