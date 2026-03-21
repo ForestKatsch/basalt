@@ -233,7 +233,7 @@ struct FnCompiler {
     registers: u16,
     locals: HashMap<String, u16>, // name -> register
     local_types: HashMap<String, Type>,
-    scope_stack: Vec<Vec<String>>,   // names declared in each scope
+    scope_stack: Vec<Vec<(String, Option<u16>, Option<Type>)>>, // (name, prev_reg, prev_type)
     loop_breaks: Vec<Vec<usize>>,    // jump indices to patch on break
     loop_continues: Vec<Vec<usize>>, // jump indices to patch on continue
     loop_starts: Vec<usize>,
@@ -291,20 +291,30 @@ impl FnCompiler {
     }
 
     fn pop_scope(&mut self) {
-        if let Some(names) = self.scope_stack.pop() {
-            for name in names {
-                self.locals.remove(&name);
-                self.local_types.remove(&name);
+        if let Some(entries) = self.scope_stack.pop() {
+            for (name, prev_reg, prev_ty) in entries {
+                if let Some(reg) = prev_reg {
+                    // Restore the previous binding
+                    self.locals.insert(name.clone(), reg);
+                    if let Some(ty) = prev_ty {
+                        self.local_types.insert(name, ty);
+                    }
+                } else {
+                    // No previous binding — remove entirely
+                    self.locals.remove(&name);
+                    self.local_types.remove(&name);
+                }
             }
         }
     }
 
     fn declare_local(&mut self, name: &str, ty: &Type) -> u16 {
         let reg = self.alloc_reg();
-        self.locals.insert(name.to_string(), reg);
-        self.local_types.insert(name.to_string(), ty.clone());
+        // Save previous binding (if any) for restoration on scope pop
+        let prev_reg = self.locals.insert(name.to_string(), reg);
+        let prev_ty = self.local_types.insert(name.to_string(), ty.clone());
         if let Some(scope) = self.scope_stack.last_mut() {
-            scope.push(name.to_string());
+            scope.push((name.to_string(), prev_reg, prev_ty));
         }
         reg
     }

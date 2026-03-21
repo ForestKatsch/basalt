@@ -2039,3 +2039,78 @@ fn main(stdout: Stdout) {
         &["true"],
     );
 }
+
+// ==================== Variable Shadowing ====================
+
+#[test]
+fn test_shadowing_in_block() {
+    run_expect_output(
+        r#"
+fn main(stdout: Stdout) {
+    let x = 1
+    if true {
+        let x = 2
+        stdout.println(x as string)
+    }
+    stdout.println(x as string)
+}
+"#,
+        &["2", "1"],
+    );
+}
+
+#[test]
+fn test_shadowing_in_loop() {
+    run_expect_output(
+        r#"
+fn main(stdout: Stdout) {
+    let x = "outer"
+    for i in 0..3 {
+        let x = i
+        stdout.println(x as string)
+    }
+    stdout.println(x)
+}
+"#,
+        &["0", "1", "2", "outer"],
+    );
+}
+
+// ==================== Cross-Type Forward References ====================
+
+#[test]
+fn test_forward_type_reference() {
+    run_expect_output(
+        r#"
+type A { b: B }
+type B { c: C }
+type C { val: i64 }
+fn main(stdout: Stdout) {
+    let a = A { b: B { c: C { val: 42 } } }
+    stdout.println(a.b.c.val as string)
+}
+"#,
+        &["42"],
+    );
+}
+
+// ==================== Closure Captures Loop Variable ====================
+
+#[test]
+fn test_closure_captures_loop_var() {
+    run_expect_output(
+        r#"
+fn main(stdout: Stdout) {
+    let mut fns = [fn() -> i64 { return 0 }]
+    fns.pop()
+    for i in 0..3 {
+        fns.push(fn() -> i64 { return i })
+    }
+    for f in fns {
+        stdout.println(f() as string)
+    }
+}
+"#,
+        &["0", "1", "2"],
+    );
+}
