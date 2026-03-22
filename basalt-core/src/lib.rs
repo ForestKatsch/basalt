@@ -49,7 +49,7 @@ pub fn compile_file_rich(path: &Path) -> Result<CompileResult, (CompileErrors, S
 
     // Resolve imports
     let dir = path.parent().unwrap_or(Path::new("."));
-    resolve_imports(&mut ast, dir).map_err(|e| {
+    resolve_imports(&mut ast, dir, path).map_err(|e| {
         (
             CompileErrors::single(CompileError::bare(&e)),
             source.clone(),
@@ -83,45 +83,74 @@ pub fn compile_file(path: &Path) -> Result<Program, String> {
 
     // Resolve imports
     let dir = path.parent().unwrap_or(Path::new("."));
-    resolve_imports(&mut ast, dir)?;
+    resolve_imports(&mut ast, dir, path)?;
 
     let checked = types::check(&ast)?;
     let program = compiler::compile(&checked)?;
     Ok(program)
 }
 
-fn resolve_imports(program: &mut ast::Program, base_dir: &Path) -> Result<(), String> {
+fn resolve_imports(
+    program: &mut ast::Program,
+    base_dir: &Path,
+    entry_file: &Path,
+) -> Result<(), String> {
+    let mut visited = std::collections::HashSet::new();
+    // Mark the entry file as visited
+    let entry_canonical = entry_file
+        .canonicalize()
+        .unwrap_or_else(|_| entry_file.to_path_buf());
+    visited.insert(entry_canonical);
+    resolve_imports_recursive(program, base_dir, &mut visited)
+}
+
+fn resolve_imports_recursive(
+    program: &mut ast::Program,
+    base_dir: &Path,
+    visited: &mut std::collections::HashSet<std::path::PathBuf>,
+) -> Result<(), String> {
     let mut imported_items = Vec::new();
 
     for item in &program.items {
         if let ast::Item::Import(imp) = item {
-            let module_path = if imp.path.starts_with("std/") {
-                // Standard library - skip for now, handled at type-check time
+            if imp.path.starts_with("std/") {
                 continue;
-            } else {
-                let mut p = base_dir.to_path_buf();
-                p.push(format!("{}.bas", imp.path));
-                p
-            };
+            }
+            let mut module_file = base_dir.to_path_buf();
+            module_file.push(format!("{}.bas", imp.path));
 
-            let source = std::fs::read_to_string(&module_path)
+            let module_canonical = module_file
+                .canonicalize()
+                .unwrap_or_else(|_| module_file.clone());
+
+            if visited.contains(&module_canonical) {
+                return Err(format!(
+                    "circular import detected: '{}' is already in the import chain",
+                    imp.path
+                ));
+            }
+            visited.insert(module_canonical);
+
+            let source = std::fs::read_to_string(&module_file)
                 .map_err(|e| format!("cannot import '{}': {}", imp.path, e))?;
             let tokens = lexer::lex(&source)?;
-            let module_ast = parser::parse(tokens)?;
+            let mut module_ast = parser::parse(tokens)?;
+
+            // Recursively resolve imports in the imported module
+            let module_dir = module_file.parent().unwrap_or(base_dir);
+            resolve_imports_recursive(&mut module_ast, module_dir, visited)?;
 
             let alias = imp
                 .alias
                 .clone()
                 .unwrap_or_else(|| imp.path.rsplit('/').next().unwrap_or(&imp.path).to_string());
 
-            // Add module items with the alias prefix
             for module_item in module_ast.items {
                 imported_items.push((alias.clone(), module_item));
             }
         }
     }
 
-    // Store imported modules in the program
     for (alias, item) in imported_items {
         program.modules.entry(alias).or_default().push(item);
     }
