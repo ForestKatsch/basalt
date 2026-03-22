@@ -3,10 +3,19 @@ pub mod ast;
 pub mod parser;
 pub mod types;
 pub mod compiler;
+pub mod error;
 
 pub use compiler::Program;
+pub use error::CompileError;
 
 use std::path::Path;
+
+/// Result of a successful compilation, including source for error rendering.
+pub struct CompileResult {
+    pub program: Program,
+    pub source: String,
+    pub filename: String,
+}
 
 /// Compile source code to a Program.
 pub fn compile(source: &str) -> Result<Program, String> {
@@ -17,7 +26,46 @@ pub fn compile(source: &str) -> Result<Program, String> {
     Ok(program)
 }
 
+/// Compile a file, returning a CompileResult with source for diagnostics.
+/// On error, returns a CompileError with source location info.
+pub fn compile_file_rich(path: &Path) -> Result<CompileResult, (CompileError, String, String)> {
+    let source = std::fs::read_to_string(path).map_err(|e| {
+        let msg = format!("cannot read {}: {}", path.display(), e);
+        (CompileError::bare(&msg), String::new(), path.display().to_string())
+    })?;
+    let filename = path.file_name()
+        .map(|f| f.to_string_lossy().to_string())
+        .unwrap_or_else(|| path.display().to_string());
+
+    let tokens = lexer::lex(&source).map_err(|e| {
+        (CompileError::bare(&e), source.clone(), filename.clone())
+    })?;
+    let mut ast = parser::parse(tokens).map_err(|e| {
+        (CompileError::bare(&e), source.clone(), filename.clone())
+    })?;
+
+    // Resolve imports
+    let dir = path.parent().unwrap_or(Path::new("."));
+    resolve_imports(&mut ast, dir).map_err(|e| {
+        (CompileError::bare(&e), source.clone(), filename.clone())
+    })?;
+
+    let checked = types::check(&ast).map_err(|e| {
+        (e, source.clone(), filename.clone())
+    })?;
+    let program = compiler::compile(&checked).map_err(|e| {
+        (CompileError::bare(&e), source.clone(), filename.clone())
+    })?;
+
+    Ok(CompileResult {
+        program,
+        source,
+        filename,
+    })
+}
+
 /// Compile a file (resolving imports relative to file's directory).
+/// Legacy API returning String errors for backward compatibility.
 pub fn compile_file(path: &Path) -> Result<Program, String> {
     let source = std::fs::read_to_string(path)
         .map_err(|e| format!("cannot read {}: {}", path.display(), e))?;

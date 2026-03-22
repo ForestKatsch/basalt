@@ -1,53 +1,120 @@
-/// Basalt CLI - Command-line interface for running Basalt programs.
+/// Basalt CLI - Command-line interface for the Basalt programming language.
 use std::path::Path;
 use std::process;
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
+    let exit_code = match parse_and_run(&args[1..]) {
+        Ok(()) => 0,
+        Err(CliError::Compile) => 1,
+        Err(CliError::Runtime) => 2,
+    };
+    process::exit(exit_code);
+}
 
-    if args.len() < 2 {
-        eprintln!("Usage: basalt run <file.bas>");
-        process::exit(1);
-    }
+enum CliError {
+    Compile,
+    Runtime,
+}
 
-    match args[1].as_str() {
-        "run" => {
-            if args.len() < 3 {
-                eprintln!("Usage: basalt run <file.bas>");
-                process::exit(1);
-            }
-            let file_path = &args[2];
-            run_file(file_path);
+fn parse_and_run(args: &[String]) -> Result<(), CliError> {
+    match args.first().map(String::as_str) {
+        None | Some("help" | "--help" | "-h") => {
+            print_help();
+            Ok(())
         }
-        _ => {
-            eprintln!("Unknown command: {}", args[1]);
-            eprintln!("Usage: basalt run <file.bas>");
-            process::exit(1);
+        Some("version" | "--version" | "-v") => {
+            println!("basalt {VERSION}");
+            Ok(())
+        }
+        Some("run") => {
+            let path = require_file_arg(args)?;
+            run_file(path)
+        }
+        Some("check") => {
+            let path = require_file_arg(args)?;
+            check_file(path)
+        }
+        Some(cmd) => {
+            eprintln!("error: unknown command '{cmd}'");
+            eprintln!();
+            print_help();
+            Err(CliError::Compile)
         }
     }
 }
 
-fn run_file(path: &str) {
+/// Extracts the file argument from `[command, file, ...]`, or prints an error.
+fn require_file_arg(args: &[String]) -> Result<&str, CliError> {
+    match args.get(1) {
+        Some(path) => Ok(path.as_str()),
+        None => {
+            eprintln!("error: missing file argument");
+            eprintln!("usage: basalt {} <file.bas>", &args[0]);
+            Err(CliError::Compile)
+        }
+    }
+}
+
+fn print_help() {
+    println!(
+        "\
+basalt {VERSION}
+The Basalt programming language
+
+Usage: basalt <command> [options] [file]
+
+Commands:
+  run <file.bas>      Compile and execute a Basalt program
+  check <file.bas>    Type-check a program without running it
+  version             Print version information
+  help                Print this help message
+
+Options:
+  --help, -h          Print help
+  --version, -v       Print version"
+    );
+}
+
+fn check_file(path: &str) -> Result<(), CliError> {
     let file_path = Path::new(path);
     if !file_path.exists() {
-        eprintln!("Error: file '{}' not found", path);
-        process::exit(1);
+        eprintln!("error: file '{path}' not found");
+        return Err(CliError::Compile);
     }
 
-    let program = match basalt_core::compile_file(file_path) {
-        Ok(p) => p,
-        Err(e) => {
-            eprintln!("Compile error: {}", e);
-            process::exit(1);
+    match basalt_core::compile_file_rich(file_path) {
+        Ok(_) => Ok(()),
+        Err((err, source, filename)) => {
+            eprint!("{}", err.render(&source, &filename));
+            Err(CliError::Compile)
+        }
+    }
+}
+
+fn run_file(path: &str) -> Result<(), CliError> {
+    let file_path = Path::new(path);
+    if !file_path.exists() {
+        eprintln!("error: file '{path}' not found");
+        return Err(CliError::Compile);
+    }
+
+    let result = match basalt_core::compile_file_rich(file_path) {
+        Ok(r) => r,
+        Err((err, source, filename)) => {
+            eprint!("{}", err.render(&source, &filename));
+            return Err(CliError::Compile);
         }
     };
 
-    let mut vm = basalt_vm::VM::new(program);
+    let mut vm = basalt_vm::VM::new(result.program);
     match vm.run() {
-        Ok(_) => {}
+        Ok(_) => Ok(()),
         Err(e) => {
-            eprintln!("{}", e);
-            process::exit(1);
+            eprintln!("runtime error: {e}");
+            Err(CliError::Runtime)
         }
     }
 }

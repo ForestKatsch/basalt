@@ -1,6 +1,19 @@
 /// Basalt AST - Abstract Syntax Tree definitions.
 use std::collections::HashMap;
 
+/// Source location for error reporting.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct Span {
+    pub line: u32,
+    pub col: u32,
+}
+
+impl Span {
+    pub fn new(line: u32, col: u32) -> Self {
+        Span { line, col }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Program {
     pub items: Vec<Item>,
@@ -27,6 +40,7 @@ pub struct FnDef {
     pub params: Vec<Param>,
     pub return_type: Option<TypeExpr>,
     pub body: Block,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone)]
@@ -40,8 +54,15 @@ pub struct Block {
     pub stmts: Vec<Stmt>,
 }
 
+/// A statement with source location.
 #[derive(Debug, Clone)]
-pub enum Stmt {
+pub struct Stmt {
+    pub kind: StmtKind,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub enum StmtKind {
     Let(LetDecl),
     LetTuple(Vec<String>, Expr), // let (a, b, c) = expr
     Assign(AssignTarget, Expr),
@@ -58,6 +79,7 @@ pub struct LetDecl {
     pub mutable: bool,
     pub ty: Option<TypeExpr>,
     pub value: Expr,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone)]
@@ -67,8 +89,15 @@ pub enum AssignTarget {
     Index(Box<Expr>, Box<Expr>),
 }
 
+/// An expression with source location.
 #[derive(Debug, Clone)]
-pub enum Expr {
+pub struct Expr {
+    pub kind: ExprKind,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub enum ExprKind {
     IntLit(i64),
     FloatLit(f64),
     BoolLit(bool),
@@ -129,6 +158,20 @@ pub enum Expr {
     Range(Box<Expr>, Box<Expr>), // start..end
 }
 
+/// Helper to construct an Expr with a span.
+impl ExprKind {
+    pub fn at(self, span: Span) -> Expr {
+        Expr { kind: self, span }
+    }
+}
+
+/// Helper to construct a Stmt with a span.
+impl StmtKind {
+    pub fn at(self, span: Span) -> Stmt {
+        Stmt { kind: self, span }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum StringPart {
     Literal(String),
@@ -179,8 +222,15 @@ pub struct MatchArm {
     pub body: Expr,
 }
 
+/// A pattern with source location.
 #[derive(Debug, Clone)]
-pub enum Pattern {
+pub struct Pattern {
+    pub kind: PatternKind,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub enum PatternKind {
     Wildcard,
     IntLit(i64),
     FloatLit(f64),
@@ -193,6 +243,13 @@ pub enum Pattern {
     Error(String),                            // !name
     IsType(TypeExpr),                         // is T
     IsEnumVariant(String, String),            // is Type.Variant
+}
+
+/// Helper to construct a Pattern with a span.
+impl PatternKind {
+    pub fn at(self, span: Span) -> Pattern {
+        Pattern { kind: self, span }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -214,6 +271,7 @@ pub struct TypeDef {
     pub name: String,
     pub parent: Option<String>,
     pub kind: TypeDefKind,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone)]

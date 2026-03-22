@@ -16,6 +16,8 @@ pub struct VM {
     pub captured_output: Vec<String>,
     stdin_lines: Vec<String>,
     stdin_pos: usize,
+    /// Call stack for error reporting: (function_index, instruction_pointer)
+    call_stack: Vec<(usize, usize)>,
 }
 
 /// Helper to extract a heap reference, returning a runtime error instead of panicking.
@@ -45,6 +47,7 @@ impl VM {
             captured_output: Vec::new(),
             stdin_lines: Vec::new(),
             stdin_pos: 0,
+            call_stack: Vec::new(),
         }
     }
 
@@ -78,7 +81,8 @@ impl VM {
     fn call_function(&mut self, func_idx: usize, args: &[Value]) -> Result<Value, String> {
         self.call_depth += 1;
         if self.call_depth > MAX_CALL_DEPTH {
-            return Err("stack overflow: maximum call depth exceeded".to_string());
+            let trace = self.format_stack_trace();
+            return Err(format!("stack overflow: maximum call depth exceeded\nstack trace:\n{}", trace));
         }
 
         // Check instruction budget at call boundaries (amortized)
@@ -95,9 +99,25 @@ impl VM {
             registers[i] = arg.clone();
         }
 
-        let result = self.execute(func_idx, &mut registers)?;
+        self.call_stack.push((func_idx, 0));
+        let result = self.execute(func_idx, &mut registers);
         self.call_depth -= 1;
-        Ok(result)
+        match result {
+            Ok(v) => {
+                self.call_stack.pop();
+                Ok(v)
+            }
+            Err(msg) if !msg.contains("\nstack trace:\n") => {
+                // Format trace while all frames (including this one) are still on the stack
+                let trace = self.format_stack_trace();
+                self.call_stack.pop();
+                Err(format!("{}\nstack trace:\n{}", msg, trace))
+            }
+            err => {
+                self.call_stack.pop();
+                err
+            }
+        }
     }
 
     fn execute(&mut self, func_idx: usize, reg: &mut [Value]) -> Result<Value, String> {
@@ -107,6 +127,10 @@ impl VM {
         while pc < code_len {
             // Copy the instruction out (Op is Copy) to release borrow on self
             let op = self.program.functions[func_idx].code[pc];
+            // Update call stack with current pc for stack traces
+            if let Some(frame) = self.call_stack.last_mut() {
+                frame.1 = pc;
+            }
             pc += 1;
 
             match op {
@@ -733,7 +757,12 @@ impl VM {
                         _ => return Err("IterNext on non-iterator".to_string()),
                     };
                     match iter {
-                        IterState::Array { values, index } => {
+                        IterState::Array { source, index } => {
+                            let src = source.borrow();
+                            let values = match &*src {
+                                HeapObject::Array(v) => v,
+                                _ => return Err("iterator source is not an array".to_string()),
+                            };
                             if *index < values.len() {
                                 reg[vd as usize] = values[*index].clone();
                                 reg[dd as usize] = Value::bool(false);
@@ -762,7 +791,7 @@ impl VM {
                         }
                         IterState::Map {
                             keys,
-                            values: _,
+                            source: _,
                             index,
                         } => {
                             if *index < keys.len() {
@@ -783,7 +812,12 @@ impl VM {
                         _ => return Err("IterNextKV on non-iterator".to_string()),
                     };
                     match iter {
-                        IterState::Array { values, index } => {
+                        IterState::Array { source, index } => {
+                            let src = source.borrow();
+                            let values = match &*src {
+                                HeapObject::Array(v) => v,
+                                _ => return Err("iterator source is not an array".to_string()),
+                            };
                             if *index < values.len() {
                                 reg[kd as usize] = values[*index].clone();
                                 reg[vd as usize] = Value::int(*index as i64);
@@ -795,12 +829,17 @@ impl VM {
                         }
                         IterState::Map {
                             keys,
-                            values,
+                            source,
                             index,
                         } => {
+                            let src = source.borrow();
+                            let map = match &*src {
+                                HeapObject::Map(m) => m,
+                                _ => return Err("iterator source is not a map".to_string()),
+                            };
                             if *index < keys.len() {
                                 reg[kd as usize] = map_key_to_value(&keys[*index]);
-                                reg[vd as usize] = values[*index].clone();
+                                reg[vd as usize] = map.get(&keys[*index]).cloned().unwrap_or(Value::Nil);
                                 reg[dd as usize] = Value::bool(false);
                                 *index += 1;
                             } else {
@@ -863,6 +902,20 @@ impl VM {
         }
 
         Ok(Value::Nil)
+    }
+
+    fn format_stack_trace(&self) -> String {
+        let mut trace = String::new();
+        for &(fi, ip) in self.call_stack.iter().rev() {
+            let func = &self.program.functions[fi];
+            let line = func.line_table.get(ip).copied().unwrap_or(0);
+            if line > 0 {
+                trace.push_str(&format!("  at {} (line {})\n", func.name, line));
+            } else {
+                trace.push_str(&format!("  at {}\n", func.name));
+            }
+        }
+        trace
     }
 
     fn val_to_string(&self, val: &Value) -> String {
@@ -935,13 +988,13 @@ impl VM {
         let href = heap_ref(val, "iteration")?;
         let obj = href.borrow();
         match &*obj {
-            HeapObject::Array(v) => Ok(IterState::Array {
-                values: v.clone(),
+            HeapObject::Array(_) => Ok(IterState::Array {
+                source: href.clone(),
                 index: 0,
             }),
             HeapObject::Map(m) => Ok(IterState::Map {
                 keys: m.keys().cloned().collect(),
-                values: m.values().cloned().collect(),
+                source: href.clone(),
                 index: 0,
             }),
             HeapObject::String(s) => Ok(IterState::String {
@@ -963,10 +1016,10 @@ impl VM {
             if parts[0] == "math" {
                 return self.call_math(parts[1], args);
             }
-            // Look up compiled function by name
-            for (i, f) in self.program.functions.iter().enumerate() {
-                if f.name == parts[1] {
-                    return self.call_function(i, args);
+            // Look up compiled function by name via method_lookup
+            if let Some(indices) = self.program.method_lookup.get(parts[1]) {
+                if let Some(&idx) = indices.first() {
+                    return self.call_function(idx, args);
                 }
             }
             return Err(format!("unknown function '{}'", method));
@@ -994,12 +1047,12 @@ impl VM {
                     }
                     let type_name = s.type_name.clone();
                     drop(obj_borrow);
-                    // Look for user methods
-                    for (i, f) in self.program.functions.iter().enumerate() {
-                        if f.name == method {
+                    // Look for user methods via method_lookup
+                    if let Some(indices) = self.program.method_lookup.get(method) {
+                        if let Some(&idx) = indices.first() {
                             let mut call_args = vec![obj.clone()];
                             call_args.extend_from_slice(args);
-                            return self.call_function(i, &call_args);
+                            return self.call_function(idx, &call_args);
                         }
                     }
                     return Err(format!("unknown method '{}' on '{}'", method, type_name));
@@ -1007,11 +1060,11 @@ impl VM {
                 HeapObject::Enum(e) => {
                     let type_name = e.type_name.clone();
                     drop(obj_borrow);
-                    for (i, f) in self.program.functions.iter().enumerate() {
-                        if f.name == method {
+                    if let Some(indices) = self.program.method_lookup.get(method) {
+                        if let Some(&idx) = indices.first() {
                             let mut call_args = vec![obj.clone()];
                             call_args.extend_from_slice(args);
-                            return self.call_function(i, &call_args);
+                            return self.call_function(idx, &call_args);
                         }
                     }
                     return Err(format!("unknown method '{}' on '{}'", method, type_name));

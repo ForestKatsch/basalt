@@ -205,6 +205,7 @@ pub enum TypedAssignTarget {
 pub struct TypedExpr {
     pub kind: TypedExprKind,
     pub ty: Type,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone)]

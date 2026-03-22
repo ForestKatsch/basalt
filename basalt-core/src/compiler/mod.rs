@@ -1,5 +1,6 @@
 /// Basalt Bytecode Compiler - Generates bytecode from typed AST.
 use crate::types::*;
+use std::collections::HashMap;
 
 /// Bytecode instructions. All register operands are u16.
 /// Values are untagged 8-byte slots.
@@ -198,6 +199,8 @@ pub struct CompiledFunction {
     pub code: Vec<Op>,
     pub param_types: Vec<Type>,
     pub return_type: Type,
+    /// Source line for each instruction (1-indexed, 0 = unknown).
+    pub line_table: Vec<u32>,
 }
 
 /// Compiled program.
@@ -210,6 +213,8 @@ pub struct Program {
     pub method_names: Vec<String>,
     pub type_ids: Vec<String>, // type name -> type_id mapping
     pub globals: Vec<(String, Type)>,
+    /// method_name -> [function_index] for O(1) method dispatch
+    pub method_lookup: HashMap<String, Vec<usize>>,
 }
 
 pub fn compile(program: &TypedProgram) -> Result<Program, String> {

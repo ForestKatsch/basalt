@@ -34,6 +34,11 @@ impl Parser {
         )
     }
 
+    fn span(&self) -> Span {
+        let (line, col) = self.current_span();
+        Span::new(line as u32, col as u32)
+    }
+
     fn error(&self, msg: impl std::fmt::Display) -> String {
         let (line, col) = self.current_span();
         format!("[line {}:{}] {}", line, col, msg)
@@ -153,6 +158,7 @@ impl Parser {
     }
 
     fn parse_fn_def(&mut self) -> Result<FnDef, String> {
+        let span = self.span();
         self.expect(&Token::Fn)?;
         let name = self.expect_ident()?;
         self.expect(&Token::LParen)?;
@@ -174,6 +180,7 @@ impl Parser {
             params,
             return_type,
             body,
+            span,
         })
     }
 
@@ -337,6 +344,7 @@ impl Parser {
     }
 
     fn parse_type_def(&mut self) -> Result<TypeDef, String> {
+        let span = self.span();
         self.expect(&Token::Type)?;
         let name = self.expect_type_ident()?;
 
@@ -357,6 +365,7 @@ impl Parser {
                 name,
                 parent,
                 kind: TypeDefKind::Alias(ty),
+                span,
             });
         }
 
@@ -439,7 +448,7 @@ impl Parser {
             TypeDefKind::Struct(StructDef { fields, methods })
         };
 
-        Ok(TypeDef { name, parent, kind })
+        Ok(TypeDef { name, parent, kind, span })
     }
 
     fn parse_block(&mut self) -> Result<Block, String> {
@@ -463,6 +472,7 @@ impl Parser {
     }
 
     fn parse_stmt(&mut self) -> Result<Stmt, String> {
+        let span = self.span();
         match self.peek().clone() {
             Token::Let => {
                 // Check for tuple destructuring: let (a, b) = expr
@@ -482,11 +492,11 @@ impl Parser {
                     self.expect(&Token::Eq)?;
                     let value = self.parse_expr()?;
                     self.expect_newline_or_eof()?;
-                    return Ok(Stmt::LetTuple(names, value));
+                    return Ok(StmtKind::LetTuple(names, value).at(span));
                 }
                 let decl = self.parse_let_decl()?;
                 self.expect_newline_or_eof()?;
-                Ok(Stmt::Let(decl))
+                Ok(StmtKind::Let(decl).at(span))
             }
             Token::Return => {
                 self.advance();
@@ -497,25 +507,25 @@ impl Parser {
                     let expr = self.parse_expr()?;
                     self.expect(&Token::RParen)?;
                     self.expect_newline_or_eof()?;
-                    Ok(Stmt::ReturnError(expr))
+                    Ok(StmtKind::ReturnError(expr).at(span))
                 } else if matches!(self.peek(), Token::Newline | Token::RBrace | Token::Eof) {
                     self.expect_newline_or_eof()?;
-                    Ok(Stmt::Return(None))
+                    Ok(StmtKind::Return(None).at(span))
                 } else {
                     let expr = self.parse_expr()?;
                     self.expect_newline_or_eof()?;
-                    Ok(Stmt::Return(Some(expr)))
+                    Ok(StmtKind::Return(Some(expr)).at(span))
                 }
             }
             Token::Break => {
                 self.advance();
                 self.expect_newline_or_eof()?;
-                Ok(Stmt::Break)
+                Ok(StmtKind::Break.at(span))
             }
             Token::Continue => {
                 self.advance();
                 self.expect_newline_or_eof()?;
-                Ok(Stmt::Continue)
+                Ok(StmtKind::Continue.at(span))
             }
             _ => {
                 let expr = self.parse_expr()?;
@@ -525,25 +535,26 @@ impl Parser {
                     let target = self.expr_to_assign_target(expr)?;
                     let value = self.parse_expr()?;
                     self.expect_newline_or_eof()?;
-                    Ok(Stmt::Assign(target, value))
+                    Ok(StmtKind::Assign(target, value).at(span))
                 } else {
                     self.expect_newline_or_eof()?;
-                    Ok(Stmt::Expr(expr))
+                    Ok(StmtKind::Expr(expr).at(span))
                 }
             }
         }
     }
 
     fn expr_to_assign_target(&self, expr: Expr) -> Result<AssignTarget, String> {
-        match expr {
-            Expr::Ident(name) => Ok(AssignTarget::Variable(name)),
-            Expr::FieldAccess(obj, field) => Ok(AssignTarget::Field(obj, field)),
-            Expr::Index(obj, idx) => Ok(AssignTarget::Index(obj, idx)),
+        match expr.kind {
+            ExprKind::Ident(name) => Ok(AssignTarget::Variable(name)),
+            ExprKind::FieldAccess(obj, field) => Ok(AssignTarget::Field(obj, field)),
+            ExprKind::Index(obj, idx) => Ok(AssignTarget::Index(obj, idx)),
             _ => Err(self.error("invalid assignment target")),
         }
     }
 
     fn parse_let_decl(&mut self) -> Result<LetDecl, String> {
+        let span = self.span();
         self.expect(&Token::Let)?;
         let mutable = if *self.peek() == Token::Mut {
             self.advance();
@@ -565,6 +576,7 @@ impl Parser {
             mutable,
             ty,
             value,
+            span,
         })
     }
 
@@ -575,11 +587,12 @@ impl Parser {
 
     // Precedence 1: Range (..)
     fn parse_range_expr(&mut self) -> Result<Expr, String> {
+        let span = self.span();
         let left = self.parse_or_expr()?;
         if *self.peek() == Token::DotDot {
             self.advance();
             let right = self.parse_or_expr()?;
-            Ok(Expr::Range(Box::new(left), Box::new(right)))
+            Ok(ExprKind::Range(Box::new(left), Box::new(right)).at(span))
         } else {
             Ok(left)
         }
@@ -589,9 +602,10 @@ impl Parser {
     fn parse_or_expr(&mut self) -> Result<Expr, String> {
         let mut left = self.parse_and_expr()?;
         while *self.peek() == Token::PipePipe {
+            let span = self.span();
             self.advance();
             let right = self.parse_and_expr()?;
-            left = Expr::BinOp(Box::new(left), BinOp::Or, Box::new(right));
+            left = ExprKind::BinOp(Box::new(left), BinOp::Or, Box::new(right)).at(span);
         }
         Ok(left)
     }
@@ -600,9 +614,10 @@ impl Parser {
     fn parse_and_expr(&mut self) -> Result<Expr, String> {
         let mut left = self.parse_bitor_expr()?;
         while *self.peek() == Token::AmpAmp {
+            let span = self.span();
             self.advance();
             let right = self.parse_bitor_expr()?;
-            left = Expr::BinOp(Box::new(left), BinOp::And, Box::new(right));
+            left = ExprKind::BinOp(Box::new(left), BinOp::And, Box::new(right)).at(span);
         }
         Ok(left)
     }
@@ -611,9 +626,10 @@ impl Parser {
     fn parse_bitor_expr(&mut self) -> Result<Expr, String> {
         let mut left = self.parse_bitxor_expr()?;
         while *self.peek() == Token::Pipe {
+            let span = self.span();
             self.advance();
             let right = self.parse_bitxor_expr()?;
-            left = Expr::BinOp(Box::new(left), BinOp::BitOr, Box::new(right));
+            left = ExprKind::BinOp(Box::new(left), BinOp::BitOr, Box::new(right)).at(span);
         }
         Ok(left)
     }
@@ -622,9 +638,10 @@ impl Parser {
     fn parse_bitxor_expr(&mut self) -> Result<Expr, String> {
         let mut left = self.parse_bitand_expr()?;
         while *self.peek() == Token::Caret {
+            let span = self.span();
             self.advance();
             let right = self.parse_bitand_expr()?;
-            left = Expr::BinOp(Box::new(left), BinOp::BitXor, Box::new(right));
+            left = ExprKind::BinOp(Box::new(left), BinOp::BitXor, Box::new(right)).at(span);
         }
         Ok(left)
     }
@@ -633,9 +650,10 @@ impl Parser {
     fn parse_bitand_expr(&mut self) -> Result<Expr, String> {
         let mut left = self.parse_equality_expr()?;
         while *self.peek() == Token::Ampersand {
+            let span = self.span();
             self.advance();
             let right = self.parse_equality_expr()?;
-            left = Expr::BinOp(Box::new(left), BinOp::BitAnd, Box::new(right));
+            left = ExprKind::BinOp(Box::new(left), BinOp::BitAnd, Box::new(right)).at(span);
         }
         Ok(left)
     }
@@ -644,21 +662,22 @@ impl Parser {
     fn parse_equality_expr(&mut self) -> Result<Expr, String> {
         let mut left = self.parse_comparison_expr()?;
         loop {
+            let span = self.span();
             match self.peek() {
                 Token::EqEq => {
                     self.advance();
                     let right = self.parse_comparison_expr()?;
-                    left = Expr::BinOp(Box::new(left), BinOp::Eq, Box::new(right));
+                    left = ExprKind::BinOp(Box::new(left), BinOp::Eq, Box::new(right)).at(span);
                 }
                 Token::BangEq => {
                     self.advance();
                     let right = self.parse_comparison_expr()?;
-                    left = Expr::BinOp(Box::new(left), BinOp::NotEq, Box::new(right));
+                    left = ExprKind::BinOp(Box::new(left), BinOp::NotEq, Box::new(right)).at(span);
                 }
                 Token::Is => {
                     self.advance();
                     let target = self.parse_is_target()?;
-                    left = Expr::Is(Box::new(left), target);
+                    left = ExprKind::Is(Box::new(left), target).at(span);
                 }
                 _ => break,
             }
@@ -710,10 +729,10 @@ impl Parser {
                         }
                     } else {
                         // Just an expression
-                        Ok(IsTarget::Expr(Box::new(Expr::Ident(name))))
+                        Ok(IsTarget::Expr(Box::new(ExprKind::Ident(name).at(self.span()))))
                     }
                 } else {
-                    Ok(IsTarget::Expr(Box::new(Expr::Ident(name))))
+                    Ok(IsTarget::Expr(Box::new(ExprKind::Ident(name).at(self.span()))))
                 }
             }
             Token::Nil => {
@@ -732,6 +751,7 @@ impl Parser {
     fn parse_comparison_expr(&mut self) -> Result<Expr, String> {
         let mut left = self.parse_shift_expr()?;
         loop {
+            let span = self.span();
             let op = match self.peek() {
                 Token::Lt => BinOp::Lt,
                 Token::LtEq => BinOp::LtEq,
@@ -741,7 +761,7 @@ impl Parser {
             };
             self.advance();
             let right = self.parse_shift_expr()?;
-            left = Expr::BinOp(Box::new(left), op, Box::new(right));
+            left = ExprKind::BinOp(Box::new(left), op, Box::new(right)).at(span);
         }
         Ok(left)
     }
@@ -750,6 +770,7 @@ impl Parser {
     fn parse_shift_expr(&mut self) -> Result<Expr, String> {
         let mut left = self.parse_additive_expr()?;
         loop {
+            let span = self.span();
             let op = match self.peek() {
                 Token::ShiftLeft => BinOp::ShiftLeft,
                 Token::ShiftRight => BinOp::ShiftRight,
@@ -757,7 +778,7 @@ impl Parser {
             };
             self.advance();
             let right = self.parse_additive_expr()?;
-            left = Expr::BinOp(Box::new(left), op, Box::new(right));
+            left = ExprKind::BinOp(Box::new(left), op, Box::new(right)).at(span);
         }
         Ok(left)
     }
@@ -766,6 +787,7 @@ impl Parser {
     fn parse_additive_expr(&mut self) -> Result<Expr, String> {
         let mut left = self.parse_multiplicative_expr()?;
         loop {
+            let span = self.span();
             let op = match self.peek() {
                 Token::Plus => BinOp::Add,
                 Token::Minus => BinOp::Sub,
@@ -773,7 +795,7 @@ impl Parser {
             };
             self.advance();
             let right = self.parse_multiplicative_expr()?;
-            left = Expr::BinOp(Box::new(left), op, Box::new(right));
+            left = ExprKind::BinOp(Box::new(left), op, Box::new(right)).at(span);
         }
         Ok(left)
     }
@@ -782,6 +804,7 @@ impl Parser {
     fn parse_multiplicative_expr(&mut self) -> Result<Expr, String> {
         let mut left = self.parse_power_expr()?;
         loop {
+            let span = self.span();
             let op = match self.peek() {
                 Token::Star => BinOp::Mul,
                 Token::Slash => BinOp::Div,
@@ -790,18 +813,19 @@ impl Parser {
             };
             self.advance();
             let right = self.parse_power_expr()?;
-            left = Expr::BinOp(Box::new(left), op, Box::new(right));
+            left = ExprKind::BinOp(Box::new(left), op, Box::new(right)).at(span);
         }
         Ok(left)
     }
 
     // Precedence 12: Power (**) - right associative
     fn parse_power_expr(&mut self) -> Result<Expr, String> {
+        let span = self.span();
         let base = self.parse_as_expr()?;
         if *self.peek() == Token::StarStar {
             self.advance();
             let exp = self.parse_power_expr()?; // right-associative: recurse
-            Ok(Expr::BinOp(Box::new(base), BinOp::Pow, Box::new(exp)))
+            Ok(ExprKind::BinOp(Box::new(base), BinOp::Pow, Box::new(exp)).at(span))
         } else {
             Ok(base)
         }
@@ -812,14 +836,15 @@ impl Parser {
         let mut expr = self.parse_unary_expr()?;
         loop {
             if *self.peek() == Token::As {
+                let span = self.span();
                 self.advance();
                 if *self.peek() == Token::Question {
                     self.advance();
                     let ty = self.parse_base_type()?;
-                    expr = Expr::AsSafe(Box::new(expr), ty);
+                    expr = ExprKind::AsSafe(Box::new(expr), ty).at(span);
                 } else {
                     let ty = self.parse_base_type()?;
-                    expr = Expr::As(Box::new(expr), ty);
+                    expr = ExprKind::As(Box::new(expr), ty).at(span);
                 }
             } else {
                 break;
@@ -830,11 +855,12 @@ impl Parser {
 
     // Precedence 14: Unary (-, !)
     fn parse_unary_expr(&mut self) -> Result<Expr, String> {
+        let span = self.span();
         match self.peek() {
             Token::Minus => {
                 self.advance();
                 let expr = self.parse_unary_expr()?;
-                Ok(Expr::UnaryOp(UnaryOp::Neg, Box::new(expr)))
+                Ok(ExprKind::UnaryOp(UnaryOp::Neg, Box::new(expr)).at(span))
             }
             Token::Bang => {
                 // Check if this is !(expr) - error literal
@@ -843,19 +869,19 @@ impl Parser {
                     self.advance(); // (
                     let expr = self.parse_expr()?;
                     self.expect(&Token::RParen)?;
-                    let error = Expr::ErrorLit(Box::new(expr));
+                    let error = ExprKind::ErrorLit(Box::new(expr)).at(span);
                     // Continue parsing postfix on the error value
                     self.parse_postfix(error)
                 } else {
                     self.advance();
                     let expr = self.parse_unary_expr()?;
-                    Ok(Expr::UnaryOp(UnaryOp::Not, Box::new(expr)))
+                    Ok(ExprKind::UnaryOp(UnaryOp::Not, Box::new(expr)).at(span))
                 }
             }
             Token::Tilde => {
                 self.advance();
                 let expr = self.parse_unary_expr()?;
-                Ok(Expr::UnaryOp(UnaryOp::BitNot, Box::new(expr)))
+                Ok(ExprKind::UnaryOp(UnaryOp::BitNot, Box::new(expr)).at(span))
             }
             _ => self.parse_postfix_expr(),
         }
@@ -868,6 +894,7 @@ impl Parser {
     }
 
     fn parse_postfix(&mut self, mut expr: Expr) -> Result<Expr, String> {
+        let span = self.span();
         loop {
             match self.peek() {
                 Token::Dot => {
@@ -880,9 +907,9 @@ impl Parser {
                                 self.advance();
                                 let args = self.parse_args()?;
                                 self.expect(&Token::RParen)?;
-                                expr = Expr::MethodCall(Box::new(expr), name, args);
+                                expr = ExprKind::MethodCall(Box::new(expr), name, args).at(span);
                             } else {
-                                expr = Expr::FieldAccess(Box::new(expr), name);
+                                expr = ExprKind::FieldAccess(Box::new(expr), name).at(span);
                             }
                         }
                         Token::TypeIdent(name) => {
@@ -894,31 +921,31 @@ impl Parser {
                                 self.expect(&Token::RParen)?;
 
                                 // Determine if this is EnumVariant, StaticMethodCall, or QualifiedEnumVariant
-                                match &expr {
-                                    Expr::TypeIdent(type_name) => {
-                                        expr = Expr::EnumVariant(type_name.clone(), name, args);
+                                match &expr.kind {
+                                    ExprKind::TypeIdent(type_name) => {
+                                        expr = ExprKind::EnumVariant(type_name.clone(), name, args).at(span);
                                     }
-                                    Expr::Ident(module_name) => {
+                                    ExprKind::Ident(module_name) => {
                                         // module.Type(args) -> could be static method call or
                                         // qualified type access
                                         expr =
-                                            Expr::StaticMethodCall(module_name.clone(), name, args);
+                                            ExprKind::StaticMethodCall(module_name.clone(), name, args).at(span);
                                     }
                                     _ => {
-                                        expr = Expr::MethodCall(Box::new(expr), name, args);
+                                        expr = ExprKind::MethodCall(Box::new(expr), name, args).at(span);
                                     }
                                 }
                             } else {
                                 // Type.Variant with no args, or module.Type access
-                                match &expr {
-                                    Expr::TypeIdent(type_name) => {
-                                        expr = Expr::EnumVariant(type_name.clone(), name, vec![]);
+                                match &expr.kind {
+                                    ExprKind::TypeIdent(type_name) => {
+                                        expr = ExprKind::EnumVariant(type_name.clone(), name, vec![]).at(span);
                                     }
-                                    Expr::Ident(_) => {
-                                        expr = Expr::TypeAccess(Box::new(expr), name);
+                                    ExprKind::Ident(_) => {
+                                        expr = ExprKind::TypeAccess(Box::new(expr), name).at(span);
                                     }
                                     _ => {
-                                        expr = Expr::TypeAccess(Box::new(expr), name);
+                                        expr = ExprKind::TypeAccess(Box::new(expr), name).at(span);
                                     }
                                 }
                             }
@@ -926,7 +953,7 @@ impl Parser {
                         Token::IntLit(idx) => {
                             // Tuple index: t.0, t.1
                             self.advance();
-                            expr = Expr::FieldAccess(Box::new(expr), idx.to_string());
+                            expr = ExprKind::FieldAccess(Box::new(expr), idx.to_string()).at(span);
                         }
                         tok => return Err(self.error(format!("expected field name after '.', got {:?}", tok))),
                     }
@@ -935,17 +962,17 @@ impl Parser {
                     self.advance();
                     let args = self.parse_args()?;
                     self.expect(&Token::RParen)?;
-                    expr = Expr::Call(Box::new(expr), args);
+                    expr = ExprKind::Call(Box::new(expr), args).at(span);
                 }
                 Token::LBracket => {
                     self.advance();
                     let index = self.parse_expr()?;
                     self.expect(&Token::RBracket)?;
-                    expr = Expr::Index(Box::new(expr), Box::new(index));
+                    expr = ExprKind::Index(Box::new(expr), Box::new(index)).at(span);
                 }
                 Token::Question => {
                     self.advance();
-                    expr = Expr::Try(Box::new(expr));
+                    expr = ExprKind::Try(Box::new(expr)).at(span);
                 }
                 _ => break,
             }
@@ -976,35 +1003,36 @@ impl Parser {
     }
 
     fn parse_primary(&mut self) -> Result<Expr, String> {
+        let span = self.span();
         match self.peek().clone() {
             Token::IntLit(n) => {
                 self.advance();
-                Ok(Expr::IntLit(n))
+                Ok(ExprKind::IntLit(n).at(span))
             }
             Token::FloatLit(f) => {
                 self.advance();
-                Ok(Expr::FloatLit(f))
+                Ok(ExprKind::FloatLit(f).at(span))
             }
             Token::True => {
                 self.advance();
-                Ok(Expr::BoolLit(true))
+                Ok(ExprKind::BoolLit(true).at(span))
             }
             Token::False => {
                 self.advance();
-                Ok(Expr::BoolLit(false))
+                Ok(ExprKind::BoolLit(false).at(span))
             }
             Token::Nil => {
                 self.advance();
-                Ok(Expr::Nil)
+                Ok(ExprKind::Nil.at(span))
             }
             Token::StringLit(s) => {
                 self.advance();
-                Ok(Expr::StringLit(s))
+                Ok(ExprKind::StringLit(s).at(span))
             }
             Token::InterpolatedString(parts) => {
                 self.advance();
                 let ast_parts = self.convert_string_parts(parts)?;
-                Ok(Expr::InterpolatedString(ast_parts))
+                Ok(ExprKind::InterpolatedString(ast_parts).at(span))
             }
             Token::Ident(name) => {
                 self.advance();
@@ -1024,7 +1052,7 @@ impl Parser {
                                 self.skip_newlines();
                                 let (fields, spread) = self.parse_struct_fields()?;
                                 self.expect(&Token::RBrace)?;
-                                return Ok(Expr::StructLit(type_name, Some(name), fields, spread));
+                                return Ok(ExprKind::StructLit(type_name, Some(name), fields, spread).at(span));
                             }
                             Token::Dot => {
                                 // module.Type.Variant or module.Type.method
@@ -1036,16 +1064,16 @@ impl Parser {
                                             self.advance();
                                             let args = self.parse_args()?;
                                             self.expect(&Token::RParen)?;
-                                            return Ok(Expr::QualifiedEnumVariant(
+                                            return Ok(ExprKind::QualifiedEnumVariant(
                                                 name, type_name, variant, args,
-                                            ));
+                                            ).at(span));
                                         }
-                                        return Ok(Expr::QualifiedEnumVariant(
+                                        return Ok(ExprKind::QualifiedEnumVariant(
                                             name,
                                             type_name,
                                             variant,
                                             vec![],
-                                        ));
+                                        ).at(span));
                                     }
                                     Token::Ident(method) => {
                                         self.advance();
@@ -1053,27 +1081,27 @@ impl Parser {
                                             self.advance();
                                             let args = self.parse_args()?;
                                             self.expect(&Token::RParen)?;
-                                            let type_expr = Expr::TypeAccess(
-                                                Box::new(Expr::Ident(name)),
-                                                type_name,
-                                            );
-                                            return Ok(Expr::MethodCall(
+                                            let type_expr = ExprKind::TypeAccess(
+                                                Box::new(ExprKind::Ident(name.clone()).at(span)),
+                                                type_name.clone(),
+                                            ).at(span);
+                                            return Ok(ExprKind::MethodCall(
                                                 Box::new(type_expr),
                                                 method,
                                                 args,
-                                            ));
+                                            ).at(span));
                                         }
-                                        let type_expr = Expr::TypeAccess(
-                                            Box::new(Expr::Ident(name)),
-                                            type_name,
-                                        );
-                                        return Ok(Expr::FieldAccess(Box::new(type_expr), method));
+                                        let type_expr = ExprKind::TypeAccess(
+                                            Box::new(ExprKind::Ident(name.clone()).at(span)),
+                                            type_name.clone(),
+                                        ).at(span);
+                                        return Ok(ExprKind::FieldAccess(Box::new(type_expr), method).at(span));
                                     }
                                     _ => {
-                                        return Ok(Expr::TypeAccess(
-                                            Box::new(Expr::Ident(name)),
+                                        return Ok(ExprKind::TypeAccess(
+                                            Box::new(ExprKind::Ident(name).at(span)),
                                             type_name,
-                                        ));
+                                        ).at(span));
                                     }
                                 }
                             }
@@ -1082,18 +1110,18 @@ impl Parser {
                                 self.advance();
                                 let args = self.parse_args()?;
                                 self.expect(&Token::RParen)?;
-                                return Ok(Expr::StaticMethodCall(name, type_name, args));
+                                return Ok(ExprKind::StaticMethodCall(name, type_name, args).at(span));
                             }
                             _ => {
-                                return Ok(Expr::TypeAccess(
-                                    Box::new(Expr::Ident(name)),
+                                return Ok(ExprKind::TypeAccess(
+                                    Box::new(ExprKind::Ident(name).at(span)),
                                     type_name,
-                                ));
+                                ).at(span));
                             }
                         }
                     }
                 }
-                Ok(Expr::Ident(name))
+                Ok(ExprKind::Ident(name).at(span))
             }
             Token::TypeIdent(name) => {
                 self.advance();
@@ -1107,17 +1135,17 @@ impl Parser {
                             self.skip_newlines();
                             let (fields, spread) = self.parse_struct_fields()?;
                             self.expect(&Token::RBrace)?;
-                            Ok(Expr::StructLit(name, None, fields, spread))
+                            Ok(ExprKind::StructLit(name, None, fields, spread).at(span))
                         } else {
-                            Ok(Expr::TypeIdent(name))
+                            Ok(ExprKind::TypeIdent(name).at(span))
                         }
                     }
                     Token::Dot => {
                         // Type.Variant or Type.method
                         // Don't consume the dot here - let postfix handle it
-                        Ok(Expr::TypeIdent(name))
+                        Ok(ExprKind::TypeIdent(name).at(span))
                     }
-                    _ => Ok(Expr::TypeIdent(name)),
+                    _ => Ok(ExprKind::TypeIdent(name).at(span)),
                 }
             }
             Token::LParen => {
@@ -1134,7 +1162,7 @@ impl Parser {
                         elements.push(self.parse_expr()?);
                     }
                     self.expect(&Token::RParen)?;
-                    Ok(Expr::TupleLit(elements))
+                    Ok(ExprKind::TupleLit(elements).at(span))
                 } else {
                     // Grouping
                     self.expect(&Token::RParen)?;
@@ -1146,7 +1174,7 @@ impl Parser {
                 self.skip_newlines();
                 if *self.peek() == Token::RBracket {
                     self.advance();
-                    return Ok(Expr::ArrayLit(vec![]));
+                    return Ok(ExprKind::ArrayLit(vec![]).at(span));
                 }
                 let first = self.parse_expr()?;
                 self.skip_newlines();
@@ -1163,7 +1191,7 @@ impl Parser {
                         self.skip_newlines();
                     }
                     self.expect(&Token::RBracket)?;
-                    Ok(Expr::ArrayLit(elements))
+                    Ok(ExprKind::ArrayLit(elements).at(span))
                 } else {
                     Err(self.error(format!(
                         "expected ',' or ']' in array literal, got {:?}",
@@ -1180,7 +1208,7 @@ impl Parser {
                     self.skip_newlines();
                     if *self.peek() == Token::RBrace {
                         self.advance();
-                        return Ok(Expr::MapLit(vec![]));
+                        return Ok(ExprKind::MapLit(vec![]).at(span));
                     }
                     let mut entries = Vec::new();
                     loop {
@@ -1199,10 +1227,10 @@ impl Parser {
                     }
                     self.skip_newlines();
                     self.expect(&Token::RBrace)?;
-                    Ok(Expr::MapLit(entries))
+                    Ok(ExprKind::MapLit(entries).at(span))
                 } else {
                     let block = self.parse_block()?;
-                    Ok(Expr::Block(block))
+                    Ok(ExprKind::Block(block).at(span))
                 }
             }
             Token::If => self.parse_if_expr(),
@@ -1331,6 +1359,7 @@ impl Parser {
     }
 
     fn parse_if_expr(&mut self) -> Result<Expr, String> {
+        let span = self.span();
         self.expect(&Token::If)?;
         let cond = self.parse_expr()?;
         self.skip_newlines();
@@ -1346,7 +1375,7 @@ impl Parser {
             } else {
                 self.skip_newlines();
                 let block = self.parse_block()?;
-                Some(Box::new(Expr::Block(block)))
+                Some(Box::new(ExprKind::Block(block).at(span)))
             }
         } else {
             // No else — restore position so newlines aren't consumed
@@ -1354,10 +1383,11 @@ impl Parser {
             None
         };
 
-        Ok(Expr::If(Box::new(cond), then_block, else_expr))
+        Ok(ExprKind::If(Box::new(cond), then_block, else_expr).at(span))
     }
 
     fn parse_match_expr(&mut self) -> Result<Expr, String> {
+        let span = self.span();
         self.expect(&Token::Match)?;
         let scrutinee = self.parse_expr()?;
         self.skip_newlines();
@@ -1376,10 +1406,10 @@ impl Parser {
             let body = if matches!(self.peek(), Token::Return | Token::Break | Token::Continue) {
                 // Statement in match arm - wrap in a block
                 let stmt = self.parse_stmt()?;
-                Expr::Block(Block { stmts: vec![stmt] })
+                ExprKind::Block(Block { stmts: vec![stmt] }).at(span)
             } else if *self.peek() == Token::LBrace {
                 let block = self.parse_block()?;
-                Expr::Block(block)
+                ExprKind::Block(block).at(span)
             } else {
                 self.parse_expr()?
             };
@@ -1394,44 +1424,45 @@ impl Parser {
         }
 
         self.expect(&Token::RBrace)?;
-        Ok(Expr::Match(Box::new(scrutinee), arms))
+        Ok(ExprKind::Match(Box::new(scrutinee), arms).at(span))
     }
 
     fn parse_pattern(&mut self) -> Result<Pattern, String> {
+        let span = self.span();
         match self.peek().clone() {
             Token::Ident(ref name) if name == "_" => {
                 self.advance();
-                Ok(Pattern::Wildcard)
+                Ok(PatternKind::Wildcard.at(span))
             }
             Token::IntLit(n) => {
                 self.advance();
-                Ok(Pattern::IntLit(n))
+                Ok(PatternKind::IntLit(n).at(span))
             }
             Token::FloatLit(f) => {
                 self.advance();
-                Ok(Pattern::FloatLit(f))
+                Ok(PatternKind::FloatLit(f).at(span))
             }
             Token::True => {
                 self.advance();
-                Ok(Pattern::BoolLit(true))
+                Ok(PatternKind::BoolLit(true).at(span))
             }
             Token::False => {
                 self.advance();
-                Ok(Pattern::BoolLit(false))
+                Ok(PatternKind::BoolLit(false).at(span))
             }
             Token::StringLit(s) => {
                 self.advance();
-                Ok(Pattern::StringLit(s))
+                Ok(PatternKind::StringLit(s).at(span))
             }
             Token::Nil => {
                 self.advance();
-                Ok(Pattern::Nil)
+                Ok(PatternKind::Nil.at(span))
             }
             Token::Bang => {
                 // Error pattern: !name
                 self.advance();
                 let name = self.expect_ident()?;
-                Ok(Pattern::Error(name))
+                Ok(PatternKind::Error(name).at(span))
             }
             Token::Is => {
                 // is Type pattern
@@ -1442,9 +1473,9 @@ impl Parser {
                         if *self.peek() == Token::Dot {
                             self.advance();
                             let variant = self.expect_type_ident()?;
-                            Ok(Pattern::IsEnumVariant(name, variant))
+                            Ok(PatternKind::IsEnumVariant(name, variant).at(span))
                         } else {
-                            Ok(Pattern::IsType(TypeExpr::Named(name)))
+                            Ok(PatternKind::IsType(TypeExpr::Named(name)).at(span))
                         }
                     }
                     Token::Ident(ref name) if is_primitive_type(name) => {
@@ -1455,7 +1486,7 @@ impl Parser {
                             self.advance();
                             ty = TypeExpr::Optional(Box::new(ty));
                         }
-                        Ok(Pattern::IsType(ty))
+                        Ok(PatternKind::IsType(ty).at(span))
                     }
                     tok => Err(self.error(format!("expected type after 'is', got {:?}", tok))),
                 }
@@ -1480,9 +1511,9 @@ impl Parser {
                             }
                         }
                         self.expect(&Token::RParen)?;
-                        Ok(Pattern::EnumVariant(type_name, variant, bindings))
+                        Ok(PatternKind::EnumVariant(type_name, variant, bindings).at(span))
                     } else {
-                        Ok(Pattern::EnumVariant(type_name, variant, vec![]))
+                        Ok(PatternKind::EnumVariant(type_name, variant, vec![]).at(span))
                     }
                 } else {
                     Err(self.error(format!(
@@ -1517,27 +1548,28 @@ impl Parser {
                                         }
                                     }
                                     self.expect(&Token::RParen)?;
-                                    return Ok(Pattern::QualifiedEnumVariant(
+                                    return Ok(PatternKind::QualifiedEnumVariant(
                                         name, type_name, variant, bindings,
-                                    ));
+                                    ).at(span));
                                 }
-                                return Ok(Pattern::QualifiedEnumVariant(
+                                return Ok(PatternKind::QualifiedEnumVariant(
                                     name,
                                     type_name,
                                     variant,
                                     vec![],
-                                ));
+                                ).at(span));
                             }
                         }
                     }
                 }
-                Ok(Pattern::Binding(name))
+                Ok(PatternKind::Binding(name).at(span))
             }
             tok => Err(self.error(format!("unexpected token in pattern: {:?}", tok))),
         }
     }
 
     fn parse_for_expr(&mut self) -> Result<Expr, String> {
+        let span = self.span();
         self.expect(&Token::For)?;
         let var1 = self.expect_ident()?;
         let var2 = if *self.peek() == Token::Comma {
@@ -1550,25 +1582,28 @@ impl Parser {
         let iterable = self.parse_expr()?;
         self.skip_newlines();
         let body = self.parse_block()?;
-        Ok(Expr::For(var1, var2, Box::new(iterable), body))
+        Ok(ExprKind::For(var1, var2, Box::new(iterable), body).at(span))
     }
 
     fn parse_while_expr(&mut self) -> Result<Expr, String> {
+        let span = self.span();
         self.expect(&Token::While)?;
         let cond = self.parse_expr()?;
         self.skip_newlines();
         let body = self.parse_block()?;
-        Ok(Expr::While(Box::new(cond), body))
+        Ok(ExprKind::While(Box::new(cond), body).at(span))
     }
 
     fn parse_loop_expr(&mut self) -> Result<Expr, String> {
+        let span = self.span();
         self.expect(&Token::Loop)?;
         self.skip_newlines();
         let body = self.parse_block()?;
-        Ok(Expr::Loop(body))
+        Ok(ExprKind::Loop(body).at(span))
     }
 
     fn parse_guard_expr(&mut self) -> Result<Expr, String> {
+        let span = self.span();
         self.expect(&Token::Guard)?;
 
         let (binding, condition) = if *self.peek() == Token::Let {
@@ -1585,10 +1620,11 @@ impl Parser {
         self.skip_newlines();
         let else_block = self.parse_block()?;
 
-        Ok(Expr::Guard(binding, Box::new(condition), else_block))
+        Ok(ExprKind::Guard(binding, Box::new(condition), else_block).at(span))
     }
 
     fn parse_lambda(&mut self) -> Result<Expr, String> {
+        let span = self.span();
         self.expect(&Token::Fn)?;
         self.expect(&Token::LParen)?;
         let params = self.parse_params()?;
@@ -1604,7 +1640,7 @@ impl Parser {
         self.skip_newlines();
         let body = self.parse_block()?;
 
-        Ok(Expr::Lambda(params, return_type, body))
+        Ok(ExprKind::Lambda(params, return_type, body).at(span))
     }
 
     fn convert_string_parts(&self, parts: Vec<LexStringPart>) -> Result<Vec<StringPart>, String> {
@@ -1764,8 +1800,8 @@ mod tests {
     fn test_array_literal() {
         let prog = parse_str("let arr = [1, 2, 3]").unwrap();
         match &prog.items[0] {
-            Item::Let(decl) => match &decl.value {
-                Expr::ArrayLit(elems) => assert_eq!(elems.len(), 3),
+            Item::Let(decl) => match &decl.value.kind {
+                ExprKind::ArrayLit(elems) => assert_eq!(elems.len(), 3),
                 _ => panic!("expected ArrayLit"),
             },
             _ => panic!("expected Let"),
@@ -1776,8 +1812,8 @@ mod tests {
     fn test_map_literal() {
         let prog = parse_str(r#"let m = {"a": 1, "b": 2}"#).unwrap();
         match &prog.items[0] {
-            Item::Let(decl) => match &decl.value {
-                Expr::MapLit(entries) => assert_eq!(entries.len(), 2),
+            Item::Let(decl) => match &decl.value.kind {
+                ExprKind::MapLit(entries) => assert_eq!(entries.len(), 2),
                 _ => panic!("expected MapLit"),
             },
             _ => panic!("expected Let"),
@@ -1788,8 +1824,8 @@ mod tests {
     fn test_tuple_literal() {
         let prog = parse_str("let t = (1, 2, 3)").unwrap();
         match &prog.items[0] {
-            Item::Let(decl) => match &decl.value {
-                Expr::TupleLit(elems) => assert_eq!(elems.len(), 3),
+            Item::Let(decl) => match &decl.value.kind {
+                ExprKind::TupleLit(elems) => assert_eq!(elems.len(), 3),
                 _ => panic!("expected TupleLit"),
             },
             _ => panic!("expected Let"),
@@ -1816,7 +1852,7 @@ mod tests {
         let prog = parse_str(src).unwrap();
         match &prog.items[0] {
             Item::Let(decl) => {
-                assert!(matches!(&decl.value, Expr::Lambda(_, _, _)));
+                assert!(matches!(&decl.value.kind, ExprKind::Lambda(_, _, _)));
             }
             _ => panic!("expected Let"),
         }
@@ -1827,8 +1863,8 @@ mod tests {
         // 2 + 3 * 4 should parse as 2 + (3 * 4)
         let prog = parse_str("let x = 2 + 3 * 4").unwrap();
         match &prog.items[0] {
-            Item::Let(decl) => match &decl.value {
-                Expr::BinOp(_, BinOp::Add, _) => {} // correct: Add is top-level
+            Item::Let(decl) => match &decl.value.kind {
+                ExprKind::BinOp(_, BinOp::Add, _) => {} // correct: Add is top-level
                 _ => panic!("expected Add at top level"),
             },
             _ => panic!("expected Let"),
@@ -1840,7 +1876,7 @@ mod tests {
         let prog = parse_str(r#"let e = !("error")"#).unwrap();
         match &prog.items[0] {
             Item::Let(decl) => {
-                assert!(matches!(&decl.value, Expr::ErrorLit(_)));
+                assert!(matches!(&decl.value.kind, ExprKind::ErrorLit(_)));
             }
             _ => panic!("expected Let"),
         }

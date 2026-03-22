@@ -1,4 +1,4 @@
-use crate::ast::{BinOp, Pattern, UnaryOp};
+use crate::ast::{BinOp, Pattern, PatternKind, UnaryOp};
 use super::*;
 use super::capture::*;
 use std::collections::HashMap;
@@ -19,6 +19,8 @@ struct Compiler {
 
 struct FnCompiler {
     code: Vec<Op>,
+    line_table: Vec<u32>,
+    current_line: u32,
     registers: u16,
     locals: HashMap<String, u16>, // name -> register
     local_types: HashMap<String, Type>,
@@ -35,6 +37,8 @@ impl FnCompiler {
     fn new() -> Self {
         FnCompiler {
             code: Vec::new(),
+            line_table: Vec::new(),
+            current_line: 0,
             registers: 0,
             locals: HashMap::new(),
             local_types: HashMap::new(),
@@ -55,6 +59,7 @@ impl FnCompiler {
     fn emit(&mut self, op: Op) -> usize {
         let idx = self.code.len();
         self.code.push(op);
+        self.line_table.push(self.current_line);
         idx
     }
 
@@ -168,6 +173,7 @@ impl Compiler {
                     code: Vec::new(),
                     param_types: fdef.params.iter().map(|(_, t)| t.clone()).collect(),
                     return_type: fdef.return_type.clone(),
+                    line_table: Vec::new(),
                 });
                 fn_defs.push(fdef);
                 if fdef.name == "main" {
@@ -193,14 +199,21 @@ impl Compiler {
 
         let entry = entry_point.ok_or("entry module must define a `main` function")?;
 
+        let functions = std::mem::take(&mut self.functions);
+        let mut method_lookup: HashMap<String, Vec<usize>> = HashMap::new();
+        for (i, f) in functions.iter().enumerate() {
+            method_lookup.entry(f.name.clone()).or_insert_with(Vec::new).push(i);
+        }
+
         Ok(Program {
-            functions: std::mem::take(&mut self.functions),
+            functions,
             strings: std::mem::take(&mut self.strings),
             entry_point: entry,
             type_info: std::mem::take(&mut self.type_info),
             method_names: std::mem::take(&mut self.method_names),
             type_ids: std::mem::take(&mut self.type_ids),
             globals: std::mem::take(&mut self.globals),
+            method_lookup,
         })
     }
 
@@ -218,6 +231,7 @@ impl Compiler {
             code: Vec::new(),
             param_types: fdef.params.iter().map(|(_, t)| t.clone()).collect(),
             return_type: fdef.return_type.clone(),
+            line_table: Vec::new(),
         });
         self.compile_fn_body_with_cells(idx, fdef, cell_params)?;
         Ok(idx)
@@ -274,6 +288,7 @@ impl Compiler {
             code: fc.code,
             param_types: fdef.params.iter().map(|(_, t)| t.clone()).collect(),
             return_type: fdef.return_type.clone(),
+            line_table: fc.line_table,
         };
 
         Ok(())
@@ -383,6 +398,7 @@ impl Compiler {
     }
 
     fn compile_expr(&mut self, fc: &mut FnCompiler, expr: &TypedExpr) -> Result<u16, String> {
+        fc.current_line = expr.span.line;
         match &expr.kind {
             TypedExprKind::IntLit(n) => {
                 let reg = fc.alloc_reg();
@@ -1188,12 +1204,12 @@ impl Compiler {
         pattern: &Pattern,
         _scrutinee_ty: &Type,
     ) -> Result<Option<usize>, String> {
-        match pattern {
-            Pattern::Wildcard | Pattern::Binding(_) => {
+        match &pattern.kind {
+            PatternKind::Wildcard | PatternKind::Binding(_) => {
                 // Always matches
                 Ok(None)
             }
-            Pattern::IntLit(n) => {
+            PatternKind::IntLit(n) => {
                 let cmp_reg = fc.alloc_reg();
                 let val_reg = fc.alloc_reg();
                 fc.emit(Op::LoadInt(val_reg, *n));
@@ -1201,7 +1217,7 @@ impl Compiler {
                 let jump = fc.emit(Op::JumpIfFalse(cmp_reg, 0));
                 Ok(Some(jump))
             }
-            Pattern::FloatLit(f) => {
+            PatternKind::FloatLit(f) => {
                 let cmp_reg = fc.alloc_reg();
                 let val_reg = fc.alloc_reg();
                 fc.emit(Op::LoadFloat(val_reg, *f));
@@ -1209,7 +1225,7 @@ impl Compiler {
                 let jump = fc.emit(Op::JumpIfFalse(cmp_reg, 0));
                 Ok(Some(jump))
             }
-            Pattern::BoolLit(b) => {
+            PatternKind::BoolLit(b) => {
                 let cmp_reg = fc.alloc_reg();
                 let val_reg = fc.alloc_reg();
                 fc.emit(Op::LoadBool(val_reg, *b));
@@ -1217,7 +1233,7 @@ impl Compiler {
                 let jump = fc.emit(Op::JumpIfFalse(cmp_reg, 0));
                 Ok(Some(jump))
             }
-            Pattern::StringLit(s) => {
+            PatternKind::StringLit(s) => {
                 let cmp_reg = fc.alloc_reg();
                 let val_reg = fc.alloc_reg();
                 let idx = self.intern_string(s);
@@ -1226,16 +1242,16 @@ impl Compiler {
                 let jump = fc.emit(Op::JumpIfFalse(cmp_reg, 0));
                 Ok(Some(jump))
             }
-            Pattern::Nil => {
+            PatternKind::Nil => {
                 let cmp_reg = fc.alloc_reg();
                 fc.emit(Op::IsNil(cmp_reg, scrutinee_reg));
                 let jump = fc.emit(Op::JumpIfFalse(cmp_reg, 0));
                 Ok(Some(jump))
             }
-            Pattern::EnumVariant(type_name, variant, _)
-            | Pattern::QualifiedEnumVariant(_, type_name, variant, _) => {
-                let full_name = match pattern {
-                    Pattern::QualifiedEnumVariant(m, t, _, _) => format!("{}.{}", m, t),
+            PatternKind::EnumVariant(type_name, variant, _)
+            | PatternKind::QualifiedEnumVariant(_, type_name, variant, _) => {
+                let full_name = match &pattern.kind {
+                    PatternKind::QualifiedEnumVariant(m, t, _, _) => format!("{}.{}", m, t),
                     _ => type_name.clone(),
                 };
                 let variant_idx = self.get_variant_index(&full_name, variant)?;
@@ -1244,13 +1260,13 @@ impl Compiler {
                 let jump = fc.emit(Op::JumpIfFalse(cmp_reg, 0));
                 Ok(Some(jump))
             }
-            Pattern::Error(_name) => {
+            PatternKind::Error(_name) => {
                 let is_err = fc.alloc_reg();
                 fc.emit(Op::IsError(is_err, scrutinee_reg));
                 let jump = fc.emit(Op::JumpIfFalse(is_err, 0));
                 Ok(Some(jump))
             }
-            Pattern::IsType(ty_expr) => {
+            PatternKind::IsType(ty_expr) => {
                 let type_name = canonical_type_name(ty_expr);
                 let type_id = self.intern_type(&type_name);
                 let cmp_reg = fc.alloc_reg();
@@ -1258,7 +1274,7 @@ impl Compiler {
                 let jump = fc.emit(Op::JumpIfFalse(cmp_reg, 0));
                 Ok(Some(jump))
             }
-            Pattern::IsEnumVariant(type_name, variant) => {
+            PatternKind::IsEnumVariant(type_name, variant) => {
                 let variant_idx = self.get_variant_index(type_name, variant)?;
                 let cmp_reg = fc.alloc_reg();
                 fc.emit(Op::IsEnumVariant(cmp_reg, scrutinee_reg, variant_idx));
@@ -1275,13 +1291,13 @@ impl Compiler {
         pattern: &Pattern,
         scrutinee_ty: &Type,
     ) -> Result<(), String> {
-        match pattern {
-            Pattern::Binding(name) if name != "_" => {
+        match &pattern.kind {
+            PatternKind::Binding(name) if name != "_" => {
                 let reg = fc.declare_local(name, scrutinee_ty);
                 fc.emit(Op::Move(reg, scrutinee_reg));
             }
-            Pattern::EnumVariant(_, _, bindings)
-            | Pattern::QualifiedEnumVariant(_, _, _, bindings) => {
+            PatternKind::EnumVariant(_, _, bindings)
+            | PatternKind::QualifiedEnumVariant(_, _, _, bindings) => {
                 for (i, name) in bindings.iter().enumerate() {
                     if name != "_" {
                         let reg = fc.declare_local(name, &Type::Nil); // type resolved during type check
@@ -1289,7 +1305,7 @@ impl Compiler {
                     }
                 }
             }
-            Pattern::Error(name) => {
+            PatternKind::Error(name) => {
                 let reg = fc.declare_local(name, &Type::String);
                 fc.emit(Op::UnwrapError(reg, scrutinee_reg));
             }
