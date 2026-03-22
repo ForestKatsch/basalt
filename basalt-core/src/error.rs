@@ -45,6 +45,14 @@ impl CompileError {
         self
     }
 
+    /// Set the span if it hasn't been set yet (line == 0 means unset).
+    pub fn with_span(mut self, span: Span) -> Self {
+        if self.span.line == 0 {
+            self.span = span;
+        }
+        self
+    }
+
     /// Render this error as a human-readable diagnostic.
     ///
     /// `source` is the full source code of the file that produced this error.
