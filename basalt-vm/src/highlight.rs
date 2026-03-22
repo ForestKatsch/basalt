@@ -133,10 +133,9 @@ const RUST: LangDef = LangDef {
 
 const SHELL: LangDef = LangDef {
     keywords: &[
-        "if", "then", "else", "fi", "for", "do", "done", "while",
-        "case", "esac", "in", "function", "return", "exit",
-        "echo", "cd", "ls", "rm", "cp", "mv", "mkdir", "cat",
-        "grep", "sed", "awk", "export", "source", "sudo",
+        "if", "then", "else", "fi", "for", "do", "done", "while", "case", "esac", "in", "function",
+        "return", "exit", "echo", "cd", "ls", "rm", "cp", "mv", "mkdir", "cat", "grep", "sed",
+        "awk", "export", "source", "sudo",
     ],
     types: &[],
     line_comment: "#",
