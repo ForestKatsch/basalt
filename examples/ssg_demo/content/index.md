@@ -1,19 +1,37 @@
-title: Home
-date: 2026-03-22
-description: Welcome to the Basalt example site
+title: Learn Basalt
+date: 2026-03-01
+description: A friendly guide to a language that doesn't waste your time
 
-# Welcome
+This guide walks you through everything Basalt can do, with examples you can run at every step. No prior experience with Basalt is needed — just curiosity.
 
-This site was built with a **static site generator** written entirely in [Basalt](https://github.com/example/basalt).
+## Your first three minutes
 
-## What is Basalt?
+Install and build:
 
-Basalt is a statically-typed, bytecode-compiled programming language. It emphasizes:
+```
+cargo build --release
+```
 
-- **Strict typing** — no implicit conversions
-- **Explicit error handling** — no exceptions
-- **Capability-based I/O** — sandboxed by default
+Write this to a file called `hello.bas`:
 
-> The best code is code that tells the truth about what it does.
+```
+fn main(stdout: Stdout) {
+    stdout.println("Hello! You're running Basalt.")
+}
+```
 
-See the [about page](about.html) for more details.
+Run it:
+
+```
+basalt run hello.bas
+```
+
+That's it. You just wrote and ran a Basalt program. The `stdout: Stdout` part is how Basalt handles I/O — your program only gets the capabilities you ask for. No Stdout parameter, no printing. We'll explain why this is a great idea in the [Capabilities](capabilities.html) chapter.
+
+You can also type-check without running:
+
+```
+basalt check hello.bas
+```
+
+If there's an error, Basalt will point at the exact line and character, show you the source, and often suggest what you meant to write. Try introducing a typo and see what happens.

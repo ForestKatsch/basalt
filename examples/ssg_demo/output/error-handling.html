@@ -3,8 +3,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{title}} — Basalt</title>
-    <meta name="description" content="{{description}}">
+    <title>Error Handling — Basalt</title>
+    <meta name="description" content="Result types, error propagation, and recovery">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -273,13 +273,50 @@
         </div>
     </div>
     <div class="sidebar-nav">
-        <div class="page">{{nav}}</div>
+        <div class="page"><a href="index.html">Home</a> <a href="capabilities.html">Capabilities</a> <a href="closures.html">Closures</a> <a href="control-flow.html">Control Flow</a> <a href="conversions.html">Type Conversions</a> <a href="enums.html">Enums</a> <a href="error-handling.html">Error Handling</a> <a href="functions.html">Functions</a> <a href="modules.html">Modules</a> <a href="pattern-matching.html">Pattern Matching</a> <a href="stdlib.html">Standard Library</a> <a href="structs.html">Structs</a> <a href="types.html">Types</a> <a href="variables.html">Variables</a></div>
     </div>
     <div class="page">
         <article class="content">
-            <h1>{{title}}</h1>
-            <p class="subtitle">{{description}}</p>
-            {{body}}
+            <h1>Error Handling</h1>
+            <p class="subtitle">Result types, error propagation, and recovery</p>
+            <p>Basalt has no exceptions. Errors are values, carried by result types <code>T!E</code>.</p>
+<h3>Creating and returning errors</h3>
+<pre><code>fn parse_age(s: string) -&gt; i64!string {
+    let n = s as? i64
+    if n is nil {
+        return !("invalid number: " + s)
+    }
+    let age = n as i64
+    if age &lt; 0 {
+        return !("age cannot be negative")
+    }
+    return age
+}</code></pre>
+<h3>Propagating with ?</h3>
+<p>The <code>?</code> operator propagates errors automatically. If the result is an error, it returns from the enclosing function. If successful, it unwraps the value.</p>
+<pre><code>fn load_and_parse(fs: Fs) -&gt; i64!string {
+    let content = fs.read_file("age.txt")?  // propagates read error
+    let age = parse_age(content.trim())?     // propagates parse error
+    return age
+}</code></pre>
+<p>The enclosing function must return a compatible result type.</p>
+<h3>guard let for unwrapping</h3>
+<p>When you want to unwrap and diverge on failure without <code>match</code>:</p>
+<pre><code>fn process(fs: Fs, stdout: Stdout) {
+    guard let data = fs.read_file("input.txt") else {
+        stdout.println("Cannot read input")
+        return
+    }
+    // data is `string` here
+    stdout.println("Read " + (data.length as string) + " chars")
+}</code></pre>
+<h3>panic for unrecoverable errors</h3>
+<pre><code>fn main(stdout: Stdout) {
+    panic("something went terribly wrong")
+    // Terminates with message and stack trace. Cannot be caught.
+}</code></pre>
+<p>Use <code>panic</code> for programming errors. Use result types for expected failures.</p>
+
         </article>
         <footer class="footer">
             Built with a static site generator written in Basalt

@@ -3,8 +3,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{title}} — Basalt</title>
-    <meta name="description" content="{{description}}">
+    <title>Closures — Basalt</title>
+    <meta name="description" content="Lambda functions and functional array methods">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -273,13 +273,52 @@
         </div>
     </div>
     <div class="sidebar-nav">
-        <div class="page">{{nav}}</div>
+        <div class="page"><a href="index.html">Home</a> <a href="capabilities.html">Capabilities</a> <a href="closures.html">Closures</a> <a href="control-flow.html">Control Flow</a> <a href="conversions.html">Type Conversions</a> <a href="enums.html">Enums</a> <a href="error-handling.html">Error Handling</a> <a href="functions.html">Functions</a> <a href="modules.html">Modules</a> <a href="pattern-matching.html">Pattern Matching</a> <a href="stdlib.html">Standard Library</a> <a href="structs.html">Structs</a> <a href="types.html">Types</a> <a href="variables.html">Variables</a></div>
     </div>
     <div class="page">
         <article class="content">
-            <h1>{{title}}</h1>
-            <p class="subtitle">{{description}}</p>
-            {{body}}
+            <h1>Closures</h1>
+            <p class="subtitle">Lambda functions and functional array methods</p>
+            <p>Closures use the <code>fn</code> keyword with inline bodies. They capture variables from their enclosing scope by reference.</p>
+<pre><code>fn main(stdout: Stdout) {
+    let double = fn(x: i64) -&gt; i64 { return x * 2 }
+    let square = fn(x: i64) -&gt; i64 { return x * x }
+
+    stdout.println(double(5) as string)  // Output: 10
+    stdout.println(square(5) as string)  // Output: 25
+}</code></pre>
+<h3>Capture by reference</h3>
+<p>Mutations through closures are visible in the enclosing scope:</p>
+<pre><code>fn main(stdout: Stdout) {
+    let mut count = 0
+    let increment = fn() {
+        count = count + 1
+    }
+    increment()
+    increment()
+    stdout.println(count as string)  // Output: 2
+}</code></pre>
+<h3>Functional array methods</h3>
+<p>Arrays support <code>map</code>, <code>filter</code>, <code>find</code>, <code>any</code>, and <code>all</code>:</p>
+<pre><code>fn main(stdout: Stdout) {
+    let nums = [1, 2, 3, 4, 5]
+
+    // map: transform each element
+    let doubled = nums.map(fn(x: i64) -&gt; i64 { return x * 2 })
+    stdout.println(doubled.join(", "))  // Output: 2, 4, 6, 8, 10
+
+    // filter: keep matching elements
+    let evens = nums.filter(fn(x: i64) -&gt; bool { return x % 2 == 0 })
+    stdout.println(evens.join(", "))  // Output: 2, 4
+
+    // any / all
+    let has_big = nums.any(fn(x: i64) -&gt; bool { return x &gt; 3 })
+    stdout.println(has_big as string)  // Output: true
+
+    let all_pos = nums.all(fn(x: i64) -&gt; bool { return x &gt; 0 })
+    stdout.println(all_pos as string)  // Output: true
+}</code></pre>
+
         </article>
         <footer class="footer">
             Built with a static site generator written in Basalt

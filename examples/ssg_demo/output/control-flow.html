@@ -3,8 +3,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{title}} — Basalt</title>
-    <meta name="description" content="{{description}}">
+    <title>Control Flow — Basalt</title>
+    <meta name="description" content="Conditionals, loops, guards, and pattern matching">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -273,13 +273,111 @@
         </div>
     </div>
     <div class="sidebar-nav">
-        <div class="page">{{nav}}</div>
+        <div class="page"><a href="index.html">Home</a> <a href="capabilities.html">Capabilities</a> <a href="closures.html">Closures</a> <a href="control-flow.html">Control Flow</a> <a href="conversions.html">Type Conversions</a> <a href="enums.html">Enums</a> <a href="error-handling.html">Error Handling</a> <a href="functions.html">Functions</a> <a href="modules.html">Modules</a> <a href="pattern-matching.html">Pattern Matching</a> <a href="stdlib.html">Standard Library</a> <a href="structs.html">Structs</a> <a href="types.html">Types</a> <a href="variables.html">Variables</a></div>
     </div>
     <div class="page">
         <article class="content">
-            <h1>{{title}}</h1>
-            <p class="subtitle">{{description}}</p>
-            {{body}}
+            <h1>Control Flow</h1>
+            <p class="subtitle">Conditionals, loops, guards, and pattern matching</p>
+            <h3>if/else</h3>
+<p>Conditions must be <code>bool</code>. There is no truthiness — <code>if 0</code> and <code>if ""</code> are compile errors.</p>
+<p><code>if</code> is an expression that produces a value:</p>
+<pre><code>fn main(stdout: Stdout) {
+    let x = 10
+    let label = if x &gt; 0 { "positive" } else { "non-positive" }
+    stdout.println(label)  // Output: positive
+
+    let grade = if x &gt;= 90 { "A" }
+        else if x &gt;= 80 { "B" }
+        else if x &gt;= 70 { "C" }
+        else { "F" }
+    stdout.println(grade)  // Output: F
+}</code></pre>
+<h3>while</h3>
+<pre><code>fn main(stdout: Stdout) {
+    let mut i = 1
+    while i &lt;= 5 {
+        stdout.print(i as string + " ")
+        i = i + 1
+    }
+    stdout.println("")
+    // Output: 1 2 3 4 5
+}</code></pre>
+<h3>for-in</h3>
+<p>Iterate over arrays, maps, strings, and ranges:</p>
+<pre><code>fn main(stdout: Stdout) {
+    // Array iteration
+    let fruits = ["apple", "banana", "cherry"]
+    for fruit in fruits {
+        stdout.println(fruit)
+    }
+
+    // With index (value first, index second)
+    for fruit, i in fruits {
+        stdout.println("\(i as string): \(fruit)")
+    }
+
+    // Map iteration (key first, value second)
+    let ages = {"alice": 30, "bob": 25}
+    for name, age in ages {
+        stdout.println("\(name) is \(age as string)")
+    }
+
+    // Range (exclusive end)
+    let mut sum = 0
+    for i in 0..10 {
+        sum = sum + i
+    }
+    stdout.println(sum as string)  // Output: 45
+
+    // String iteration (by character)
+    for ch in "hi!" {
+        stdout.print("[" + ch + "]")
+    }
+    stdout.println("")  // Output: [h][i][!]
+}</code></pre>
+<h3>loop, break, continue</h3>
+<pre><code>fn main(stdout: Stdout) {
+    // Infinite loop with break
+    let mut n = 0
+    loop {
+        n = n + 1
+        if n &gt; 5 { break }
+    }
+    stdout.println(n as string)  // Output: 6
+
+    // Skip odd numbers with continue
+    let mut evens = 0
+    for i in 0..10 {
+        if i % 2 != 0 { continue }
+        evens = evens + 1
+    }
+    stdout.println(evens as string)  // Output: 5
+}</code></pre>
+<h3>guard / guard let</h3>
+<p><code>guard</code> asserts a condition. If it fails, the <code>else</code> block must diverge (<code>return</code>, <code>break</code>, <code>continue</code>, or <code>panic</code>).</p>
+<pre><code>fn process(x: i64, stdout: Stdout) {
+    guard x &gt; 0 else {
+        stdout.println("must be positive")
+        return
+    }
+    stdout.println("processing: " + (x as string))
+}
+
+fn main(stdout: Stdout) {
+    process(5, stdout)   // Output: processing: 5
+    process(-1, stdout)  // Output: must be positive
+}</code></pre>
+<p><code>guard let</code> unwraps optionals and results into the enclosing scope:</p>
+<pre><code>fn load_config(fs: Fs, stdout: Stdout) {
+    guard let content = fs.read_file("config.txt") else {
+        stdout.println("Could not read config")
+        return
+    }
+    // content is `string` here, not a result type
+    stdout.println("Config loaded: " + (content.length as string) + " chars")
+}</code></pre>
+
         </article>
         <footer class="footer">
             Built with a static site generator written in Basalt

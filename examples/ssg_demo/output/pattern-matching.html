@@ -3,8 +3,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{title}} — Basalt</title>
-    <meta name="description" content="{{description}}">
+    <title>Pattern Matching — Basalt</title>
+    <meta name="description" content="Exhaustive pattern matching with match expressions">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -273,13 +273,69 @@
         </div>
     </div>
     <div class="sidebar-nav">
-        <div class="page">{{nav}}</div>
+        <div class="page"><a href="index.html">Home</a> <a href="capabilities.html">Capabilities</a> <a href="closures.html">Closures</a> <a href="control-flow.html">Control Flow</a> <a href="conversions.html">Type Conversions</a> <a href="enums.html">Enums</a> <a href="error-handling.html">Error Handling</a> <a href="functions.html">Functions</a> <a href="modules.html">Modules</a> <a href="pattern-matching.html">Pattern Matching</a> <a href="stdlib.html">Standard Library</a> <a href="structs.html">Structs</a> <a href="types.html">Types</a> <a href="variables.html">Variables</a></div>
     </div>
     <div class="page">
         <article class="content">
-            <h1>{{title}}</h1>
-            <p class="subtitle">{{description}}</p>
-            {{body}}
+            <h1>Pattern Matching</h1>
+            <p class="subtitle">Exhaustive pattern matching with match expressions</p>
+            <p><code>match</code> is an expression with exhaustive checking. It works on literals, enums, results, and union types.</p>
+<h3>Literal patterns</h3>
+<pre><code>fn classify(n: i64) -&gt; string {
+    match n {
+        0 =&gt; return "zero"
+        1 =&gt; return "one"
+        _ =&gt; return "other"
+    }
+    return "unreachable"
+}
+
+fn main(stdout: Stdout) {
+    stdout.println(classify(0))   // Output: zero
+    stdout.println(classify(42))  // Output: other
+}</code></pre>
+<h3>Enum variant patterns</h3>
+<pre><code>type Shape {
+    Circle(f64)
+    Rect(f64, f64)
+}
+
+fn area(s: Shape) -&gt; f64 {
+    match s {
+        Shape.Circle(r) =&gt; return 3.14159 * r * r
+        Shape.Rect(w, h) =&gt; return w * h
+    }
+    return 0.0
+}
+
+fn main(stdout: Stdout) {
+    let c = Shape.Circle(5.0)
+    stdout.println(area(c) as string)  // Output: 78.53975
+}</code></pre>
+<h3>Type narrowing with is</h3>
+<p>Use <code>is</code> patterns to match union members:</p>
+<pre><code>fn to_string(val: i64 | f64 | string) -&gt; string {
+    match val {
+        is i64 =&gt; return "int: " + (val as string)
+        is f64 =&gt; return "float: " + (val as string)
+        is string =&gt; return "str: " + val
+    }
+    return ""
+}</code></pre>
+<h3>Matching results</h3>
+<pre><code>fn divide(a: f64, b: f64) -&gt; f64!string {
+    if b == 0.0 { return !("division by zero") }
+    return a / b
+}
+
+fn main(stdout: Stdout) {
+    match divide(10.0, 3.0) {
+        !err =&gt; stdout.println("Error: " + err)
+        val =&gt; stdout.println("Result: " + (val as string))
+    }
+    // Output: Result: 3.3333333333333335
+}</code></pre>
+
         </article>
         <footer class="footer">
             Built with a static site generator written in Basalt

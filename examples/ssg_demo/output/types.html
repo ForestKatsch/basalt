@@ -3,8 +3,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{title}} — Basalt</title>
-    <meta name="description" content="{{description}}">
+    <title>Types — Basalt</title>
+    <meta name="description" content="Basalt's type system">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -273,13 +273,115 @@
         </div>
     </div>
     <div class="sidebar-nav">
-        <div class="page">{{nav}}</div>
+        <div class="page"><a href="index.html">Home</a> <a href="capabilities.html">Capabilities</a> <a href="closures.html">Closures</a> <a href="control-flow.html">Control Flow</a> <a href="conversions.html">Type Conversions</a> <a href="enums.html">Enums</a> <a href="error-handling.html">Error Handling</a> <a href="functions.html">Functions</a> <a href="modules.html">Modules</a> <a href="pattern-matching.html">Pattern Matching</a> <a href="stdlib.html">Standard Library</a> <a href="structs.html">Structs</a> <a href="types.html">Types</a> <a href="variables.html">Variables</a></div>
     </div>
     <div class="page">
         <article class="content">
-            <h1>{{title}}</h1>
-            <p class="subtitle">{{description}}</p>
-            {{body}}
+            <h1>Types</h1>
+            <p class="subtitle">Basalt's type system</p>
+            <h3>Primitive Types</h3>
+<pre><code>fn main(stdout: Stdout) {
+    let i = 42              // i64 (default integer)
+    let f = 3.14            // f64
+    let b = true            // bool
+    let s = "hello"         // string (immutable, UTF-8)
+    let n = nil             // nil (absence of value)
+
+    // Sized integer types require annotation
+    let byte: u8 = 255
+    let small: i16 = -1000
+    let id: u64 = 0xDEADBEEF
+
+    stdout.println(i as string)     // Output: 42
+    stdout.println(byte as string)  // Output: 255
+}</code></pre>
+<p>Integer types: <code>i8</code>, <code>i16</code>, <code>i32</code>, <code>i64</code> (signed) and <code>u8</code>, <code>u16</code>, <code>u32</code>, <code>u64</code> (unsigned). All integer literals default to <code>i64</code>. Integer arithmetic is checked — overflow panics at runtime.</p>
+<p>There is one float type: <code>f64</code> (IEEE 754 double precision).</p>
+<h3>Collections</h3>
+<pre><code>fn main(stdout: Stdout) {
+    // Arrays: ordered, growable, homogeneous
+    let nums = [1, 2, 3]
+    stdout.println(nums[0] as string)  // Output: 1
+
+    // Maps: ordered by insertion, key-value pairs
+    let ages = {"alice": 30, "bob": 25}
+    stdout.println(ages["alice"] as string)  // Output: 30
+
+    // Tuples: fixed-size, heterogeneous, immutable
+    let pair = (42, "hello")
+    stdout.println(pair.0 as string)  // Output: 42
+    stdout.println(pair.1)            // Output: hello
+}</code></pre>
+<p>Arrays and maps are reference types — assignment shares the same object. Use <code>.clone()</code> for an independent copy. Tuples are value types — assignment copies.</p>
+<pre><code>fn main(stdout: Stdout) {
+    let mut a = [1, 2, 3]
+    let mut b = a         // b and a point to the same array
+    b.push(4)
+    stdout.println(a.length as string)  // Output: 4 (same object!)
+
+    let mut c = a.clone() // independent copy
+    c.push(5)
+    stdout.println(a.length as string)  // Output: 4 (unaffected)
+}</code></pre>
+<h3>Optional Types</h3>
+<p><code>T?</code> represents a value that might be absent. It is equivalent to <code>T | nil</code>.</p>
+<pre><code>fn find_user(id: i64) -&gt; string? {
+    if id == 1 { return "Alice" }
+    return nil
+}
+
+fn main(stdout: Stdout) {
+    let name = find_user(1)
+    if name is string {
+        stdout.println("Found: " + name)  // Output: Found: Alice
+    }
+
+    let missing = find_user(99)
+    if missing is nil {
+        stdout.println("Not found")  // Output: Not found
+    }
+}</code></pre>
+<h3>Result Types</h3>
+<p><code>T!E</code> represents either a success value of type <code>T</code> or an error of type <code>E</code>. Errors are values, not exceptions.</p>
+<pre><code>fn parse_port(s: string) -&gt; i64!string {
+    if s.length == 0 { return !("empty input") }
+    let n = s as? i64
+    if n is nil { return !("not a number: " + s) }
+    return n as i64
+}
+
+fn main(stdout: Stdout) {
+    match parse_port("8080") {
+        !err =&gt; stdout.println("Error: " + err)
+        port =&gt; stdout.println("Port: " + (port as string))
+    }
+    // Output: Port: 8080
+
+    match parse_port("abc") {
+        !err =&gt; stdout.println("Error: " + err)
+        _ =&gt; stdout.println("OK")
+    }
+    // Output: Error: not a number: abc
+}</code></pre>
+<p>See <a href="error-handling.html">Error Handling</a> for the full story.</p>
+<h3>Union Types</h3>
+<p>A union <code>A | B</code> accepts values of either type. Use <code>is</code> to narrow to a specific member.</p>
+<pre><code>fn describe(val: i64 | string) -&gt; string {
+    if val is i64 {
+        return "number: " + (val as string)
+    } else {
+        return "text: " + val
+    }
+}
+
+fn main(stdout: Stdout) {
+    stdout.println(describe(42))       // Output: number: 42
+    stdout.println(describe("hello"))  // Output: text: hello
+}</code></pre>
+<p>You can name unions with type aliases:</p>
+<pre><code>type Numeric = i64 | f64
+type JsonPrimitive = bool | f64 | string | nil</code></pre>
+
         </article>
         <footer class="footer">
             Built with a static site generator written in Basalt

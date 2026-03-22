@@ -3,8 +3,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{title}} — Basalt</title>
-    <meta name="description" content="{{description}}">
+    <title>Capabilities — Basalt</title>
+    <meta name="description" content="Capability-based I/O system">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -273,13 +273,93 @@
         </div>
     </div>
     <div class="sidebar-nav">
-        <div class="page">{{nav}}</div>
+        <div class="page"><a href="index.html">Home</a> <a href="capabilities.html">Capabilities</a> <a href="closures.html">Closures</a> <a href="control-flow.html">Control Flow</a> <a href="conversions.html">Type Conversions</a> <a href="enums.html">Enums</a> <a href="error-handling.html">Error Handling</a> <a href="functions.html">Functions</a> <a href="modules.html">Modules</a> <a href="pattern-matching.html">Pattern Matching</a> <a href="stdlib.html">Standard Library</a> <a href="structs.html">Structs</a> <a href="types.html">Types</a> <a href="variables.html">Variables</a></div>
     </div>
     <div class="page">
         <article class="content">
-            <h1>{{title}}</h1>
-            <p class="subtitle">{{description}}</p>
-            {{body}}
+            <h1>Capabilities</h1>
+            <p class="subtitle">Capability-based I/O system</p>
+            <p>IO in Basalt works through capability objects passed to <code>main</code>. A program can only perform IO that it explicitly requests.</p>
+<h3>Stdout</h3>
+<pre><code>fn main(stdout: Stdout) {
+    stdout.println("line with newline")
+    stdout.print("no newline")
+    stdout.flush()
+}</code></pre>
+<h3>Stdin</h3>
+<pre><code>fn main(stdout: Stdout, stdin: Stdin) {
+    stdout.print("What is your name? ")
+    stdout.flush()
+    let name = stdin.read_line()
+    stdout.println("Hello, \(name)!")
+}</code></pre>
+<p>| Method | Description | |---|---| | <code>stdin.read_line()</code> | Read one line (strips newline) | | <code>stdin.read_key()</code> | Read single character (raw mode) |</p>
+<h3>Fs (File System)</h3>
+<p>The <code>Fs</code> capability is sandboxed to the directory containing the source file.</p>
+<pre><code>fn main(stdout: Stdout, fs: Fs) {
+    // Write a file
+    let write_result = fs.write_file("output.txt", "Hello from Basalt!")
+    match write_result {
+        !err =&gt; stdout.println("Write failed: " + err)
+        _ =&gt; stdout.println("Wrote output.txt")
+    }
+
+    // Read a file
+    guard let content = fs.read_file("output.txt") else {
+        stdout.println("Read failed")
+        return
+    }
+    stdout.println(content)
+
+    // Check existence
+    stdout.println(fs.exists("output.txt") as string)  // Output: true
+
+    // List directory
+    guard let files = fs.read_dir(".") else { return }
+    for file in files {
+        stdout.println(file)
+    }
+
+    // Path utilities
+    let p = fs.join("subdir", "page.html")   // "subdir/page.html"
+    let ext = fs.extension("photo.png")       // "png" (returns string?)
+    let name = fs.stem("photo.png")           // "photo" (returns string?)
+}</code></pre>
+<p>| Method | Returns | Description | |---|---|---| | <code>fs.read_file(path)</code> | <code>string!string</code> | Read file contents | | <code>fs.write_file(path, data)</code> | <code>nil!string</code> | Write file | | <code>fs.read_dir(path)</code> | <code>[string]!string</code> | List directory entries | | <code>fs.exists(path)</code> | <code>bool</code> | Check if path exists | | <code>fs.is_dir(path)</code> | <code>bool</code> | Check if path is a directory | | <code>fs.mkdir(path)</code> | <code>nil!string</code> | Create directory | | <code>fs.join(a, b)</code> | <code>string</code> | Join path components | | <code>fs.extension(path)</code> | <code>string?</code> | File extension without dot | | <code>fs.stem(path)</code> | <code>string?</code> | Filename without extension |</p>
+<h3>Env</h3>
+<pre><code>fn main(stdout: Stdout, env: Env) {
+    let args = env.args()
+    for arg in args {
+        stdout.println(arg)
+    }
+
+    let home = env.get("HOME")
+    if home is string {
+        stdout.println("Home: " + home)
+    }
+}</code></pre>
+<p>| Method | Returns | Description | |---|---|---| | <code>env.args()</code> | <code>[string]</code> | Command-line arguments | | <code>env.get(name)</code> | <code>string?</code> | Environment variable value |</p>
+<h3>How capabilities work</h3>
+<p>Capabilities are passed as parameters to <code>main</code>. You only get what you ask for:</p>
+<pre><code>// This program can print but cannot read files
+fn main(stdout: Stdout) {
+    stdout.println("I have no file access")
+}
+
+// This program can read/write files and print
+fn main(stdout: Stdout, fs: Fs) {
+    guard let data = fs.read_file("input.txt") else { return }
+    stdout.println(data)
+}</code></pre>
+<p>Pass capabilities to helper functions as regular parameters:</p>
+<pre><code>fn log(msg: string, stdout: Stdout) {
+    stdout.println("[LOG] " + msg)
+}
+
+fn main(stdout: Stdout) {
+    log("starting up", stdout)
+}</code></pre>
+
         </article>
         <footer class="footer">
             Built with a static site generator written in Basalt

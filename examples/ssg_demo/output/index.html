@@ -3,56 +3,388 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Home</title>
-    <meta name="description" content="Welcome to the Basalt example site">
+    <title>Learn Basalt — Basalt</title>
+    <meta name="description" content="A friendly guide to a language that doesn't waste your time">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg: #fffbf5;
+            --bg-warm: #fff7ed;
+            --text: #3c3226;
+            --text-soft: #6b5e50;
+            --text-faint: #a89882;
+            --accent: #d97706;
+            --accent-hover: #b45309;
+            --accent-light: #fef3c7;
+            --accent-glow: #fbbf24;
+            --link: #b45309;
+            --link-hover: #92400e;
+            --border: #e8ddd0;
+            --border-light: #f0e6d8;
+            --code-bg: #fdf4e8;
+            --code-text: #7c4d12;
+            --pre-bg: #2c2418;
+            --pre-text: #f5e6d0;
+            --radius: 12px;
+        }
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.7; color: #2d3748; max-width: 48rem; margin: 0 auto; padding: 2rem 1.5rem; }
-        nav { display: flex; gap: 1.5rem; padding: 1rem 0; border-bottom: 2px solid #e2e8f0; margin-bottom: 2.5rem; }
-        nav a { color: #4a5568; text-decoration: none; font-weight: 500; }
-        nav a:hover { color: #2b6cb0; }
-        h1 { font-size: 2rem; color: #1a202c; margin: 1.5rem 0 1rem; }
-        p { margin: 0.75rem 0; }
-        a { color: #2b6cb0; }
-        .page-list { list-style: none; padding: 0; }
-        .page-list li { padding: 1.25rem 0; border-bottom: 1px solid #e2e8f0; }
-        .page-list li:last-child { border-bottom: none; }
-        .page-list a { font-size: 1.2rem; font-weight: 600; text-decoration: none; }
-        .page-list a:hover { text-decoration: underline; }
-        .page-list .date { color: #718096; font-size: 0.85rem; margin-top: 0.25rem; }
-        .page-list .desc { color: #4a5568; font-size: 0.95rem; margin-top: 0.25rem; }
-        footer { margin-top: 3rem; padding-top: 1.5rem; border-top: 2px solid #e2e8f0; color: #a0aec0; font-size: 0.85rem; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+            font-size: 17px;
+            line-height: 1.75;
+            color: var(--text);
+            background: var(--bg);
+        }
+
+        .page { max-width: 52rem; margin: 0 auto; padding: 0 2rem; }
+
+        .topbar {
+            background: var(--pre-bg);
+            color: var(--pre-text);
+            padding: 0.65rem 0;
+        }
+        .topbar .page {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .topbar .brand {
+            font-weight: 700;
+            font-size: 1.05rem;
+            color: var(--accent-glow);
+            text-decoration: none;
+        }
+        .topbar .brand:hover { color: #fff; }
+        .topbar .tagline { color: #9a8b7a; font-size: 0.82rem; }
+
+        .sidebar-nav {
+            background: var(--bg-warm);
+            border-bottom: 1px solid var(--border);
+            padding: 0.75rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .sidebar-nav .page {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.15rem 0;
+        }
+        .sidebar-nav a {
+            color: var(--text-soft);
+            text-decoration: none;
+            font-size: 0.82rem;
+            font-weight: 500;
+            padding: 0.3rem 0.7rem;
+            border-radius: 99px;
+            transition: all 0.15s ease;
+        }
+        .sidebar-nav a:hover {
+            color: var(--accent-hover);
+            background: var(--accent-light);
+        }
+
+        /* --- Hero --- */
+        .hero {
+            text-align: center;
+            padding: 4rem 0 3rem;
+        }
+        .hero h1 {
+            font-size: 2.6rem;
+            font-weight: 700;
+            color: var(--text);
+            letter-spacing: -0.03em;
+            margin-bottom: 0.75rem;
+        }
+        .hero .lead {
+            font-size: 1.15rem;
+            color: var(--text-soft);
+            max-width: 32rem;
+            margin: 0 auto 2rem;
+        }
+        .hero-code {
+            background: var(--pre-bg);
+            color: var(--pre-text);
+            padding: 1.5rem 2rem;
+            border-radius: var(--radius);
+            text-align: left;
+            max-width: 28rem;
+            margin: 0 auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9em;
+            line-height: 1.6;
+            box-shadow: 0 8px 32px rgba(44,36,24,0.15);
+            border: 1px solid rgba(255,255,255,0.06);
+        }
+
+        /* --- Content sections --- */
+        .content { padding: 0 0 2rem; }
+        .content h2 {
+            font-size: 1.45rem;
+            font-weight: 600;
+            color: var(--text);
+            margin-top: 2.5rem;
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.4rem;
+            border-bottom: 2px solid var(--border-light);
+        }
+        .content p { margin: 0.85rem 0; }
+        .content a {
+            color: var(--link);
+            text-decoration: underline;
+            text-decoration-color: var(--border);
+            text-underline-offset: 2px;
+        }
+        .content a:hover {
+            color: var(--link-hover);
+            text-decoration-color: var(--link-hover);
+        }
+        .content ul { margin: 0.85rem 0; padding-left: 1.5rem; }
+        .content li { margin: 0.35rem 0; }
+        .content li::marker { color: var(--accent); }
+        .content code {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.88em;
+            background: var(--code-bg);
+            color: var(--code-text);
+            padding: 0.15em 0.45em;
+            border-radius: 6px;
+            font-weight: 500;
+        }
+        .content pre {
+            background: var(--pre-bg);
+            color: var(--pre-text);
+            padding: 1.4rem 1.6rem;
+            border-radius: var(--radius);
+            overflow-x: auto;
+            margin: 1.25rem 0;
+            line-height: 1.55;
+            border: 1px solid rgba(255,255,255,0.06);
+            box-shadow: 0 4px 16px rgba(44,36,24,0.12);
+        }
+        .content pre code {
+            background: none; color: inherit; padding: 0;
+            font-size: 0.85em; font-weight: 400;
+        }
+        .content blockquote {
+            border-left: 4px solid var(--accent);
+            padding: 0.75rem 1.25rem;
+            margin: 1.25rem 0;
+            background: var(--accent-light);
+            border-radius: 0 var(--radius) var(--radius) 0;
+            color: var(--text-soft);
+            font-style: italic;
+        }
+        .content strong { color: var(--text); font-weight: 600; }
+
+        /* --- Chapter list --- */
+        .chapters {
+            list-style: none;
+            padding: 0;
+            display: grid;
+            gap: 0;
+        }
+        .chapters li {
+            display: flex;
+            align-items: baseline;
+            gap: 1rem;
+            padding: 1rem 1.25rem;
+            border-radius: var(--radius);
+            transition: background 0.15s ease;
+        }
+        .chapters li:hover {
+            background: var(--bg-warm);
+        }
+        .chapters .num {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--accent);
+            min-width: 1.5rem;
+        }
+        .chapters .chapter-info { flex: 1; }
+        .chapters a {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--text);
+            text-decoration: none;
+        }
+        .chapters a:hover { color: var(--accent-hover); }
+        .chapters .desc {
+            color: var(--text-faint);
+            font-size: 0.88rem;
+            margin-top: 0.15rem;
+        }
+        .chapters .date { display: none; }
+
+        .footer {
+            padding: 2rem 0;
+            border-top: 1px solid var(--border);
+            color: var(--text-faint);
+            font-size: 0.85rem;
+            text-align: center;
+        }
+
+        @media (max-width: 640px) {
+            body { font-size: 16px; }
+            .page { padding: 0 1.25rem; }
+            .hero h1 { font-size: 2rem; }
+            .hero-code { font-size: 0.82em; padding: 1rem 1.25rem; }
+            .chapters li { padding: 0.75rem; }
+        }
     </style>
 </head>
 <body>
-    <nav><a href="index.html">Home</a> <a href="about.html">About Basalt</a> <a href="features.html">Language Features</a></nav>
-    <h1>Welcome</h1>
-<p>This site was built with a <strong>static site generator</strong> written entirely in <a href="https://github.com/example/basalt">Basalt</a>.</p>
-<h2>What is Basalt?</h2>
-<p>Basalt is a statically-typed, bytecode-compiled programming language. It emphasizes:</p>
-<ul>
-<li><strong>Strict typing</strong> — no implicit conversions</li>
-<li><strong>Explicit error handling</strong> — no exceptions</li>
-<li><strong>Capability-based I/O</strong> — sandboxed by default</li>
-</ul>
-<blockquote>
-<p>The best code is code that tells the truth about what it does.</p>
-</blockquote>
-<p>See the <a href="about.html">about page</a> for more details.</p>
-<h2>All Pages</h2>
-<ul class="page-list">
+    <div class="topbar">
+        <div class="page">
+            <a href="index.html" class="brand">basalt</a>
+            <span class="tagline">a language that tells the truth</span>
+        </div>
+    </div>
+    <div class="sidebar-nav">
+        <div class="page"><a href="index.html">Home</a> <a href="capabilities.html">Capabilities</a> <a href="closures.html">Closures</a> <a href="control-flow.html">Control Flow</a> <a href="conversions.html">Type Conversions</a> <a href="enums.html">Enums</a> <a href="error-handling.html">Error Handling</a> <a href="functions.html">Functions</a> <a href="modules.html">Modules</a> <a href="pattern-matching.html">Pattern Matching</a> <a href="stdlib.html">Standard Library</a> <a href="structs.html">Structs</a> <a href="types.html">Types</a> <a href="variables.html">Variables</a></div>
+    </div>
+    <div class="page">
+        <div class="hero">
+            <h1>Learn Basalt</h1>
+            <p class="lead">A statically typed language with no null, no exceptions, and no surprises. This guide will take you from hello world to building real programs.</p>
+            <div class="hero-code">
+<span style="color:#fbbf24">fn</span> main(stdout: <span style="color:#a7d28b">Stdout</span>) {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;stdout.println(<span style="color:#a7d28b">"Hello, Basalt!"</span>)<br>
+}
+            </div>
+        </div>
+        <article class="content">
+            <p>This guide walks you through everything Basalt can do, with examples you can run at every step. No prior experience with Basalt is needed — just curiosity.</p>
+<h2>Your first three minutes</h2>
+<p>Install and build:</p>
+<pre><code>cargo build --release</code></pre>
+<p>Write this to a file called <code>hello.bas</code>:</p>
+<pre><code>fn main(stdout: Stdout) {
+    stdout.println("Hello! You're running Basalt.")
+}</code></pre>
+<p>Run it:</p>
+<pre><code>basalt run hello.bas</code></pre>
+<p>That's it. You just wrote and ran a Basalt program. The <code>stdout: Stdout</code> part is how Basalt handles I/O — your program only gets the capabilities you ask for. No Stdout parameter, no printing. We'll explain why this is a great idea in the <a href="capabilities.html">Capabilities</a> chapter.</p>
+<p>You can also type-check without running:</p>
+<pre><code>basalt check hello.bas</code></pre>
+<p>If there's an error, Basalt will point at the exact line and character, show you the source, and often suggest what you meant to write. Try introducing a typo and see what happens.</p>
+<h2>Chapters</h2>
+<ul class="chapters">
 <li>
-  <a href="features.html">Language Features</a>
-  <div class="date">2026-03-21</div>
-  <div class="desc">A tour of Basalt's features</div>
+  <span class="num">1</span>
+  <div class="chapter-info">
+    <a href="types.html">Types</a>
+    <div class="date">2026-03-02</div>
+    <div class="desc">Basalt's type system</div>
+  </div>
 </li>
 <li>
-  <a href="about.html">About Basalt</a>
-  <div class="date">2026-03-20</div>
-  <div class="desc">Learn about the Basalt programming language</div>
+  <span class="num">2</span>
+  <div class="chapter-info">
+    <a href="variables.html">Variables</a>
+    <div class="date">2026-03-03</div>
+    <div class="desc">Variables, mutability, and type inference</div>
+  </div>
+</li>
+<li>
+  <span class="num">3</span>
+  <div class="chapter-info">
+    <a href="functions.html">Functions</a>
+    <div class="date">2026-03-04</div>
+    <div class="desc">Function declarations and first-class functions</div>
+  </div>
+</li>
+<li>
+  <span class="num">4</span>
+  <div class="chapter-info">
+    <a href="control-flow.html">Control Flow</a>
+    <div class="date">2026-03-05</div>
+    <div class="desc">Conditionals, loops, guards, and pattern matching</div>
+  </div>
+</li>
+<li>
+  <span class="num">5</span>
+  <div class="chapter-info">
+    <a href="pattern-matching.html">Pattern Matching</a>
+    <div class="date">2026-03-06</div>
+    <div class="desc">Exhaustive pattern matching with match expressions</div>
+  </div>
+</li>
+<li>
+  <span class="num">6</span>
+  <div class="chapter-info">
+    <a href="error-handling.html">Error Handling</a>
+    <div class="date">2026-03-07</div>
+    <div class="desc">Result types, error propagation, and recovery</div>
+  </div>
+</li>
+<li>
+  <span class="num">7</span>
+  <div class="chapter-info">
+    <a href="structs.html">Structs</a>
+    <div class="date">2026-03-08</div>
+    <div class="desc">Struct types, methods, and reference semantics</div>
+  </div>
+</li>
+<li>
+  <span class="num">8</span>
+  <div class="chapter-info">
+    <a href="enums.html">Enums</a>
+    <div class="date">2026-03-09</div>
+    <div class="desc">Enum types with data-carrying variants</div>
+  </div>
+</li>
+<li>
+  <span class="num">9</span>
+  <div class="chapter-info">
+    <a href="closures.html">Closures</a>
+    <div class="date">2026-03-10</div>
+    <div class="desc">Lambda functions and functional array methods</div>
+  </div>
+</li>
+<li>
+  <span class="num">10</span>
+  <div class="chapter-info">
+    <a href="modules.html">Modules</a>
+    <div class="date">2026-03-11</div>
+    <div class="desc">Module system and imports</div>
+  </div>
+</li>
+<li>
+  <span class="num">11</span>
+  <div class="chapter-info">
+    <a href="stdlib.html">Standard Library</a>
+    <div class="date">2026-03-12</div>
+    <div class="desc">Built-in methods and the math module</div>
+  </div>
+</li>
+<li>
+  <span class="num">12</span>
+  <div class="chapter-info">
+    <a href="capabilities.html">Capabilities</a>
+    <div class="date">2026-03-13</div>
+    <div class="desc">Capability-based I/O system</div>
+  </div>
+</li>
+<li>
+  <span class="num">13</span>
+  <div class="chapter-info">
+    <a href="conversions.html">Type Conversions</a>
+    <div class="date">2026-03-14</div>
+    <div class="desc">Type casting with as and as?</div>
+  </div>
 </li>
 </ul>
 
-    <footer>Built with Basalt</footer>
+        </article>
+        <footer class="footer">
+            Built with a static site generator written in Basalt
+        </footer>
+    </div>
 </body>
 </html>

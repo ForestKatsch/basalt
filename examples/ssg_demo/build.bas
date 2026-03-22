@@ -308,14 +308,21 @@ fn parse_frontmatter(content: string) -> [string: string] {
     return meta
 }
 
-// --- Strip frontmatter from content ---
+// --- Strip frontmatter and leading title from content ---
 // Returns everything after the frontmatter block (after the first blank line).
+// Also removes the first H1 header if it matches the title (since the template renders it).
 fn strip_frontmatter(content: string) -> string {
     let lines = content.split("\n")
     let mut started = false
+    let mut skipped_title = false
     let mut result_lines: [string] = []
     for line in lines {
         if started {
+            // Skip the first H1 (# Title) since template renders title separately
+            if !skipped_title && line.starts_with("# ") && !line.starts_with("## ") {
+                skipped_title = true
+                continue
+            }
             result_lines.push(line)
         } else {
             // Frontmatter ends at blank line or at first # header
@@ -324,7 +331,12 @@ fn strip_frontmatter(content: string) -> string {
             }
             if line.starts_with("#") {
                 started = true
-                result_lines.push(line)
+                // Don't push H1 title (skip it), but push H2+ headers
+                if line.starts_with("## ") {
+                    result_lines.push(line)
+                } else {
+                    skipped_title = true
+                }
             }
         }
     }
@@ -460,21 +472,21 @@ fn main(stdout: Stdout, fs: Fs) {
         }
     }
 
-    // Generate index page with listing sorted by date (most recent first)
+    // Generate index page with listing sorted by date (ascending for docs order)
     // Build date-sorted indices using simple insertion sort (small N)
     let mut sorted_indices: [i64] = []
     for idx in 0..stems.length {
         sorted_indices.push(idx)
     }
-    // Bubble sort descending by date string (YYYY-MM-DD sorts lexicographically)
+    // Bubble sort ascending by date string (YYYY-MM-DD sorts lexicographically)
     let mut swapped = true
     while swapped {
         swapped = false
         for j in 0..sorted_indices.length - 1 {
             let a = sorted_indices[j]
             let b = sorted_indices[j + 1]
-            // We want descending: if date[a] < date[b], swap
-            if dates[a] < dates[b] {
+            // Ascending: if date[a] > date[b], swap
+            if dates[a] > dates[b] {
                 sorted_indices[j] = b
                 sorted_indices[j + 1] = a
                 swapped = true
@@ -483,15 +495,20 @@ fn main(stdout: Stdout, fs: Fs) {
     }
 
     // Build the page listing HTML
-    let mut listing_html = "<ul class=\"page-list\">\n"
+    let mut listing_html = "<ul class=\"chapters\">\n"
+    let mut chapter_num = 1
     for si in sorted_indices {
         // Skip the index page itself from the listing
         if stems[si] == "index" { continue }
         listing_html = listing_html + "<li>\n"
-        listing_html = listing_html + "  <a href=\"" + stems[si] + ".html\">" + escape_html(titles[si]) + "</a>\n"
-        listing_html = listing_html + "  <div class=\"date\">" + escape_html(dates[si]) + "</div>\n"
-        listing_html = listing_html + "  <div class=\"desc\">" + escape_html(descriptions[si]) + "</div>\n"
+        listing_html = listing_html + "  <span class=\"num\">" + (chapter_num as string) + "</span>\n"
+        listing_html = listing_html + "  <div class=\"chapter-info\">\n"
+        listing_html = listing_html + "    <a href=\"" + stems[si] + ".html\">" + escape_html(titles[si]) + "</a>\n"
+        listing_html = listing_html + "    <div class=\"date\">" + escape_html(dates[si]) + "</div>\n"
+        listing_html = listing_html + "    <div class=\"desc\">" + escape_html(descriptions[si]) + "</div>\n"
+        listing_html = listing_html + "  </div>\n"
         listing_html = listing_html + "</li>\n"
+        chapter_num = chapter_num + 1
     }
     listing_html = listing_html + "</ul>\n"
 
@@ -509,7 +526,7 @@ fn main(stdout: Stdout, fs: Fs) {
             break
         }
     }
-    index_body = index_body + "<h2>All Pages</h2>\n" + listing_html
+    index_body = index_body + "<h2>Chapters</h2>\n" + listing_html
 
     // Apply index template
     let mut index_vars: [string: string] = {}

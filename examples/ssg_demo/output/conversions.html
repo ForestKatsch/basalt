@@ -3,8 +3,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{title}} — Basalt</title>
-    <meta name="description" content="{{description}}">
+    <title>Type Conversions — Basalt</title>
+    <meta name="description" content="Type casting with as and as?">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -273,13 +273,56 @@
         </div>
     </div>
     <div class="sidebar-nav">
-        <div class="page">{{nav}}</div>
+        <div class="page"><a href="index.html">Home</a> <a href="capabilities.html">Capabilities</a> <a href="closures.html">Closures</a> <a href="control-flow.html">Control Flow</a> <a href="conversions.html">Type Conversions</a> <a href="enums.html">Enums</a> <a href="error-handling.html">Error Handling</a> <a href="functions.html">Functions</a> <a href="modules.html">Modules</a> <a href="pattern-matching.html">Pattern Matching</a> <a href="stdlib.html">Standard Library</a> <a href="structs.html">Structs</a> <a href="types.html">Types</a> <a href="variables.html">Variables</a></div>
     </div>
     <div class="page">
         <article class="content">
-            <h1>{{title}}</h1>
-            <p class="subtitle">{{description}}</p>
-            {{body}}
+            <h1>Type Conversions</h1>
+            <p class="subtitle">Type casting with as and as?</p>
+            <h3>as (strict)</h3>
+<p>Converts the value or panics if impossible:</p>
+<pre><code>fn main(stdout: Stdout) {
+    stdout.println(42 as string)        // Output: 42
+    stdout.println(3.14 as string)      // Output: 3.14
+    stdout.println(true as string)      // Output: true
+
+    let x = 42 as f64                   // 42.0
+    let n = 3.9 as i64                  // 3 (truncates toward zero)
+    let parsed = "42" as i64            // 42
+
+    stdout.println(n as string)         // Output: 3
+    // "hello" as i64                   // PANIC: cannot parse
+    // 300 as u8                        // PANIC: out of range
+}</code></pre>
+<h3>as? (safe)</h3>
+<p>Returns <code>T?</code> — the converted value or <code>nil</code> on failure:</p>
+<pre><code>fn main(stdout: Stdout) {
+    let good = "42" as? i64       // 42
+    let bad = "hello" as? i64     // nil
+    let fits = 255 as? u8         // 255
+    let overflow = 300 as? u8     // nil
+
+    if good is i64 {
+        stdout.println("parsed: " + (good as string))
+    }
+    if bad is nil {
+        stdout.println("parse failed")
+    }
+    // Output:
+    // parsed: 42
+    // parse failed
+}</code></pre>
+<h3>Conversion table</h3>
+<p>| From | To | Behavior | |---|---|---| | any integer | any integer | Range-checked (panics/nil on overflow) | | any integer | <code>f64</code> | Always succeeds (widening) | | <code>f64</code> | any integer | Truncates toward zero, range-checked | | any numeric | <code>string</code> | Display representation | | <code>string</code> | any numeric | Parses (panics/nil on invalid input) | | <code>bool</code> | <code>string</code> | <code>"true"</code> or <code>"false"</code> |</p>
+<p>Cross-width arithmetic is a type error. Convert explicitly:</p>
+<pre><code>fn main(stdout: Stdout) {
+    let a: i32 = 10
+    let b: i64 = 20
+    // let c = a + b        // COMPILE ERROR: type mismatch
+    let c = (a as i64) + b  // correct
+    stdout.println(c as string)  // Output: 30
+}</code></pre>
+
         </article>
         <footer class="footer">
             Built with a static site generator written in Basalt

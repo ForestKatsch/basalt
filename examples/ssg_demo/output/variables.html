@@ -3,8 +3,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{title}} — Basalt</title>
-    <meta name="description" content="{{description}}">
+    <title>Variables — Basalt</title>
+    <meta name="description" content="Variables, mutability, and type inference">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -273,13 +273,40 @@
         </div>
     </div>
     <div class="sidebar-nav">
-        <div class="page">{{nav}}</div>
+        <div class="page"><a href="index.html">Home</a> <a href="capabilities.html">Capabilities</a> <a href="closures.html">Closures</a> <a href="control-flow.html">Control Flow</a> <a href="conversions.html">Type Conversions</a> <a href="enums.html">Enums</a> <a href="error-handling.html">Error Handling</a> <a href="functions.html">Functions</a> <a href="modules.html">Modules</a> <a href="pattern-matching.html">Pattern Matching</a> <a href="stdlib.html">Standard Library</a> <a href="structs.html">Structs</a> <a href="types.html">Types</a> <a href="variables.html">Variables</a></div>
     </div>
     <div class="page">
         <article class="content">
-            <h1>{{title}}</h1>
-            <p class="subtitle">{{description}}</p>
-            {{body}}
+            <h1>Variables</h1>
+            <p class="subtitle">Variables, mutability, and type inference</p>
+            <p>Variables are immutable by default:</p>
+<pre><code>fn main(stdout: Stdout) {
+    let name = "Basalt"
+    let age = 1
+    stdout.println("\(name) is \(age) year old")
+    // Output: Basalt is 1 year old
+}</code></pre>
+<p>Use <code>mut</code> when you need to reassign or mutate:</p>
+<pre><code>fn main(stdout: Stdout) {
+    let mut count = 0
+    count = count + 1
+    stdout.println(count as string)  // Output: 1
+
+    // mut is also required for mutating methods on collections
+    let mut items = [1, 2, 3]
+    items.push(4)
+    stdout.println(items.length as string)  // Output: 4
+}</code></pre>
+<p>Type inference works for most declarations. Add annotations when needed:</p>
+<pre><code>fn main(stdout: Stdout) {
+    let x = 42                  // inferred as i64
+    let y: f64 = 42.0           // annotated
+    let byte: u8 = 255          // required for non-default integer widths
+    let mut m: [string: i64] = {}  // required for empty collections
+
+    stdout.println(x as string)
+}</code></pre>
+
         </article>
         <footer class="footer">
             Built with a static site generator written in Basalt

@@ -3,8 +3,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{title}} — Basalt</title>
-    <meta name="description" content="{{description}}">
+    <title>Structs — Basalt</title>
+    <meta name="description" content="Struct types, methods, and reference semantics">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -273,13 +273,57 @@
         </div>
     </div>
     <div class="sidebar-nav">
-        <div class="page">{{nav}}</div>
+        <div class="page"><a href="index.html">Home</a> <a href="capabilities.html">Capabilities</a> <a href="closures.html">Closures</a> <a href="control-flow.html">Control Flow</a> <a href="conversions.html">Type Conversions</a> <a href="enums.html">Enums</a> <a href="error-handling.html">Error Handling</a> <a href="functions.html">Functions</a> <a href="modules.html">Modules</a> <a href="pattern-matching.html">Pattern Matching</a> <a href="stdlib.html">Standard Library</a> <a href="structs.html">Structs</a> <a href="types.html">Types</a> <a href="variables.html">Variables</a></div>
     </div>
     <div class="page">
         <article class="content">
-            <h1>{{title}}</h1>
-            <p class="subtitle">{{description}}</p>
-            {{body}}
+            <h1>Structs</h1>
+            <p class="subtitle">Struct types, methods, and reference semantics</p>
+            <p>Define structs with the <code>type</code> keyword. Structs are reference types.</p>
+<pre><code>type Point {
+    x: f64
+    y: f64
+}
+
+fn main(stdout: Stdout) {
+    let p = Point { x: 3.0, y: 4.0 }
+    stdout.println(p.x as string)  // Output: 3
+    stdout.println(p.y as string)  // Output: 4
+}</code></pre>
+<h3>Methods</h3>
+<p>Instance methods take <code>self: Self</code> as their first parameter. Static methods do not.</p>
+<pre><code>type Point {
+    x: f64
+    y: f64
+
+    fn origin() -&gt; Point {
+        return Point { x: 0.0, y: 0.0 }
+    }
+
+    fn distance(self: Self, other: Point) -&gt; f64 {
+        let dx = self.x - other.x
+        let dy = self.y - other.y
+        return math.sqrt(dx * dx + dy * dy)
+    }
+}
+
+fn main(stdout: Stdout) {
+    let a = Point.origin()
+    let b = Point { x: 3.0, y: 4.0 }
+    stdout.println(a.distance(b) as string)  // Output: 5
+}</code></pre>
+<h3>Reference semantics</h3>
+<pre><code>fn main(stdout: Stdout) {
+    let mut p = Point { x: 1.0, y: 2.0 }
+    let mut q = p        // q and p refer to the same struct
+    q.x = 10.0
+    stdout.println(p.x as string)  // Output: 10 (same object)
+
+    let mut r = p.clone()  // independent copy
+    r.x = 99.0
+    stdout.println(p.x as string)  // Output: 10 (unaffected)
+}</code></pre>
+
         </article>
         <footer class="footer">
             Built with a static site generator written in Basalt
