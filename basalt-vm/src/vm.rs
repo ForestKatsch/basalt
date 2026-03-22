@@ -168,24 +168,41 @@ impl VM {
                 Op::AddInt(d, a, b) => {
                     let va = reg[a as usize].as_int();
                     let vb = reg[b as usize].as_int();
-                    reg[d as usize] =
-                        Value::int(va.checked_add(vb).ok_or("integer overflow in addition")?);
+                    reg[d as usize] = match va.checked_add(vb) {
+                        Some(r) => Value::int(r),
+                        None => {
+                            return Err(format!(
+                                "integer overflow: {} + {} exceeds i64 range",
+                                va, vb
+                            ))
+                        }
+                    };
                 }
                 Op::SubInt(d, a, b) => {
                     let va = reg[a as usize].as_int();
                     let vb = reg[b as usize].as_int();
-                    reg[d as usize] = Value::int(
-                        va.checked_sub(vb)
-                            .ok_or("integer overflow in subtraction")?,
-                    );
+                    reg[d as usize] = match va.checked_sub(vb) {
+                        Some(r) => Value::int(r),
+                        None => {
+                            return Err(format!(
+                                "integer overflow: {} - {} exceeds i64 range",
+                                va, vb
+                            ))
+                        }
+                    };
                 }
                 Op::MulInt(d, a, b) => {
                     let va = reg[a as usize].as_int();
                     let vb = reg[b as usize].as_int();
-                    reg[d as usize] = Value::int(
-                        va.checked_mul(vb)
-                            .ok_or("integer overflow in multiplication")?,
-                    );
+                    reg[d as usize] = match va.checked_mul(vb) {
+                        Some(r) => Value::int(r),
+                        None => {
+                            return Err(format!(
+                                "integer overflow: {} * {} exceeds i64 range",
+                                va, vb
+                            ))
+                        }
+                    };
                 }
                 Op::DivInt(d, a, b) => {
                     let vb = reg[b as usize].as_int();
@@ -207,18 +224,22 @@ impl VM {
                     if exp < 0 {
                         return Err("negative exponent for integer power".to_string());
                     }
-                    reg[d as usize] = Value::int(
-                        checked_pow_i64(base, exp as u64)
-                            .ok_or("integer overflow in exponentiation")?,
-                    );
+                    reg[d as usize] = match checked_pow_i64(base, exp as u64) {
+                        Some(r) => Value::int(r),
+                        None => {
+                            return Err(format!(
+                                "integer overflow: {} ** {} exceeds i64 range",
+                                base, exp
+                            ))
+                        }
+                    };
                 }
                 Op::NegInt(d, s) => {
-                    reg[d as usize] = Value::int(
-                        reg[s as usize]
-                            .as_int()
-                            .checked_neg()
-                            .ok_or("integer overflow in negation")?,
-                    );
+                    let v = reg[s as usize].as_int();
+                    reg[d as usize] = match v.checked_neg() {
+                        Some(r) => Value::int(r),
+                        None => return Err(format!("integer overflow: -{} exceeds i64 range", v)),
+                    };
                 }
 
                 // === Float Arithmetic ===
@@ -414,7 +435,7 @@ impl VM {
                 Op::FloatToInt(d, s) => {
                     let f = reg[s as usize].as_float();
                     if f.is_nan() || f.is_infinite() {
-                        return Err("cannot convert NaN/Infinity to integer".to_string());
+                        return Err(format!("cannot convert {} to integer", f));
                     }
                     reg[d as usize] = Value::int(f as i64);
                 }
@@ -1010,7 +1031,11 @@ impl VM {
                     i += vals.len() as i64;
                 }
                 if i < 0 || i as usize >= vals.len() {
-                    return Err("array index out of bounds".to_string());
+                    return Err(format!(
+                        "array index {} out of bounds (length {})",
+                        idx.as_int(),
+                        vals.len()
+                    ));
                 }
                 vals[i as usize] = val;
                 Ok(())
@@ -1426,6 +1451,103 @@ impl VM {
                     Err("clone on non-array".to_string())
                 }
             }
+            "map" => {
+                let elements = {
+                    let o = href.borrow();
+                    if let HeapObject::Array(v) = &*o {
+                        v.clone()
+                    } else {
+                        return Err("map on non-array".to_string());
+                    }
+                };
+                let (func_idx, captures) = extract_closure(&args[0])?;
+                let mut result = Vec::with_capacity(elements.len());
+                for elem in elements {
+                    let mut call_args = captures.clone();
+                    call_args.push(elem);
+                    result.push(self.call_function(func_idx, &call_args)?);
+                }
+                Ok(Value::array(result))
+            }
+            "filter" => {
+                let elements = {
+                    let o = href.borrow();
+                    if let HeapObject::Array(v) = &*o {
+                        v.clone()
+                    } else {
+                        return Err("filter on non-array".to_string());
+                    }
+                };
+                let (func_idx, captures) = extract_closure(&args[0])?;
+                let mut result = Vec::new();
+                for elem in elements {
+                    let mut call_args = captures.clone();
+                    call_args.push(elem.clone());
+                    let keep = self.call_function(func_idx, &call_args)?;
+                    if keep.as_bool() {
+                        result.push(elem);
+                    }
+                }
+                Ok(Value::array(result))
+            }
+            "find" => {
+                let elements = {
+                    let o = href.borrow();
+                    if let HeapObject::Array(v) = &*o {
+                        v.clone()
+                    } else {
+                        return Err("find on non-array".to_string());
+                    }
+                };
+                let (func_idx, captures) = extract_closure(&args[0])?;
+                for elem in elements {
+                    let mut call_args = captures.clone();
+                    call_args.push(elem.clone());
+                    let matched = self.call_function(func_idx, &call_args)?;
+                    if matched.as_bool() {
+                        return Ok(elem);
+                    }
+                }
+                Ok(Value::Nil)
+            }
+            "any" => {
+                let elements = {
+                    let o = href.borrow();
+                    if let HeapObject::Array(v) = &*o {
+                        v.clone()
+                    } else {
+                        return Err("any on non-array".to_string());
+                    }
+                };
+                let (func_idx, captures) = extract_closure(&args[0])?;
+                for elem in elements {
+                    let mut call_args = captures.clone();
+                    call_args.push(elem);
+                    if self.call_function(func_idx, &call_args)?.as_bool() {
+                        return Ok(Value::bool(true));
+                    }
+                }
+                Ok(Value::bool(false))
+            }
+            "all" => {
+                let elements = {
+                    let o = href.borrow();
+                    if let HeapObject::Array(v) = &*o {
+                        v.clone()
+                    } else {
+                        return Err("all on non-array".to_string());
+                    }
+                };
+                let (func_idx, captures) = extract_closure(&args[0])?;
+                for elem in elements {
+                    let mut call_args = captures.clone();
+                    call_args.push(elem);
+                    if !self.call_function(func_idx, &call_args)?.as_bool() {
+                        return Ok(Value::bool(false));
+                    }
+                }
+                Ok(Value::bool(true))
+            }
             _ => Err(format!("unknown array method '{}'", method)),
         }
     }
@@ -1631,4 +1753,20 @@ fn value_is_type(val: &Value, type_name: &str) -> bool {
             }
         }
     }
+}
+
+/// Extract closure func_idx and captures from a Value.
+/// Handles both heap-allocated closures (with captures) and plain function indices.
+fn extract_closure(val: &Value) -> Result<(usize, Vec<Value>), String> {
+    if let Some(href) = val.as_heap_ref() {
+        let obj = href.borrow();
+        if let HeapObject::Closure(closure) = &*obj {
+            return Ok((closure.func_idx, closure.captures.clone()));
+        }
+    }
+    // No-capture lambda: compiled as a plain integer function index
+    if let Value::Int(idx) = val {
+        return Ok((*idx as usize, Vec::new()));
+    }
+    Err("expected closure argument".to_string())
 }

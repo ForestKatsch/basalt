@@ -2,6 +2,53 @@ use super::*;
 use crate::error::CompileError;
 use std::collections::HashMap;
 
+/// Levenshtein edit distance between two strings.
+fn edit_distance(a: &str, b: &str) -> usize {
+    let m = a.len();
+    let n = b.len();
+    let mut dp = vec![vec![0usize; n + 1]; m + 1];
+    for (i, row) in dp.iter_mut().enumerate().take(m + 1) {
+        row[0] = i;
+    }
+    for (j, val) in dp[0].iter_mut().enumerate().take(n + 1) {
+        *val = j;
+    }
+    for i in 1..=m {
+        for j in 1..=n {
+            let cost = if a.as_bytes()[i - 1] == b.as_bytes()[j - 1] {
+                0
+            } else {
+                1
+            };
+            dp[i][j] = (dp[i - 1][j] + 1)
+                .min(dp[i][j - 1] + 1)
+                .min(dp[i - 1][j - 1] + cost);
+        }
+    }
+    dp[m][n]
+}
+
+/// Find the closest matching name from candidates, within a length-dependent threshold.
+fn suggest_similar<'a>(name: &str, candidates: impl Iterator<Item = &'a str>) -> Option<String> {
+    let max_distance = match name.len() {
+        0..=2 => 1,
+        3..=5 => 2,
+        _ => 3,
+    };
+    candidates
+        .filter(|c| *c != name)
+        .filter_map(|c| {
+            let d = edit_distance(name, c);
+            if d <= max_distance {
+                Some((c, d))
+            } else {
+                None
+            }
+        })
+        .min_by_key(|(_, d)| *d)
+        .map(|(s, _)| s.to_string())
+}
+
 struct TypeChecker {
     type_info: TypeInfo,
     scopes: Vec<HashMap<String, (Type, bool)>>, // name -> (type, mutable)
@@ -189,7 +236,18 @@ impl TypeChecker {
                 if self.type_info.enums.contains_key(name) {
                     return Ok(Type::Enum(name.to_string()));
                 }
-                Err(CompileError::bare(format!("unknown type '{}'", name)))
+                let type_names = self
+                    .type_info
+                    .structs
+                    .keys()
+                    .chain(self.type_info.enums.keys())
+                    .chain(self.type_info.aliases.keys())
+                    .map(|k| k.as_str());
+                let msg = match suggest_similar(name, type_names) {
+                    Some(s) => format!("unknown type '{}'; did you mean '{}'?", name, s),
+                    None => format!("unknown type '{}'", name),
+                };
+                Err(CompileError::bare(msg))
             }
         }
     }
@@ -922,7 +980,18 @@ impl TypeChecker {
                 let typed_target = match target {
                     AssignTarget::Variable(name) => {
                         let (var_ty, mutable) = self.lookup_var(name).ok_or_else(|| {
-                            CompileError::new(format!("undefined variable '{}'", name), stmt.span)
+                            let all_vars: Vec<&str> = self
+                                .scopes
+                                .iter()
+                                .flat_map(|s| s.keys().map(|k| k.as_str()))
+                                .collect();
+                            let msg = match suggest_similar(name, all_vars.into_iter()) {
+                                Some(s) => {
+                                    format!("undefined variable '{}'; did you mean '{}'?", name, s)
+                                }
+                                None => format!("undefined variable '{}'", name),
+                            };
+                            CompileError::new(msg, stmt.span)
                         })?;
                         if !mutable {
                             return Err(CompileError::new(
@@ -1126,10 +1195,18 @@ impl TypeChecker {
                             span: expr.span,
                         })
                     } else {
-                        Err(CompileError::new(
-                            format!("undefined variable '{}'", name),
-                            expr.span,
-                        ))
+                        let all_vars: Vec<&str> = self
+                            .scopes
+                            .iter()
+                            .flat_map(|s| s.keys().map(|k| k.as_str()))
+                            .collect();
+                        let msg = match suggest_similar(name, all_vars.into_iter()) {
+                            Some(s) => {
+                                format!("undefined variable '{}'; did you mean '{}'?", name, s)
+                            }
+                            None => format!("undefined variable '{}'", name),
+                        };
+                        Err(CompileError::new(msg, expr.span))
                     }
                 }
             }
@@ -1391,7 +1468,20 @@ impl TypeChecker {
                 };
 
                 let info = struct_info.ok_or_else(|| {
-                    CompileError::new(format!("unknown struct type '{}'", full_name), expr.span)
+                    let type_names = self
+                        .type_info
+                        .structs
+                        .keys()
+                        .chain(self.type_info.enums.keys())
+                        .chain(self.type_info.aliases.keys())
+                        .map(|k| k.as_str());
+                    let msg = match suggest_similar(&full_name, type_names) {
+                        Some(s) => {
+                            format!("unknown struct type '{}'; did you mean '{}'?", full_name, s)
+                        }
+                        None => format!("unknown struct type '{}'", full_name),
+                    };
+                    CompileError::new(msg, expr.span)
                 })?;
 
                 let mut typed_fields = Vec::new();
@@ -1411,10 +1501,17 @@ impl TypeChecker {
                         .find(|(n, _)| n == name)
                         .map(|(_, t)| t.clone())
                         .ok_or_else(|| {
-                            CompileError::new(
-                                format!("unknown field '{}' on struct '{}'", name, full_name),
-                                expr.span,
-                            )
+                            let field_names = info.fields.iter().map(|(n, _)| n.as_str());
+                            let msg = match suggest_similar(name, field_names) {
+                                Some(s) => format!(
+                                    "unknown field '{}' on struct '{}'; did you mean '{}'?",
+                                    name, full_name, s
+                                ),
+                                None => {
+                                    format!("unknown field '{}' on struct '{}'", name, full_name)
+                                }
+                            };
+                            CompileError::new(msg, expr.span)
                         })?;
                     let typed = self.check_expr(expr)?;
                     if !self.is_assignable(&typed.ty, &field_ty) {
@@ -2096,10 +2193,29 @@ impl TypeChecker {
                         }
                     }
                 }
-                Err(CompileError::new(
-                    format!("unknown method '{}' on {}", method, obj_ty.display_name()),
-                    span,
-                ))
+                // Collect method names from struct and module structs for suggestion
+                let mut method_names: Vec<&str> = Vec::new();
+                if let Some(info) = self.type_info.structs.get(name) {
+                    method_names.extend(info.methods.keys().map(|k| k.as_str()));
+                }
+                for mod_info in self.type_info.modules.values() {
+                    if let Some(info) = mod_info
+                        .structs
+                        .get(name.split('.').next_back().unwrap_or(name))
+                    {
+                        method_names.extend(info.methods.keys().map(|k| k.as_str()));
+                    }
+                }
+                let msg = match suggest_similar(method, method_names.into_iter()) {
+                    Some(s) => format!(
+                        "unknown method '{}' on {}; did you mean '{}'?",
+                        method,
+                        obj_ty.display_name(),
+                        s
+                    ),
+                    None => format!("unknown method '{}' on {}", method, obj_ty.display_name()),
+                };
+                Err(CompileError::new(msg, span))
             }
             Type::Enum(name) => {
                 if let Some(info) = self.type_info.enums.get(name) {
@@ -2107,10 +2223,23 @@ impl TypeChecker {
                         return Ok(method_info.return_type.clone());
                     }
                 }
-                Err(CompileError::new(
-                    format!("unknown method '{}' on {}", method, obj_ty.display_name()),
-                    span,
-                ))
+                let method_names: Vec<&str> = self
+                    .type_info
+                    .enums
+                    .get(name)
+                    .into_iter()
+                    .flat_map(|info| info.methods.keys().map(|k| k.as_str()))
+                    .collect();
+                let msg = match suggest_similar(method, method_names.into_iter()) {
+                    Some(s) => format!(
+                        "unknown method '{}' on {}; did you mean '{}'?",
+                        method,
+                        obj_ty.display_name(),
+                        s
+                    ),
+                    None => format!("unknown method '{}' on {}", method, obj_ty.display_name()),
+                };
+                Err(CompileError::new(msg, span))
             }
             Type::Capability(cap_name) => {
                 self.check_capability_method(cap_name, method, args, span)
@@ -2258,6 +2387,88 @@ impl TypeChecker {
                     return Err(CompileError::new("clone takes 0 arguments", span));
                 }
                 Ok(Type::Array(Box::new(elem_ty.clone())))
+            }
+            "map" => {
+                if args.len() != 1 {
+                    return Err(CompileError::new("map takes 1 argument", span));
+                }
+                if let Type::Function(params, ret) = &args[0].ty {
+                    if params.len() != 1 {
+                        return Err(CompileError::new("map callback must take 1 argument", span));
+                    }
+                    Ok(Type::Array(ret.clone()))
+                } else {
+                    Err(CompileError::new("map argument must be a function", span))
+                }
+            }
+            "filter" => {
+                if args.len() != 1 {
+                    return Err(CompileError::new("filter takes 1 argument", span));
+                }
+                if let Type::Function(params, ret) = &args[0].ty {
+                    if params.len() != 1 {
+                        return Err(CompileError::new(
+                            "filter callback must take 1 argument",
+                            span,
+                        ));
+                    }
+                    if **ret != Type::Bool {
+                        return Err(CompileError::new("filter callback must return bool", span));
+                    }
+                    Ok(Type::Array(Box::new(elem_ty.clone())))
+                } else {
+                    Err(CompileError::new(
+                        "filter argument must be a function",
+                        span,
+                    ))
+                }
+            }
+            "find" => {
+                if args.len() != 1 {
+                    return Err(CompileError::new("find takes 1 argument", span));
+                }
+                if let Type::Function(params, ret) = &args[0].ty {
+                    if params.len() != 1 {
+                        return Err(CompileError::new(
+                            "find callback must take 1 argument",
+                            span,
+                        ));
+                    }
+                    if **ret != Type::Bool {
+                        return Err(CompileError::new("find callback must return bool", span));
+                    }
+                    Ok(Type::Optional(Box::new(elem_ty.clone())))
+                } else {
+                    Err(CompileError::new("find argument must be a function", span))
+                }
+            }
+            "any" | "all" => {
+                if args.len() != 1 {
+                    return Err(CompileError::new(
+                        format!("{} takes 1 argument", method),
+                        span,
+                    ));
+                }
+                if let Type::Function(params, ret) = &args[0].ty {
+                    if params.len() != 1 {
+                        return Err(CompileError::new(
+                            format!("{} callback must take 1 argument", method),
+                            span,
+                        ));
+                    }
+                    if **ret != Type::Bool {
+                        return Err(CompileError::new(
+                            format!("{} callback must return bool", method),
+                            span,
+                        ));
+                    }
+                    Ok(Type::Bool)
+                } else {
+                    Err(CompileError::new(
+                        format!("{} argument must be a function", method),
+                        span,
+                    ))
+                }
             }
             _ => Err(CompileError::new(
                 format!("unknown array method '{}'", method),
@@ -2761,10 +2972,22 @@ impl TypeChecker {
                         }
                     }
                 }
-                Err(CompileError::new(
-                    format!("unknown field '{}' on {}", field, name),
-                    span,
-                ))
+                // Collect all known fields for suggestion
+                let all_fields: Vec<&str> = self
+                    .type_info
+                    .structs
+                    .get(name)
+                    .into_iter()
+                    .flat_map(|info| info.fields.iter().map(|(n, _)| n.as_str()))
+                    .collect();
+                let msg = match suggest_similar(field, all_fields.into_iter()) {
+                    Some(s) => format!(
+                        "unknown field '{}' on {}; did you mean '{}'?",
+                        field, name, s
+                    ),
+                    None => format!("unknown field '{}' on {}", field, name),
+                };
+                Err(CompileError::new(msg, span))
             }
             _ => Err(CompileError::new(
                 format!("cannot access field '{}' on {}", field, ty.display_name()),

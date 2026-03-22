@@ -1155,6 +1155,45 @@ fn main() {
 }
 
 #[test]
+fn test_array_oob_message() {
+    run_expect_panic(
+        r#"
+fn main(stdout: Stdout) {
+    let arr = [1, 2, 3]
+    let x = arr[5]
+}
+"#,
+        "index 5 out of bounds (length 3)",
+    );
+}
+
+#[test]
+fn test_array_oob_message_negative() {
+    run_expect_panic(
+        r#"
+fn main(stdout: Stdout) {
+    let arr = [1, 2, 3]
+    let x = arr[-5]
+}
+"#,
+        "index -5 out of bounds (length 3)",
+    );
+}
+
+#[test]
+fn test_overflow_message() {
+    run_expect_panic(
+        r#"
+fn main(stdout: Stdout) {
+    let x = 9223372036854775807
+    let y = x + 1
+}
+"#,
+        "integer overflow",
+    );
+}
+
+#[test]
 fn test_string_comparison() {
     run_expect_output(
         r#"
@@ -2466,5 +2505,89 @@ fn test_error_missing_struct_field() {
     run_expect_compile_error_containing(
         "type Point { x: f64, y: f64 }\nfn main(stdout: Stdout) { let p = Point { x: 1.0 } }",
         "missing field",
+    );
+}
+
+#[test]
+fn test_array_map() {
+    run_expect_output(
+        r#"
+        fn main(stdout: Stdout) {
+            let nums = [1, 2, 3]
+            let doubled = nums.map(fn(x: i64) -> i64 { return x * 2 })
+            stdout.println(doubled.join(", "))
+        }
+        "#,
+        &["2, 4, 6"],
+    );
+}
+
+#[test]
+fn test_array_filter() {
+    run_expect_output(
+        r#"
+        fn main(stdout: Stdout) {
+            let nums = [1, 2, 3, 4, 5]
+            let evens = nums.filter(fn(x: i64) -> bool { return x % 2 == 0 })
+            stdout.println(evens.join(", "))
+        }
+        "#,
+        &["2, 4"],
+    );
+}
+
+#[test]
+fn test_array_find() {
+    run_expect_output(
+        r#"
+        fn main(stdout: Stdout) {
+            let nums = [1, 2, 3, 4, 5]
+            let found = nums.find(fn(x: i64) -> bool { return x > 3 })
+            if found is nil {
+                stdout.println("not found")
+            } else {
+                stdout.println((found as i64) as string)
+            }
+        }
+        "#,
+        &["4"],
+    );
+}
+
+#[test]
+fn test_array_any_all() {
+    run_expect_output(
+        r#"
+        fn main(stdout: Stdout) {
+            let nums = [2, 4, 6]
+            stdout.println(nums.any(fn(x: i64) -> bool { return x > 5 }) as string)
+            stdout.println(nums.all(fn(x: i64) -> bool { return x % 2 == 0 }) as string)
+        }
+        "#,
+        &["true", "true"],
+    );
+}
+
+#[test]
+fn test_did_you_mean_variable() {
+    run_expect_compile_error_containing(
+        "fn main(stdout: Stdout) { let hello = 1\nstdout.println(helo as string) }",
+        "did you mean",
+    );
+}
+
+#[test]
+fn test_did_you_mean_type() {
+    run_expect_compile_error_containing(
+        "type Point { x: f64, y: f64 }\nfn main(stdout: Stdout) { let p = Poin { x: 1.0, y: 2.0 } }",
+        "did you mean",
+    );
+}
+
+#[test]
+fn test_did_you_mean_field() {
+    run_expect_compile_error_containing(
+        "type Point { x: f64, y: f64 }\nfn main(stdout: Stdout) { let p = Point { xx: 1.0, y: 2.0 } }",
+        "did you mean",
     );
 }
