@@ -1,51 +1,85 @@
 title: Type Conversions
 date: 2026-03-14
-description: Type casting with as and as?
+description: Explicit casting. The compiler never guesses.
 
-### as (strict)
+In many languages, the compiler silently converts between numeric types. A function expects `f64` and you pass an `i32` — it just works. Until the day it doesn't: an integer silently becomes a float, loses precision, and your financial calculation is wrong by a cent. Or a large integer overflows into a small one and your array index wraps around to somewhere unexpected.
 
-Converts the value or panics if impossible:
+Basalt requires every conversion to be explicit. You always see it. You always choose it.
+
+## `as` — convert or panic
+
+The `as` keyword converts a value to a target type. If the conversion is impossible, the program panics:
 
 ```basalt
 fn main(stdout: Stdout) {
+    // Numeric to string — always succeeds
     stdout.println(42 as string)        // Output: 42
     stdout.println(3.14 as string)      // Output: 3.14
     stdout.println(true as string)      // Output: true
 
-    let x = 42 as f64                   // 42.0
-    let n = 3.9 as i64                  // 3 (truncates toward zero)
-    let parsed = "42" as i64            // 42
+    // String to number — succeeds if parseable
+    let age = "29" as i64
+    stdout.println(age as string)       // Output: 29
 
-    stdout.println(n as string)         // Output: 3
-    // "hello" as i64                   // PANIC: cannot parse
-    // 300 as u8                        // PANIC: out of range
+    // Float to integer — truncates toward zero
+    let truncated = 3.9 as i64
+    stdout.println(truncated as string) // Output: 3
+
+    // Integer widening — always succeeds
+    let big = 42 as f64
+    stdout.println(big as string)       // Output: 42
 }
 ```
 
-### as? (safe)
+When the conversion fails, you get a clear panic:
 
-Returns `T?` — the converted value or `nil` on failure:
+> **Panic:** cannot convert "hello" to i64
+
+> **Panic:** value 300 out of range for u8
+
+Use `as` when a failed conversion is a programming error — you know the value is valid, and if it isn't, something is deeply wrong.
+
+## `as?` — convert or nil
+
+When the input comes from the outside world — user input, file contents, configuration — failure is expected, not exceptional. Use `as?` to get an optional instead of a panic:
 
 ```basalt
 fn main(stdout: Stdout) {
-    let good = "42" as? i64       // 42
-    let bad = "hello" as? i64     // nil
-    let fits = 255 as? u8         // 255
-    let overflow = 300 as? u8     // nil
+    let input = "not_a_number"
+    let parsed = input as? i64
 
-    if good is i64 {
-        stdout.println("parsed: " + (good as string))
+    if parsed is nil {
+        stdout.println("invalid input")
     }
-    if bad is nil {
-        stdout.println("parse failed")
+    // Output: invalid input
+
+    let valid = "42" as? i64
+    if valid is i64 {
+        stdout.println("got: " + (valid as string))
     }
-    // Output:
-    // parsed: 42
-    // parse failed
+    // Output: got: 42
 }
 ```
 
-### Conversion table
+Combine with `guard let` for clean error handling (see [Error Handling](error-handling.html)):
+
+```basalt
+fn parse_port(s: string) -> i64!string {
+    guard let port = s as? i64 else {
+        return !("not a number: " + s)
+    }
+    let p = port as i64
+    if p < 1 {
+        return !("port must be positive")
+    }
+    if p > 65535 {
+        return !("port out of range: " + (p as string))
+    }
+    return p
+}
+```
+
+## Conversion table
 
 | From | To | Behavior |
 |---|---|---|
@@ -56,14 +90,50 @@ fn main(stdout: Stdout) {
 | `string` | any numeric | Parses (panics/nil on invalid input) |
 | `bool` | `string` | `"true"` or `"false"` |
 
-Cross-width arithmetic is a type error. Convert explicitly:
+<div class="callout callout-warn"><strong>No implicit widening</strong>
+Even "safe" conversions like <code>i32</code> to <code>i64</code> require an explicit <code>as</code>. Basalt treats all conversions the same — visible and intentional. This catches bugs where you accidentally mix integer widths.
+</div>
+
+## Cross-width arithmetic
+
+You cannot mix integer sizes in arithmetic. The compiler rejects it at compile time:
 
 ```basalt
 fn main(stdout: Stdout) {
-    let a: i32 = 10
-    let b: i64 = 20
-    // let c = a + b        // COMPILE ERROR: type mismatch
-    let c = (a as i64) + b  // correct
-    stdout.println(c as string)  // Output: 30
+    let sensor_id: i32 = 10
+    let reading: i64 = 2500
+
+    // let sum = sensor_id + reading   // COMPILE ERROR: type mismatch i32 vs i64
+
+    let sum = (sensor_id as i64) + reading  // correct
+    stdout.println(sum as string)           // Output: 2510
 }
 ```
+
+> **Error:** type mismatch: cannot apply + to i32 and i64
+
+This forces you to decide which width is correct, rather than letting the compiler pick one and hoping for the best.
+
+## Safe range checking
+
+When you need to narrow a value — say, converting a file size from `i64` to `i32` for a legacy system — use `as?` to catch overflow:
+
+```basalt
+fn to_i32_safe(n: i64, stdout: Stdout) {
+    let narrow = n as? i32
+    if narrow is nil {
+        stdout.println("value too large for i32: " + (n as string))
+        return
+    }
+    stdout.println("converted: " + (narrow as string))
+}
+
+fn main(stdout: Stdout) {
+    to_i32_safe(42, stdout)             // Output: converted: 42
+    to_i32_safe(3000000000, stdout)     // Output: value too large for i32: 3000000000
+}
+```
+
+---
+
+You've learned the entire language. The next step is building something. The static site generator that built this documentation was written in Basalt — 500 lines of code, reading files, parsing markdown, generating HTML.

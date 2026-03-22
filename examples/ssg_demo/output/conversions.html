@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Type Conversions — Basalt</title>
-    <meta name="description" content="Type casting with as and as?">
+    <meta name="description" content="Explicit casting. The compiler never guesses.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -334,41 +334,69 @@
     <div class="page">
         <article class="content">
             <h1>Type Conversions</h1>
-            <p class="subtitle">Type casting with as and as?</p>
-            <h3>as (strict)</h3>
-<p>Converts the value or panics if impossible:</p>
+            <p class="subtitle">Explicit casting. The compiler never guesses.</p>
+            <p>In many languages, the compiler silently converts between numeric types. A function expects <code>f64</code> and you pass an <code>i32</code> — it just works. Until the day it doesn't: an integer silently becomes a float, loses precision, and your financial calculation is wrong by a cent. Or a large integer overflows into a small one and your array index wraps around to somewhere unexpected.</p>
+<p>Basalt requires every conversion to be explicit. You always see it. You always choose it.</p>
+<h2><code>as</code> — convert or panic</h2>
+<p>The <code>as</code> keyword converts a value to a target type. If the conversion is impossible, the program panics:</p>
 <pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="cm">// Numeric to string — always succeeds</span>
     stdout.<span class="fn">println</span>(<span class="nu">42</span> <span class="kw">as</span> <span class="ty">string</span>)        <span class="cm">// Output: 42</span>
     stdout.<span class="fn">println</span>(<span class="nu">3.14</span> <span class="kw">as</span> <span class="ty">string</span>)      <span class="cm">// Output: 3.14</span>
     stdout.<span class="fn">println</span>(<span class="kw">true</span> <span class="kw">as</span> <span class="ty">string</span>)      <span class="cm">// Output: true</span>
 
-    <span class="kw">let</span> x <span class="op">=</span> <span class="nu">42</span> <span class="kw">as</span> <span class="ty">f64</span>                   <span class="cm">// 42.0</span>
-    <span class="kw">let</span> n <span class="op">=</span> <span class="nu">3.9</span> <span class="kw">as</span> <span class="ty">i64</span>                  <span class="cm">// 3 (truncates toward zero)</span>
-    <span class="kw">let</span> parsed <span class="op">=</span> <span class="st">"42"</span> <span class="kw">as</span> <span class="ty">i64</span>            <span class="cm">// 42</span>
+    <span class="cm">// String to number — succeeds if parseable</span>
+    <span class="kw">let</span> age <span class="op">=</span> <span class="st">"29"</span> <span class="kw">as</span> <span class="ty">i64</span>
+    stdout.<span class="fn">println</span>(age <span class="kw">as</span> <span class="ty">string</span>)       <span class="cm">// Output: 29</span>
 
-    stdout.<span class="fn">println</span>(n <span class="kw">as</span> <span class="ty">string</span>)         <span class="cm">// Output: 3</span>
-    <span class="cm">// "hello" as i64                   // PANIC: cannot parse</span>
-    <span class="cm">// 300 as u8                        // PANIC: out of range</span>
+    <span class="cm">// Float to integer — truncates toward zero</span>
+    <span class="kw">let</span> truncated <span class="op">=</span> <span class="nu">3.9</span> <span class="kw">as</span> <span class="ty">i64</span>
+    stdout.<span class="fn">println</span>(truncated <span class="kw">as</span> <span class="ty">string</span>) <span class="cm">// Output: 3</span>
+
+    <span class="cm">// Integer widening — always succeeds</span>
+    <span class="kw">let</span> big <span class="op">=</span> <span class="nu">42</span> <span class="kw">as</span> <span class="ty">f64</span>
+    stdout.<span class="fn">println</span>(big <span class="kw">as</span> <span class="ty">string</span>)       <span class="cm">// Output: 42</span>
 }</code></pre>
-<h3>as? (safe)</h3>
-<p>Returns <code>T?</code> — the converted value or <code>nil</code> on failure:</p>
+<p>When the conversion fails, you get a clear panic:</p>
+<blockquote>
+<p><strong>Panic:</strong> cannot convert "hello" to i64</p>
+</blockquote>
+<blockquote>
+<p><strong>Panic:</strong> value 300 out of range for u8</p>
+</blockquote>
+<p>Use <code>as</code> when a failed conversion is a programming error — you know the value is valid, and if it isn't, something is deeply wrong.</p>
+<h2><code>as?</code> — convert or nil</h2>
+<p>When the input comes from the outside world — user input, file contents, configuration — failure is expected, not exceptional. Use <code>as?</code> to get an optional instead of a panic:</p>
 <pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    <span class="kw">let</span> good <span class="op">=</span> <span class="st">"42"</span> <span class="kw">as</span><span class="op">?</span> <span class="ty">i64</span>       <span class="cm">// 42</span>
-    <span class="kw">let</span> bad <span class="op">=</span> <span class="st">"hello"</span> <span class="kw">as</span><span class="op">?</span> <span class="ty">i64</span>     <span class="cm">// nil</span>
-    <span class="kw">let</span> fits <span class="op">=</span> <span class="nu">255</span> <span class="kw">as</span><span class="op">?</span> <span class="ty">u8</span>         <span class="cm">// 255</span>
-    <span class="kw">let</span> overflow <span class="op">=</span> <span class="nu">300</span> <span class="kw">as</span><span class="op">?</span> <span class="ty">u8</span>     <span class="cm">// nil</span>
+    <span class="kw">let</span> input <span class="op">=</span> <span class="st">"not_a_number"</span>
+    <span class="kw">let</span> parsed <span class="op">=</span> input <span class="kw">as</span><span class="op">?</span> <span class="ty">i64</span>
 
-    <span class="kw">if</span> good <span class="kw">is</span> <span class="ty">i64</span> {
-        stdout.<span class="fn">println</span>(<span class="st">"parsed: "</span> <span class="op">+</span> (good <span class="kw">as</span> <span class="ty">string</span>))
+    <span class="kw">if</span> parsed <span class="kw">is</span> <span class="kw">nil</span> {
+        stdout.<span class="fn">println</span>(<span class="st">"invalid input"</span>)
     }
-    <span class="kw">if</span> bad <span class="kw">is</span> <span class="kw">nil</span> {
-        stdout.<span class="fn">println</span>(<span class="st">"parse failed"</span>)
+    <span class="cm">// Output: invalid input</span>
+
+    <span class="kw">let</span> valid <span class="op">=</span> <span class="st">"42"</span> <span class="kw">as</span><span class="op">?</span> <span class="ty">i64</span>
+    <span class="kw">if</span> valid <span class="kw">is</span> <span class="ty">i64</span> {
+        stdout.<span class="fn">println</span>(<span class="st">"got: "</span> <span class="op">+</span> (valid <span class="kw">as</span> <span class="ty">string</span>))
     }
-    <span class="cm">// Output:</span>
-    <span class="cm">// parsed: 42</span>
-    <span class="cm">// parse failed</span>
+    <span class="cm">// Output: got: 42</span>
 }</code></pre>
-<h3>Conversion table</h3>
+<p>Combine with <code>guard let</code> for clean error handling (see <a href="error-handling.html">Error Handling</a>):</p>
+<pre><code><span class="kw">fn</span> <span class="fn">parse_port</span>(s<span class="op">:</span> <span class="ty">string</span>) <span class="op">-&gt;</span> <span class="ty">i64</span><span class="op">!</span><span class="ty">string</span> {
+    <span class="kw">guard</span> <span class="kw">let</span> port <span class="op">=</span> s <span class="kw">as</span><span class="op">?</span> <span class="ty">i64</span> <span class="kw">else</span> {
+        <span class="kw">return</span> <span class="op">!</span>(<span class="st">"not a number: "</span> <span class="op">+</span> s)
+    }
+    <span class="kw">let</span> p <span class="op">=</span> port <span class="kw">as</span> <span class="ty">i64</span>
+    <span class="kw">if</span> p <span class="op">&lt;</span> <span class="nu">1</span> {
+        <span class="kw">return</span> <span class="op">!</span>(<span class="st">"port must be positive"</span>)
+    }
+    <span class="kw">if</span> p <span class="op">&gt;</span> <span class="nu">65535</span> {
+        <span class="kw">return</span> <span class="op">!</span>(<span class="st">"port out of range: "</span> <span class="op">+</span> (p <span class="kw">as</span> <span class="ty">string</span>))
+    }
+    <span class="kw">return</span> p
+}</code></pre>
+<h2>Conversion table</h2>
 <table>
 <thead><tr><th>From</th><th>To</th><th>Behavior</th></tr></thead>
 <tbody>
@@ -379,14 +407,39 @@
 <tr><td><code>string</code></td><td>any numeric</td><td>Parses (panics/nil on invalid input)</td></tr>
 <tr><td><code>bool</code></td><td><code>string</code></td><td><code>"true"</code> or <code>"false"</code></td></tr>
 </tbody></table>
-<p>Cross-width arithmetic is a type error. Convert explicitly:</p>
+<p>&lt;div class="callout callout-warn"&gt;&lt;strong&gt;No implicit widening&lt;/strong&gt; Even "safe" conversions like &lt;code&gt;i32&lt;/code&gt; to &lt;code&gt;i64&lt;/code&gt; require an explicit &lt;code&gt;as&lt;/code&gt;. Basalt treats all conversions the same — visible and intentional. This catches bugs where you accidentally mix integer widths. &lt;/div&gt;</p>
+<h2>Cross-width arithmetic</h2>
+<p>You cannot mix integer sizes in arithmetic. The compiler rejects it at compile time:</p>
 <pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    <span class="kw">let</span> a<span class="op">:</span> <span class="ty">i32</span> <span class="op">=</span> <span class="nu">10</span>
-    <span class="kw">let</span> b<span class="op">:</span> <span class="ty">i64</span> <span class="op">=</span> <span class="nu">20</span>
-    <span class="cm">// let c = a + b        // COMPILE ERROR: type mismatch</span>
-    <span class="kw">let</span> c <span class="op">=</span> (a <span class="kw">as</span> <span class="ty">i64</span>) <span class="op">+</span> b  <span class="cm">// correct</span>
-    stdout.<span class="fn">println</span>(c <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 30</span>
+    <span class="kw">let</span> sensor_id<span class="op">:</span> <span class="ty">i32</span> <span class="op">=</span> <span class="nu">10</span>
+    <span class="kw">let</span> reading<span class="op">:</span> <span class="ty">i64</span> <span class="op">=</span> <span class="nu">2500</span>
+
+    <span class="cm">// let sum = sensor_id + reading   // COMPILE ERROR: type mismatch i32 vs i64</span>
+
+    <span class="kw">let</span> sum <span class="op">=</span> (sensor_id <span class="kw">as</span> <span class="ty">i64</span>) <span class="op">+</span> reading  <span class="cm">// correct</span>
+    stdout.<span class="fn">println</span>(sum <span class="kw">as</span> <span class="ty">string</span>)           <span class="cm">// Output: 2510</span>
 }</code></pre>
+<blockquote>
+<p><strong>Error:</strong> type mismatch: cannot apply + to i32 and i64</p>
+</blockquote>
+<p>This forces you to decide which width is correct, rather than letting the compiler pick one and hoping for the best.</p>
+<h2>Safe range checking</h2>
+<p>When you need to narrow a value — say, converting a file size from <code>i64</code> to <code>i32</code> for a legacy system — use <code>as?</code> to catch overflow:</p>
+<pre><code><span class="kw">fn</span> <span class="fn">to_i32_safe</span>(n<span class="op">:</span> <span class="ty">i64</span>, stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> narrow <span class="op">=</span> n <span class="kw">as</span><span class="op">?</span> <span class="ty">i32</span>
+    <span class="kw">if</span> narrow <span class="kw">is</span> <span class="kw">nil</span> {
+        stdout.<span class="fn">println</span>(<span class="st">"value too large for i32: "</span> <span class="op">+</span> (n <span class="kw">as</span> <span class="ty">string</span>))
+        <span class="kw">return</span>
+    }
+    stdout.<span class="fn">println</span>(<span class="st">"converted: "</span> <span class="op">+</span> (narrow <span class="kw">as</span> <span class="ty">string</span>))
+}
+
+<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="fn">to_i32_safe</span>(<span class="nu">42</span>, stdout)             <span class="cm">// Output: converted: 42</span>
+    <span class="fn">to_i32_safe</span>(<span class="nu">3000000000</span>, stdout)     <span class="cm">// Output: value too large for i32: 3000000000</span>
+}</code></pre>
+<hr>
+<p>You've learned the entire language. The next step is building something. The static site generator that built this documentation was written in Basalt — 500 lines of code, reading files, parsing markdown, generating HTML.</p>
 
         </article>
         <nav class="page-nav">

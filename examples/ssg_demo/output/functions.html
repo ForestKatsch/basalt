@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Functions — Basalt</title>
-    <meta name="description" content="Function declarations and first-class functions">
+    <meta name="description" content="Everything is explicit. Parameters, return types, return statements.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -334,22 +334,56 @@
     <div class="page">
         <article class="content">
             <h1>Functions</h1>
-            <p class="subtitle">Function declarations and first-class functions</p>
-            <pre><code><span class="kw">fn</span> <span class="fn">add</span>(a<span class="op">:</span> <span class="ty">i64</span>, b<span class="op">:</span> <span class="ty">i64</span>) <span class="op">-&gt;</span> <span class="ty">i64</span> {
-    <span class="kw">return</span> a <span class="op">+</span> b
-}
-
-<span class="kw">fn</span> <span class="fn">greet</span>(name<span class="op">:</span> <span class="ty">string</span>, stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    stdout.<span class="fn">println</span>(<span class="st">"Hello, \(name)!"</span>)
+            <p class="subtitle">Everything is explicit. Parameters, return types, return statements.</p>
+            <p>Functions in Basalt have no hidden behavior. Every parameter has a type. Every non-void function declares its return type. Every value is returned explicitly. Reading a function signature tells you exactly what goes in and what comes out.</p>
+<h2>Declaring functions</h2>
+<pre><code><span class="kw">fn</span> <span class="fn">celsius_to_fahrenheit</span>(c<span class="op">:</span> <span class="ty">f64</span>) <span class="op">-&gt;</span> <span class="ty">f64</span> {
+    <span class="kw">return</span> c <span class="op">*</span> <span class="nu">1.8</span> <span class="op">+</span> <span class="nu">32.0</span>
 }
 
 <span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    <span class="kw">let</span> sum <span class="op">=</span> <span class="fn">add</span>(<span class="nu">3</span>, <span class="nu">4</span>)
-    stdout.<span class="fn">println</span>(sum <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 7</span>
-    <span class="fn">greet</span>(<span class="st">"world"</span>, stdout)         <span class="cm">// Output: Hello, world!</span>
+    <span class="kw">let</span> temp <span class="op">=</span> <span class="fn">celsius_to_fahrenheit</span>(<span class="nu">100.0</span>)
+    stdout.<span class="fn">println</span>(temp <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 212</span>
 }</code></pre>
-<p>All parameters need type annotations. Return type is required unless the function returns <code>nil</code>. Explicit <code>return</code> is required — the last expression is not implicitly returned.</p>
-<p>Functions are first-class values:</p>
+<p>Parameters require type annotations — always. The return type follows <code>-&gt;</code>. If a function returns nothing (only performs side effects), omit the return type:</p>
+<pre><code><span class="kw">fn</span> <span class="fn">log_request</span>(method<span class="op">:</span> <span class="ty">string</span>, path<span class="op">:</span> <span class="ty">string</span>, stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    stdout.<span class="fn">println</span>(<span class="st">"\(method) \(path)"</span>)
+}</code></pre>
+<h2>Explicit return</h2>
+<p>Basalt requires you to write <code>return</code>. The last expression in a function body is <strong>not</strong> implicitly returned.</p>
+<p>&lt;div class="callout callout-note"&gt;&lt;strong&gt;Why explicit return?&lt;/strong&gt; In languages with implicit return, adding a logging line at the end of a function silently changes its return value to &lt;code&gt;nil&lt;/code&gt;. Basalt avoids this class of bug entirely. If a function promises to return a value, the compiler verifies every code path has an explicit &lt;code&gt;return&lt;/code&gt;. &lt;/div&gt;</p>
+<p>If you declare a return type but forget to return:</p>
+<pre><code><span class="kw">fn</span> <span class="fn">double</span>(x<span class="op">:</span> <span class="ty">i64</span>) <span class="op">-&gt;</span> <span class="ty">i64</span> {
+    <span class="kw">let</span> result <span class="op">=</span> x <span class="op">*</span> <span class="nu">2</span>
+}</code></pre>
+<blockquote>
+<p><strong>Error:</strong> Function <code>double</code> declares return type <code>i64</code> but not all code paths return a value.</p>
+</blockquote>
+<p>And if you return the wrong type:</p>
+<pre><code><span class="kw">fn</span> <span class="fn">label</span>(code<span class="op">:</span> <span class="ty">i64</span>) <span class="op">-&gt;</span> <span class="ty">string</span> {
+    <span class="kw">return</span> code
+}</code></pre>
+<blockquote>
+<p><strong>Error:</strong> Cannot return <code>i64</code> from function with return type <code>string</code>.</p>
+</blockquote>
+<p>No ambiguity. The compiler catches it, points at the line, and tells you what's wrong.</p>
+<h2>Multiple parameters and early return</h2>
+<p>Functions can return early from any point. This keeps the happy path unindented:</p>
+<pre><code><span class="kw">fn</span> <span class="fn">http_status</span>(code<span class="op">:</span> <span class="ty">i64</span>) <span class="op">-&gt;</span> <span class="ty">string</span> {
+    <span class="kw">if</span> code <span class="op">&lt;</span> <span class="nu">100</span> { <span class="kw">return</span> <span class="st">"invalid"</span> }
+    <span class="kw">if</span> code <span class="op">&lt;</span> <span class="nu">200</span> { <span class="kw">return</span> <span class="st">"informational"</span> }
+    <span class="kw">if</span> code <span class="op">&lt;</span> <span class="nu">300</span> { <span class="kw">return</span> <span class="st">"success"</span> }
+    <span class="kw">if</span> code <span class="op">&lt;</span> <span class="nu">400</span> { <span class="kw">return</span> <span class="st">"redirect"</span> }
+    <span class="kw">if</span> code <span class="op">&lt;</span> <span class="nu">500</span> { <span class="kw">return</span> <span class="st">"client error"</span> }
+    <span class="kw">return</span> <span class="st">"server error"</span>
+}
+
+<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    stdout.<span class="fn">println</span>(<span class="fn">http_status</span>(<span class="nu">404</span>))  <span class="cm">// Output: client error</span>
+    stdout.<span class="fn">println</span>(<span class="fn">http_status</span>(<span class="nu">200</span>))  <span class="cm">// Output: success</span>
+}</code></pre>
+<h2>Functions as first-class values</h2>
+<p>Functions are values. You can pass them as arguments, store them in variables, and return them from other functions:</p>
 <pre><code><span class="kw">fn</span> <span class="fn">apply</span>(f<span class="op">:</span> <span class="kw">fn</span>(<span class="ty">i64</span>) <span class="op">-&gt;</span> <span class="ty">i64</span>, x<span class="op">:</span> <span class="ty">i64</span>) <span class="op">-&gt;</span> <span class="ty">i64</span> {
     <span class="kw">return</span> <span class="fn">f</span>(x)
 }
@@ -358,10 +392,18 @@
     <span class="kw">return</span> x <span class="op">*</span> <span class="nu">2</span>
 }
 
+<span class="kw">fn</span> <span class="fn">negate</span>(x<span class="op">:</span> <span class="ty">i64</span>) <span class="op">-&gt;</span> <span class="ty">i64</span> {
+    <span class="kw">return</span> <span class="nu">0</span> <span class="op">-</span> x
+}
+
 <span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    <span class="kw">let</span> result <span class="op">=</span> <span class="fn">apply</span>(double, <span class="nu">5</span>)
-    stdout.<span class="fn">println</span>(result <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 10</span>
+    stdout.<span class="fn">println</span>(<span class="fn">apply</span>(double, <span class="nu">5</span>) <span class="kw">as</span> <span class="ty">string</span>)   <span class="cm">// Output: 10</span>
+    stdout.<span class="fn">println</span>(<span class="fn">apply</span>(negate, <span class="nu">3</span>) <span class="kw">as</span> <span class="ty">string</span>)    <span class="cm">// Output: -3</span>
 }</code></pre>
+<p>The type <code>fn(i64) -&gt; i64</code> describes any function that takes one <code>i64</code> and returns an <code>i64</code>. This enables higher-order patterns — mapping, filtering, and composing operations — without any special syntax. We'll see this in action with <a href="closures.html">Closures</a>.</p>
+<p>&lt;div class="callout callout-tip"&gt;&lt;strong&gt;Try this&lt;/strong&gt; Write a function &lt;code&gt;fn clamp(val: i64, lo: i64, hi: i64) -&gt; i64&lt;/code&gt; that returns &lt;code&gt;val&lt;/code&gt; if it's between &lt;code&gt;lo&lt;/code&gt; and &lt;code&gt;hi&lt;/code&gt;, otherwise the nearest bound. You'll need &lt;code&gt;if&lt;/code&gt; expressions — which brings us to the next chapter. &lt;/div&gt;</p>
+<h2>What's Next</h2>
+<p>Functions describe <em>what</em> to compute. Control flow describes <em>when</em> and <em>how</em>. Next up: <a href="control-flow.html">Control Flow</a>.</p>
 
         </article>
         <nav class="page-nav">

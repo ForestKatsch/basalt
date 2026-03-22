@@ -1,61 +1,145 @@
 title: Error Handling
 date: 2026-03-07
-description: Result types, error propagation, and recovery
+description: No exceptions. No surprises. Errors are values you can see in the type.
 
-Basalt has no exceptions. Errors are values, carried by result types `T!E`.
+In most languages, any function can throw an exception. You don't know which ones until one crashes your program at 3 AM. You can't see it in the type signature. You can't grep for it reliably. You just have to *know* — or wrap everything in `try/catch` and hope.
 
-### Creating and returning errors
+Basalt takes a different approach: **errors are values**. If a function can fail, its return type says so. The compiler ensures you handle every error before you can use the result.
+
+## Result types
+
+`T!E` is a type that holds either a success value of type `T` or an error of type `E`:
 
 ```basalt
-fn parse_age(s: string) -> i64!string {
-    let n = s as? i64
+fn parse_temperature(s: string) -> f64!string {
+    let trimmed = s.trim()
+    if trimmed.length == 0 {
+        return !("empty input")
+    }
+    let n = trimmed as? f64
     if n is nil {
-        return !("invalid number: " + s)
+        return !("not a number: " + trimmed)
     }
-    let age = n as i64
-    if age < 0 {
-        return !("age cannot be negative")
-    }
-    return age
+    return n as f64
 }
 ```
 
-### Propagating with ?
+Success values return normally. Errors are returned with `!(value)`. The caller sees both possibilities in the type — nothing is hidden.
 
-The `?` operator propagates errors automatically. If the result is an error, it returns from the enclosing function. If successful, it unwraps the value.
+## Handling results with match
 
-```basalt
-fn load_and_parse(fs: Fs) -> i64!string {
-    let content = fs.read_file("age.txt")?  // propagates read error
-    let age = parse_age(content.trim())?     // propagates parse error
-    return age
-}
-```
-
-The enclosing function must return a compatible result type.
-
-### guard let for unwrapping
-
-When you want to unwrap and diverge on failure without `match`:
-
-```basalt
-fn process(fs: Fs, stdout: Stdout) {
-    guard let data = fs.read_file("input.txt") else {
-        stdout.println("Cannot read input")
-        return
-    }
-    // data is `string` here
-    stdout.println("Read " + (data.length as string) + " chars")
-}
-```
-
-### panic for unrecoverable errors
+The most explicit way to handle a result is `match`:
 
 ```basalt
 fn main(stdout: Stdout) {
-    panic("something went terribly wrong")
-    // Terminates with message and stack trace. Cannot be caught.
+    match parse_temperature("72.5") {
+        !err => stdout.println("Failed: " + err)
+        temp => stdout.println("Temperature: " + (temp as string))
+    }
+    // Output: Temperature: 72.5
+
+    match parse_temperature("warm") {
+        !err => stdout.println("Failed: " + err)
+        temp => stdout.println("Temperature: " + (temp as string))
+    }
+    // Output: Failed: not a number: warm
 }
 ```
 
-Use `panic` for programming errors. Use result types for expected failures.
+Both arms are required. You cannot ignore the error case — the compiler enforces this.
+
+## Propagating with ?
+
+When your function also returns a result, `?` propagates errors automatically. If the value is an error, it returns from the enclosing function immediately. If it's a success, it unwraps the value:
+
+```basalt
+fn load_temperature(fs: Fs) -> f64!string {
+    let content = fs.read_file("temperature.txt")?
+    let temp = parse_temperature(content)?
+    return temp
+}
+```
+
+Two operations, two possible failure points, zero nesting. Compare this to the equivalent nested `match`:
+
+```basalt
+fn load_temperature_verbose(fs: Fs) -> f64!string {
+    match fs.read_file("temperature.txt") {
+        !err => return !(err)
+        content => {
+            match parse_temperature(content) {
+                !err => return !(err)
+                temp => return temp
+            }
+        }
+    }
+    return !("unreachable")
+}
+```
+
+The `?` version says the same thing in three lines instead of eleven. The enclosing function must return a compatible result type — the compiler checks this.
+
+## guard let: unwrap or bail
+
+When you're in a function that doesn't return a result (like `main`), use `guard let` to unwrap and handle the error in place:
+
+```basalt
+fn main(stdout: Stdout, fs: Fs) {
+    guard let content = fs.read_file("config.txt") else {
+        stdout.println("Could not read config file")
+        return
+    }
+    // content is `string` here — unwrapped and safe
+    stdout.println("Config: " + content)
+}
+```
+
+The variable `content` is available in the **enclosing scope**, not just inside a block. The `else` branch must diverge — `return`, `break`, or `panic`.
+
+## A real example: read, parse, validate
+
+Here's how these pieces compose in practice:
+
+```basalt
+fn load_user_age(fs: Fs) -> i64!string {
+    let content = fs.read_file("user_age.txt")?
+    let trimmed = content.trim()
+    let n = trimmed as? i64
+    if n is nil {
+        return !("invalid age: " + trimmed)
+    }
+    let age = n as i64
+    if age < 0 { return !("age cannot be negative") }
+    if age > 150 { return !("age seems unrealistic: " + (age as string)) }
+    return age
+}
+
+fn main(stdout: Stdout, fs: Fs) {
+    match load_user_age(fs) {
+        !err => stdout.println("Error: " + err)
+        age => stdout.println("User age: " + (age as string))
+    }
+}
+```
+
+Each possible failure — file not found, not a number, out of range — is explicit. The caller sees a single `i64!string` and decides how to handle failure. No exception hierarchy to memorize. No hidden control flow.
+
+## What happens if you ignore a result?
+
+You can't. If a function returns `T!E` and you don't handle the error, the compiler tells you:
+
+> **Error:** Result type `i64!string` must be handled. Use `match`, `?`, or `guard let`.
+
+This is the core guarantee: errors cannot be silently swallowed. Every result is either used, propagated, or explicitly handled.
+
+<div class="callout callout-warn"><strong>panic is not error handling</strong>
+<code>panic("message")</code> terminates the program immediately with a stack trace. It cannot be caught. Use it for programming errors — violated invariants, impossible states, bugs. Use result types for expected failures — bad input, missing files, network timeouts. If a user can cause it, it's not a panic.
+</div>
+
+<div class="callout callout-tip"><strong>Try this</strong>
+Write a function <code>fn parse_pair(s: string) -> (i64, i64)!string</code> that takes a string like <code>"3,7"</code>, splits on <code>,</code>, and parses both halves. Use <code>?</code> to propagate parse errors. What error message does the user see for <code>"3,abc"</code>?
+</div>
+
+## What's Next
+
+Errors are values, and now you know how to create, propagate, and handle them. Next, let's define our own data types. Next up: [Structs](structs.html).

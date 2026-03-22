@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Types — Basalt</title>
-    <meta name="description" content="Basalt's type system">
+    <meta name="description" content="Every value has a type. Every type tells the truth.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -334,109 +334,98 @@
     <div class="page">
         <article class="content">
             <h1>Types</h1>
-            <p class="subtitle">Basalt's type system</p>
-            <h3>Primitive Types</h3>
+            <p class="subtitle">Every value has a type. Every type tells the truth.</p>
+            <p>Most bugs in dynamic languages come from a value being something you didn't expect — a string where you wanted a number, <code>null</code> where you wanted a record, <code>undefined</code> where you wanted anything at all. Basalt's type system eliminates these bugs at compile time. If your program type-checks, every value is exactly what the type says it is.</p>
+<h2>Primitives</h2>
+<p>The building blocks. Every literal has a definite type:</p>
 <pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    <span class="kw">let</span> i <span class="op">=</span> <span class="nu">42</span>              <span class="cm">// i64 (default integer)</span>
-    <span class="kw">let</span> f <span class="op">=</span> <span class="nu">3.14</span>            <span class="cm">// f64</span>
-    <span class="kw">let</span> b <span class="op">=</span> <span class="kw">true</span>            <span class="cm">// bool</span>
-    <span class="kw">let</span> s <span class="op">=</span> <span class="st">"hello"</span>         <span class="cm">// string (immutable, UTF-8)</span>
-    <span class="kw">let</span> n <span class="op">=</span> <span class="kw">nil</span>             <span class="cm">// nil (absence of value)</span>
+    <span class="kw">let</span> status_code <span class="op">=</span> <span class="nu">200</span>          <span class="cm">// i64 — default integer type</span>
+    <span class="kw">let</span> temperature <span class="op">=</span> <span class="nu">98.6</span>         <span class="cm">// f64 — IEEE 754 double</span>
+    <span class="kw">let</span> active <span class="op">=</span> <span class="kw">true</span>              <span class="cm">// bool</span>
+    <span class="kw">let</span> greeting <span class="op">=</span> <span class="st">"hello world"</span>   <span class="cm">// string — immutable, UTF-8</span>
+    <span class="kw">let</span> nothing <span class="op">=</span> <span class="kw">nil</span>              <span class="cm">// nil — explicit absence</span>
 
-    <span class="cm">// Sized integer types require annotation</span>
+    stdout.<span class="fn">println</span>(status_code <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 200</span>
+}</code></pre>
+<p>Integer types come in signed (<code>i8</code>, <code>i16</code>, <code>i32</code>, <code>i64</code>) and unsigned (<code>u8</code>, <code>u16</code>, <code>u32</code>, <code>u64</code>). All integer literals default to <code>i64</code>. When you need a specific width, annotate:</p>
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
     <span class="kw">let</span> byte<span class="op">:</span> <span class="ty">u8</span> <span class="op">=</span> <span class="nu">255</span>
-    <span class="kw">let</span> small<span class="op">:</span> <span class="ty">i16</span> <span class="op">=</span> <span class="op">-</span><span class="nu">1000</span>
+    <span class="kw">let</span> port<span class="op">:</span> <span class="ty">u16</span> <span class="op">=</span> <span class="nu">8080</span>
     <span class="kw">let</span> id<span class="op">:</span> <span class="ty">u64</span> <span class="op">=</span> <span class="nu">0xDEADBEEF</span>
-
-    stdout.<span class="fn">println</span>(i <span class="kw">as</span> <span class="ty">string</span>)     <span class="cm">// Output: 42</span>
     stdout.<span class="fn">println</span>(byte <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 255</span>
 }</code></pre>
-<p>Integer types: <code>i8</code>, <code>i16</code>, <code>i32</code>, <code>i64</code> (signed) and <code>u8</code>, <code>u16</code>, <code>u32</code>, <code>u64</code> (unsigned). All integer literals default to <code>i64</code>. Integer arithmetic is checked — overflow panics at runtime.</p>
-<p>There is one float type: <code>f64</code> (IEEE 754 double precision).</p>
-<h3>Collections</h3>
+<h2>No implicit conversions</h2>
+<p>What happens if you mix integers and floats?</p>
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> x <span class="op">=</span> <span class="nu">1</span> <span class="op">+</span> <span class="nu">2.0</span>
+}</code></pre>
+<blockquote>
+<p><strong>Error:</strong> Cannot apply operator <code>+</code> to types <code>i64</code> and <code>f64</code>.</p>
+</blockquote>
+<p>Basalt refuses to silently convert between numeric types. You might lose precision, change sign, or overflow — and the language won't pretend that's fine.</p>
+<p>&lt;div class="callout callout-note"&gt;&lt;strong&gt;Design philosophy&lt;/strong&gt; Implicit conversions hide data loss. In C, &lt;code&gt;int x = 3.9&lt;/code&gt; silently gives you &lt;code&gt;3&lt;/code&gt;. In Basalt, every conversion is explicit and visible in the code. See &lt;a href="conversions.html"&gt;Type Conversions&lt;/a&gt; for the full story. &lt;/div&gt;</p>
+<h2>Collections</h2>
+<p>Three built-in collection types cover most data structures:</p>
 <pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
     <span class="cm">// Arrays: ordered, growable, homogeneous</span>
-    <span class="kw">let</span> nums <span class="op">=</span> [<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>]
-    stdout.<span class="fn">println</span>(nums[<span class="nu">0</span>] <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 1</span>
+    <span class="kw">let</span> temps <span class="op">=</span> [<span class="nu">72.0</span>, <span class="nu">68.5</span>, <span class="nu">74.1</span>]
+    stdout.<span class="fn">println</span>(temps[<span class="nu">0</span>] <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 72</span>
 
     <span class="cm">// Maps: ordered by insertion, key-value pairs</span>
-    <span class="kw">let</span> ages <span class="op">=</span> {<span class="st">"alice"</span><span class="op">:</span> <span class="nu">30</span>, <span class="st">"bob"</span><span class="op">:</span> <span class="nu">25</span>}
-    stdout.<span class="fn">println</span>(ages[<span class="st">"alice"</span>] <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 30</span>
+    <span class="kw">let</span> headers <span class="op">=</span> {<span class="st">"Content-Type"</span><span class="op">:</span> <span class="st">"text/html"</span>, <span class="st">"Status"</span><span class="op">:</span> <span class="st">"200 OK"</span>}
+    stdout.<span class="fn">println</span>(headers[<span class="st">"Status"</span>])  <span class="cm">// Output: 200 OK</span>
 
     <span class="cm">// Tuples: fixed-size, heterogeneous, immutable</span>
-    <span class="kw">let</span> pair <span class="op">=</span> (<span class="nu">42</span>, <span class="st">"hello"</span>)
-    stdout.<span class="fn">println</span>(pair<span class="nu">.0</span> <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 42</span>
-    stdout.<span class="fn">println</span>(pair<span class="nu">.1</span>)            <span class="cm">// Output: hello</span>
+    <span class="kw">let</span> user <span class="op">=</span> (<span class="st">"Alice"</span>, <span class="nu">30</span>, <span class="kw">true</span>)
+    stdout.<span class="fn">println</span>(user<span class="nu">.0</span>)             <span class="cm">// Output: Alice</span>
 }</code></pre>
-<p>Arrays and maps are reference types — assignment shares the same object. Use <code>.clone()</code> for an independent copy. Tuples are value types — assignment copies.</p>
-<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    <span class="kw">let</span> <span class="kw">mut</span> a <span class="op">=</span> [<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>]
-    <span class="kw">let</span> <span class="kw">mut</span> b <span class="op">=</span> a         <span class="cm">// b and a point to the same array</span>
-    b.<span class="fn">push</span>(<span class="nu">4</span>)
-    stdout.<span class="fn">println</span>(a.length <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 4 (same object!)</span>
-
-    <span class="kw">let</span> <span class="kw">mut</span> c <span class="op">=</span> a.<span class="fn">clone</span>() <span class="cm">// independent copy</span>
-    c.<span class="fn">push</span>(<span class="nu">5</span>)
-    stdout.<span class="fn">println</span>(a.length <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 4 (unaffected)</span>
-}</code></pre>
-<h3>Optional Types</h3>
-<p><code>T?</code> represents a value that might be absent. It is equivalent to <code>T | nil</code>.</p>
+<p>Arrays and maps are reference types — assignment shares the same object. Use <code>.clone()</code> for an independent copy. Tuples are value types and copy on assignment.</p>
+<h2>Optional types: null done right</h2>
+<p>In languages with <code>null</code>, any reference can be null. You don't know until it blows up at runtime. Basalt has no null references. Instead, <code>T?</code> (shorthand for <code>T | nil</code>) makes absence explicit in the type:</p>
 <pre><code><span class="kw">fn</span> <span class="fn">find_user</span>(id<span class="op">:</span> <span class="ty">i64</span>) <span class="op">-&gt;</span> <span class="ty">string</span><span class="op">?</span> {
     <span class="kw">if</span> id <span class="op">==</span> <span class="nu">1</span> { <span class="kw">return</span> <span class="st">"Alice"</span> }
     <span class="kw">return</span> <span class="kw">nil</span>
 }
 
 <span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    <span class="kw">let</span> name <span class="op">=</span> <span class="fn">find_user</span>(<span class="nu">1</span>)
+    <span class="kw">let</span> name <span class="op">=</span> <span class="fn">find_user</span>(<span class="nu">42</span>)
+    <span class="cm">// name is `string?` — you CANNOT use it as a string directly</span>
     <span class="kw">if</span> name <span class="kw">is</span> <span class="ty">string</span> {
-        stdout.<span class="fn">println</span>(<span class="st">"Found: "</span> <span class="op">+</span> name)  <span class="cm">// Output: Found: Alice</span>
-    }
-
-    <span class="kw">let</span> missing <span class="op">=</span> <span class="fn">find_user</span>(<span class="nu">99</span>)
-    <span class="kw">if</span> missing <span class="kw">is</span> <span class="kw">nil</span> {
+        stdout.<span class="fn">println</span>(<span class="st">"Found: "</span> <span class="op">+</span> name)
+    } <span class="kw">else</span> {
         stdout.<span class="fn">println</span>(<span class="st">"Not found"</span>)  <span class="cm">// Output: Not found</span>
     }
 }</code></pre>
-<h3>Result Types</h3>
-<p><code>T!E</code> represents either a success value of type <code>T</code> or an error of type <code>E</code>. Errors are values, not exceptions.</p>
+<p>The compiler forces you to handle <code>nil</code> before using the value. No null pointer exceptions. Ever.</p>
+<h2>Result types</h2>
+<p>When an operation can fail, the return type says so: <code>T!E</code> is either a success value of type <code>T</code> or an error of type <code>E</code>. Errors are values, not exceptions thrown from unknown depths.</p>
 <pre><code><span class="kw">fn</span> <span class="fn">parse_port</span>(s<span class="op">:</span> <span class="ty">string</span>) <span class="op">-&gt;</span> <span class="ty">i64</span><span class="op">!</span><span class="ty">string</span> {
     <span class="kw">if</span> s.length <span class="op">==</span> <span class="nu">0</span> { <span class="kw">return</span> <span class="op">!</span>(<span class="st">"empty input"</span>) }
     <span class="kw">let</span> n <span class="op">=</span> s <span class="kw">as</span><span class="op">?</span> <span class="ty">i64</span>
     <span class="kw">if</span> n <span class="kw">is</span> <span class="kw">nil</span> { <span class="kw">return</span> <span class="op">!</span>(<span class="st">"not a number: "</span> <span class="op">+</span> s) }
     <span class="kw">return</span> n <span class="kw">as</span> <span class="ty">i64</span>
+}</code></pre>
+<p>This is a deep topic — see <a href="error-handling.html">Error Handling</a> for propagation, <code>guard let</code>, and real-world patterns.</p>
+<h2>Union types</h2>
+<p>Sometimes a value can legitimately be one of several types. Union types make this explicit:</p>
+<pre><code><span class="kw">fn</span> <span class="fn">respond</span>(code<span class="op">:</span> <span class="ty">i64</span>) <span class="op">-&gt;</span> <span class="ty">i64</span> <span class="op">|</span> <span class="ty">string</span> {
+    <span class="kw">if</span> code <span class="op">==</span> <span class="nu">200</span> { <span class="kw">return</span> <span class="st">"OK"</span> }
+    <span class="kw">return</span> code
 }
 
 <span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    <span class="kw">match</span> <span class="fn">parse_port</span>(<span class="st">"8080"</span>) {
-        <span class="op">!</span>err <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(<span class="st">"Error: "</span> <span class="op">+</span> err)
-        port <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(<span class="st">"Port: "</span> <span class="op">+</span> (port <span class="kw">as</span> <span class="ty">string</span>))
+    <span class="kw">let</span> result <span class="op">=</span> <span class="fn">respond</span>(<span class="nu">200</span>)
+    <span class="kw">match</span> result {
+        <span class="kw">is</span> <span class="ty">string</span> <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(result <span class="kw">as</span> <span class="ty">string</span>)
+        <span class="kw">is</span> <span class="ty">i64</span> <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(<span class="st">"Code: "</span> <span class="op">+</span> (result <span class="kw">as</span> <span class="ty">string</span>))
     }
-    <span class="cm">// Output: Port: 8080</span>
-
-    <span class="kw">match</span> <span class="fn">parse_port</span>(<span class="st">"abc"</span>) {
-        <span class="op">!</span>err <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(<span class="st">"Error: "</span> <span class="op">+</span> err)
-        _ <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(<span class="st">"OK"</span>)
-    }
-    <span class="cm">// Output: Error: not a number: abc</span>
+    <span class="cm">// Output: OK</span>
 }</code></pre>
-<p>See <a href="error-handling.html">Error Handling</a> for the full story.</p>
-<h3>Union Types</h3>
-<p>A union <code>A | B</code> accepts values of either type. Use <code>is</code> to narrow to a specific member.</p>
-<pre><code><span class="kw">fn</span> <span class="fn">describe</span>(val<span class="op">:</span> <span class="ty">i64</span> <span class="op">|</span> <span class="ty">string</span>) <span class="op">-&gt;</span> <span class="ty">string</span> {
-    <span class="kw">if</span> val <span class="kw">is</span> <span class="ty">i64</span> {
-        <span class="kw">return</span> <span class="st">"number: "</span> <span class="op">+</span> (val <span class="kw">as</span> <span class="ty">string</span>)
-    } <span class="kw">else</span> {
-        <span class="kw">return</span> <span class="st">"text: "</span> <span class="op">+</span> val
-    }
-}
-
-<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    stdout.<span class="fn">println</span>(<span class="fn">describe</span>(<span class="nu">42</span>))       <span class="cm">// Output: number: 42</span>
-    stdout.<span class="fn">println</span>(<span class="fn">describe</span>(<span class="st">"hello"</span>))  <span class="cm">// Output: text: hello</span>
-}</code></pre>
-<p>You can name unions with type aliases:</p>
-<pre><code><span class="kw">type</span> <span class="ty">Numeric</span> <span class="op">=</span> <span class="ty">i64</span> <span class="op">|</span> <span class="ty">f64</span>
-<span class="kw">type</span> <span class="ty">JsonPrimitive</span> <span class="op">=</span> <span class="ty">bool</span> <span class="op">|</span> <span class="ty">f64</span> <span class="op">|</span> <span class="ty">string</span> <span class="op">|</span> <span class="kw">nil</span></code></pre>
+<p>You can name unions with type aliases for readability:</p>
+<pre><code><span class="kw">type</span> <span class="ty">JsonValue</span> <span class="op">=</span> <span class="ty">bool</span> <span class="op">|</span> <span class="ty">f64</span> <span class="op">|</span> <span class="ty">string</span> <span class="op">|</span> <span class="kw">nil</span></code></pre>
+<p>The compiler ensures you handle every member of the union — you can't accidentally forget the <code>nil</code> case.</p>
+<h2>What's Next</h2>
+<p>Now that you know what values can be, let's look at how to bind them to names. Next up: <a href="variables.html">Variables</a>.</p>
 
         </article>
         <nav class="page-nav">

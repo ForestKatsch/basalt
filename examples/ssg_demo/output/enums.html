@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Enums — Basalt</title>
-    <meta name="description" content="Enum types with data-carrying variants">
+    <meta name="description" content="A closed set of possibilities. The compiler ensures you handle each one.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -334,55 +334,71 @@
     <div class="page">
         <article class="content">
             <h1>Enums</h1>
-            <p class="subtitle">Enum types with data-carrying variants</p>
-            <p>Enums define a closed set of variants. Variants can carry data.</p>
-<pre><code><span class="kw">type</span> <span class="ty">Color</span> { <span class="ty">Red</span>, <span class="ty">Green</span>, <span class="ty">Blue</span> }
+            <p class="subtitle">A closed set of possibilities. The compiler ensures you handle each one.</p>
+            <p>An enum defines a type that can be exactly one of several variants. Unlike structs, which always have the same fields, an enum value is one possibility from a fixed set.</p>
+<h2>Simple enums</h2>
+<p>At their simplest, enums are named constants:</p>
+<pre><code><span class="kw">type</span> <span class="ty">Direction</span> { <span class="ty">North</span>, <span class="ty">South</span>, <span class="ty">East</span>, <span class="ty">West</span> }
 
-<span class="kw">type</span> <span class="ty">Option</span> {
-    <span class="ty">Some</span>(<span class="ty">i64</span>)
-    <span class="ty">None</span>
-}
-
-<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    <span class="kw">let</span> c <span class="op">=</span> <span class="ty">Color</span>.<span class="ty">Red</span>
-
-    <span class="kw">let</span> x <span class="op">=</span> <span class="ty">Option</span>.<span class="ty">Some</span>(<span class="nu">42</span>)
-    <span class="kw">match</span> x {
-        <span class="ty">Option</span>.<span class="ty">Some</span>(val) <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(val <span class="kw">as</span> <span class="ty">string</span>)
-        <span class="ty">Option</span>.<span class="ty">None</span> <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(<span class="st">"none"</span>)
-    }
-    <span class="cm">// Output: 42</span>
-}</code></pre>
-<h3>Data-carrying variants</h3>
-<pre><code><span class="kw">type</span> <span class="ty">Shape</span> {
-    <span class="ty">Circle</span>(<span class="ty">f64</span>)
-    <span class="ty">Rect</span>(<span class="ty">f64</span>, <span class="ty">f64</span>)
-}
-
-<span class="kw">fn</span> <span class="fn">describe</span>(s<span class="op">:</span> <span class="ty">Shape</span>) <span class="op">-&gt;</span> <span class="ty">string</span> {
-    <span class="kw">match</span> s {
-        <span class="ty">Shape</span>.<span class="ty">Circle</span>(r) <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"circle with radius "</span> <span class="op">+</span> (r <span class="kw">as</span> <span class="ty">string</span>)
-        <span class="ty">Shape</span>.<span class="ty">Rect</span>(w, h) <span class="op">=&gt;</span> <span class="kw">return</span> (w <span class="kw">as</span> <span class="ty">string</span>) <span class="op">+</span> <span class="st">"x"</span> <span class="op">+</span> (h <span class="kw">as</span> <span class="ty">string</span>) <span class="op">+</span> <span class="st">" rectangle"</span>
+<span class="kw">fn</span> <span class="fn">describe</span>(d<span class="op">:</span> <span class="ty">Direction</span>) <span class="op">-&gt;</span> <span class="ty">string</span> {
+    <span class="kw">match</span> d {
+        <span class="ty">Direction</span>.<span class="ty">North</span> <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"heading north"</span>
+        <span class="ty">Direction</span>.<span class="ty">South</span> <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"heading south"</span>
+        <span class="ty">Direction</span>.<span class="ty">East</span>  <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"heading east"</span>
+        <span class="ty">Direction</span>.<span class="ty">West</span>  <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"heading west"</span>
     }
     <span class="kw">return</span> <span class="st">""</span>
 }
 
 <span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    stdout.<span class="fn">println</span>(<span class="fn">describe</span>(<span class="ty">Shape</span>.<span class="ty">Circle</span>(<span class="nu">5.0</span>)))
-    <span class="cm">// Output: circle with radius 5</span>
-    stdout.<span class="fn">println</span>(<span class="fn">describe</span>(<span class="ty">Shape</span>.<span class="ty">Rect</span>(<span class="nu">3.0</span>, <span class="nu">4.0</span>)))
-    <span class="cm">// Output: 3x4 rectangle</span>
+    <span class="kw">let</span> heading <span class="op">=</span> <span class="ty">Direction</span>.<span class="ty">North</span>
+    stdout.<span class="fn">println</span>(<span class="fn">describe</span>(heading))  <span class="cm">// Output: heading north</span>
 }</code></pre>
-<h3>Testing variants with is</h3>
-<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    <span class="kw">let</span> x <span class="op">=</span> <span class="ty">Option</span>.<span class="ty">Some</span>(<span class="nu">42</span>)
-    <span class="kw">if</span> x <span class="kw">is</span> <span class="ty">Option</span>.<span class="ty">Some</span> {
-        stdout.<span class="fn">println</span>(<span class="st">"has a value"</span>)
+<p>Variants are always accessed through the type name: <code>Direction.North</code>, never just <code>North</code>.</p>
+<h2>Data-carrying variants</h2>
+<p>Each variant can carry its own data. Different variants can carry different types and different numbers of fields:</p>
+<pre><code><span class="kw">type</span> <span class="ty">Shape</span> {
+    <span class="ty">Circle</span>(<span class="ty">f64</span>)
+    <span class="ty">Rect</span>(<span class="ty">f64</span>, <span class="ty">f64</span>)
+    <span class="ty">Triangle</span>(<span class="ty">f64</span>, <span class="ty">f64</span>, <span class="ty">f64</span>)
+}
+
+<span class="kw">fn</span> <span class="fn">area</span>(s<span class="op">:</span> <span class="ty">Shape</span>) <span class="op">-&gt;</span> <span class="ty">f64</span> {
+    <span class="kw">match</span> s {
+        <span class="ty">Shape</span>.<span class="ty">Circle</span>(r) <span class="op">=&gt;</span> <span class="kw">return</span> <span class="nu">3.14159</span> <span class="op">*</span> r <span class="op">*</span> r
+        <span class="ty">Shape</span>.<span class="ty">Rect</span>(w, h) <span class="op">=&gt;</span> <span class="kw">return</span> w <span class="op">*</span> h
+        <span class="ty">Shape</span>.<span class="ty">Triangle</span>(a, b, h) <span class="op">=&gt;</span> <span class="kw">return</span> <span class="nu">0.5</span> <span class="op">*</span> b <span class="op">*</span> h
     }
-    <span class="cm">// Use match to destructure the inner data</span>
+    <span class="kw">return</span> <span class="nu">0.0</span>
+}
+
+<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> shapes <span class="op">=</span> [
+        <span class="ty">Shape</span>.<span class="ty">Circle</span>(<span class="nu">5.0</span>),
+        <span class="ty">Shape</span>.<span class="ty">Rect</span>(<span class="nu">3.0</span>, <span class="nu">4.0</span>),
+    ]
+    <span class="kw">for</span> shape <span class="kw">in</span> shapes {
+        stdout.<span class="fn">println</span>(<span class="fn">area</span>(shape) <span class="kw">as</span> <span class="ty">string</span>)
+    }
+    <span class="cm">// Output: 78.53975</span>
+    <span class="cm">// Output: 12</span>
 }</code></pre>
-<h3>Recursive enums</h3>
-<p>Enum variants can reference the enclosing type, enabling trees and nested data:</p>
+<p>The exhaustiveness guarantee from <a href="pattern-matching.html">Pattern Matching</a> makes enums powerful — add a new variant and the compiler tells you every place that needs updating.</p>
+<h2>Testing variants with <code>is</code></h2>
+<p>When you need to check which variant you have without destructuring:</p>
+<pre><code><span class="kw">type</span> <span class="ty">Status</span> { <span class="ty">Active</span>, <span class="ty">Suspended</span>, <span class="ty">Deleted</span> }
+
+<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> user_status <span class="op">=</span> <span class="ty">Status</span>.<span class="ty">Active</span>
+
+    <span class="kw">if</span> user_status <span class="kw">is</span> <span class="ty">Status</span>.<span class="ty">Active</span> {
+        stdout.<span class="fn">println</span>(<span class="st">"user can log in"</span>)
+    }
+    <span class="cm">// Output: user can log in</span>
+}</code></pre>
+<p>Use <code>is</code> for branching, <code>match</code> for extracting data.</p>
+<h2>Modeling real domains</h2>
+<p>Enums shine when you model domains where something can be one of several distinct states. Here's a JSON value type:</p>
 <pre><code><span class="kw">type</span> <span class="ty">Json</span> {
     <span class="ty">Null</span>
     <span class="ty">Bool</span>(<span class="ty">bool</span>)
@@ -391,6 +407,40 @@
     <span class="ty">Arr</span>([<span class="ty">Json</span>])
     <span class="ty">Obj</span>([<span class="ty">string</span><span class="op">:</span> <span class="ty">Json</span>])
 }</code></pre>
+<p>Variants can reference the enclosing type, so recursive structures like trees and nested documents work naturally. Every function that receives a <code>Json</code> value must handle every variant — the compiler ensures nothing is missed.</p>
+<h2>State machines</h2>
+<p>Enums are the natural fit for state machines. Each state is a variant, and transitions are functions that return the next state:</p>
+<pre><code><span class="kw">type</span> <span class="ty">ConnectionState</span> {
+    <span class="ty">Disconnected</span>
+    <span class="ty">Connecting</span>(<span class="ty">string</span>)
+    <span class="ty">Connected</span>(<span class="ty">string</span>, <span class="ty">i64</span>)
+    <span class="ty">Failed</span>(<span class="ty">string</span>)
+}
+
+<span class="kw">fn</span> <span class="fn">describe_state</span>(state<span class="op">:</span> <span class="ty">ConnectionState</span>) <span class="op">-&gt;</span> <span class="ty">string</span> {
+    <span class="kw">match</span> state {
+        <span class="ty">ConnectionState</span>.<span class="ty">Disconnected</span> <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"not connected"</span>
+        <span class="ty">ConnectionState</span>.<span class="ty">Connecting</span>(host) <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"connecting to "</span> <span class="op">+</span> host
+        <span class="ty">ConnectionState</span>.<span class="ty">Connected</span>(host, port) <span class="op">=&gt;</span> {
+            <span class="kw">return</span> <span class="st">"connected to "</span> <span class="op">+</span> host <span class="op">+</span> <span class="st">":"</span> <span class="op">+</span> (port <span class="kw">as</span> <span class="ty">string</span>)
+        }
+        <span class="ty">ConnectionState</span>.<span class="ty">Failed</span>(reason) <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"failed: "</span> <span class="op">+</span> reason
+    }
+    <span class="kw">return</span> <span class="st">""</span>
+}
+
+<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> state <span class="op">=</span> <span class="ty">ConnectionState</span>.<span class="ty">Connecting</span>(<span class="st">"api.example.com"</span>)
+    stdout.<span class="fn">println</span>(<span class="fn">describe_state</span>(state))
+    <span class="cm">// Output: connecting to api.example.com</span>
+
+    <span class="kw">let</span> next <span class="op">=</span> <span class="ty">ConnectionState</span>.<span class="ty">Connected</span>(<span class="st">"api.example.com"</span>, <span class="nu">443</span>)
+    stdout.<span class="fn">println</span>(<span class="fn">describe_state</span>(next))
+    <span class="cm">// Output: connected to api.example.com:443</span>
+}</code></pre>
+<p>&lt;div class="callout callout-note"&gt;&lt;strong&gt;Enums vs. type unions&lt;/strong&gt; Basalt also has union types like &lt;code&gt;string | i64&lt;/code&gt; for ad-hoc combinations. Enums are different — they define a &lt;em&gt;named, closed&lt;/em&gt; set of possibilities with meaningful variant names. Use unions when combining existing types; use enums when defining a domain concept. &lt;/div&gt;</p>
+<h2>What's Next</h2>
+<p>Enums and match give you powerful data modeling. <a href="closures.html">Closures</a> add another dimension — functions you can create on the fly and pass around as values.</p>
 
         </article>
         <nav class="page-nav">

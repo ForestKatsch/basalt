@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Capabilities — Basalt</title>
-    <meta name="description" content="Capability-based I/O system">
+    <meta name="description" content="Your program only does what you allow it to do.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -334,58 +334,72 @@
     <div class="page">
         <article class="content">
             <h1>Capabilities</h1>
-            <p class="subtitle">Capability-based I/O system</p>
-            <p>IO in Basalt works through capability objects passed to <code>main</code>. A program can only perform IO that it explicitly requests.</p>
-<h3>Stdout</h3>
+            <p class="subtitle">Your program only does what you allow it to do.</p>
+            <p>Most programs have unrestricted access to the outside world. They can read any file, connect to any server, access any environment variable — and you only find out what they actually do by reading every line of code.</p>
+<p>Basalt inverts this. A program declares its capabilities in <code>main</code>'s parameter list, and the runtime provides only what is requested. If you don't ask for file system access, your program physically cannot read or write files.</p>
+<h2>A minimal program</h2>
 <pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    stdout.<span class="fn">println</span>(<span class="st">"line with newline"</span>)
-    stdout.<span class="fn">print</span>(<span class="st">"no newline"</span>)
-    stdout.<span class="fn">flush</span>()
+    stdout.<span class="fn">println</span>(<span class="st">"Hello, world!"</span>)
 }</code></pre>
-<h3>Stdin</h3>
-<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>, stdin<span class="op">:</span> <span class="ty">Stdin</span>) {
-    stdout.<span class="fn">print</span>(<span class="st">"What is your name? "</span>)
-    stdout.<span class="fn">flush</span>()
-    <span class="kw">let</span> name <span class="op">=</span> stdin.<span class="fn">read_line</span>()
-    stdout.<span class="fn">println</span>(<span class="st">"Hello, \(name)!"</span>)
-}</code></pre>
-<table>
-<thead><tr><th>Method</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>stdin.read_line()</code></td><td>Read one line (strips newline)</td></tr>
-<tr><td><code>stdin.read_key()</code></td><td>Read single character (raw mode)</td></tr>
-</tbody></table>
-<h3>Fs (File System)</h3>
-<p>The <code>Fs</code> capability is sandboxed to the directory containing the source file.</p>
+<p>This program can write to the terminal. It cannot read files, access environment variables, or read user input. Not because of a policy — because the runtime never gave it the objects to do those things.</p>
+<h2>Adding capabilities</h2>
+<p>Need to read files? Add <code>Fs</code> to the parameter list:</p>
 <pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>, fs<span class="op">:</span> <span class="ty">Fs</span>) {
-    <span class="cm">// Write a file</span>
-    <span class="kw">let</span> write_result <span class="op">=</span> fs.<span class="fn">write_file</span>(<span class="st">"output.txt"</span>, <span class="st">"Hello from Basalt!"</span>)
-    <span class="kw">match</span> write_result {
-        <span class="op">!</span>err <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(<span class="st">"Write failed: "</span> <span class="op">+</span> err)
-        _ <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(<span class="st">"Wrote output.txt"</span>)
-    }
-
-    <span class="cm">// Read a file</span>
-    <span class="kw">guard</span> <span class="kw">let</span> content <span class="op">=</span> fs.<span class="fn">read_file</span>(<span class="st">"output.txt"</span>) <span class="kw">else</span> {
-        stdout.<span class="fn">println</span>(<span class="st">"Read failed"</span>)
+    <span class="kw">guard</span> <span class="kw">let</span> content <span class="op">=</span> fs.<span class="fn">read_file</span>(<span class="st">"config.txt"</span>) <span class="kw">else</span> {
+        stdout.<span class="fn">println</span>(<span class="st">"No config found"</span>)
         <span class="kw">return</span>
     }
     stdout.<span class="fn">println</span>(content)
-
-    <span class="cm">// Check existence</span>
-    stdout.<span class="fn">println</span>(fs.<span class="fn">exists</span>(<span class="st">"output.txt"</span>) <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: true</span>
-
-    <span class="cm">// List directory</span>
-    <span class="kw">guard</span> <span class="kw">let</span> files <span class="op">=</span> fs.<span class="fn">read_dir</span>(<span class="st">"."</span>) <span class="kw">else</span> { <span class="kw">return</span> }
-    <span class="kw">for</span> file <span class="kw">in</span> files {
-        stdout.<span class="fn">println</span>(file)
-    }
-
-    <span class="cm">// Path utilities</span>
-    <span class="kw">let</span> p <span class="op">=</span> fs.<span class="fn">join</span>(<span class="st">"subdir"</span>, <span class="st">"page.html"</span>)   <span class="cm">// "subdir/page.html"</span>
-    <span class="kw">let</span> ext <span class="op">=</span> fs.<span class="fn">extension</span>(<span class="st">"photo.png"</span>)       <span class="cm">// "png" (returns string?)</span>
-    <span class="kw">let</span> name <span class="op">=</span> fs.<span class="fn">stem</span>(<span class="st">"photo.png"</span>)           <span class="cm">// "photo" (returns string?)</span>
 }</code></pre>
+<p>Need command-line arguments? Add <code>Env</code>:</p>
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>, env<span class="op">:</span> <span class="ty">Env</span>) {
+    <span class="kw">let</span> args <span class="op">=</span> env.<span class="fn">args</span>()
+    <span class="kw">if</span> args.length <span class="op">==</span> <span class="nu">0</span> {
+        stdout.<span class="fn">println</span>(<span class="st">"Usage: program &lt;name&gt;"</span>)
+        <span class="kw">return</span>
+    }
+    stdout.<span class="fn">println</span>(<span class="st">"Hello, \(args[0])!"</span>)
+}</code></pre>
+<p>Every capability you use is visible in one place — the function signature.</p>
+<p>&lt;div class="callout callout-note"&gt;&lt;strong&gt;This is capability-based security, not access control&lt;/strong&gt; Access control systems have a central authority that grants or denies permissions at runtime. Capability-based security is structural: if you don't have the object, you can't use it. There is no way to "escalate" — no global namespace to reach into, no ambient authority to exploit. &lt;/div&gt;</p>
+<h2>The Fs sandbox</h2>
+<p>The <code>Fs</code> capability is sandboxed to the directory containing the source file. Path traversal is blocked:</p>
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>, fs<span class="op">:</span> <span class="ty">Fs</span>) {
+    <span class="cm">// This works — reading a file in the project directory</span>
+    <span class="kw">guard</span> <span class="kw">let</span> readme <span class="op">=</span> fs.<span class="fn">read_file</span>(<span class="st">"README.md"</span>) <span class="kw">else</span> {
+        stdout.<span class="fn">println</span>(<span class="st">"no readme"</span>)
+        <span class="kw">return</span>
+    }
+    stdout.<span class="fn">println</span>(readme)
+
+    <span class="cm">// This is blocked — trying to escape the sandbox</span>
+    <span class="kw">let</span> result <span class="op">=</span> fs.<span class="fn">read_file</span>(<span class="st">"../../etc/passwd"</span>)
+    <span class="kw">match</span> result {
+        <span class="op">!</span>err <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(<span class="st">"Blocked: "</span> <span class="op">+</span> err)
+        _ <span class="op">=&gt;</span> {}
+    }
+}</code></pre>
+<blockquote>
+<p><strong>Error:</strong> path traversal blocked: ../../etc/passwd is outside the sandbox</p>
+</blockquote>
+<p>Even with <code>Fs</code>, you can only reach files in your project directory. A downloaded script cannot read your SSH keys or browser cookies.</p>
+<h2>Capability reference</h2>
+<h3>Stdout</h3>
+<table>
+<thead><tr><th>Method</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>stdout.println(s)</code></td><td>Print with newline</td></tr>
+<tr><td><code>stdout.print(s)</code></td><td>Print without newline</td></tr>
+<tr><td><code>stdout.flush()</code></td><td>Flush output buffer</td></tr>
+</tbody></table>
+<h3>Stdin</h3>
+<table>
+<thead><tr><th>Method</th><th>Returns</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>stdin.read_line()</code></td><td><code>string</code></td><td>Read one line (strips newline)</td></tr>
+<tr><td><code>stdin.read_key()</code></td><td><code>string</code></td><td>Read single character (raw mode)</td></tr>
+</tbody></table>
+<h3>Fs (File System)</h3>
 <table>
 <thead><tr><th>Method</th><th>Returns</th><th>Description</th></tr></thead>
 <tbody>
@@ -393,50 +407,41 @@
 <tr><td><code>fs.write_file(path, data)</code></td><td><code>nil!string</code></td><td>Write file</td></tr>
 <tr><td><code>fs.read_dir(path)</code></td><td><code>[string]!string</code></td><td>List directory entries</td></tr>
 <tr><td><code>fs.exists(path)</code></td><td><code>bool</code></td><td>Check if path exists</td></tr>
-<tr><td><code>fs.is_dir(path)</code></td><td><code>bool</code></td><td>Check if path is a directory</td></tr>
+<tr><td><code>fs.is_dir(path)</code></td><td><code>bool</code></td><td>Check if path is directory</td></tr>
 <tr><td><code>fs.mkdir(path)</code></td><td><code>nil!string</code></td><td>Create directory</td></tr>
 <tr><td><code>fs.join(a, b)</code></td><td><code>string</code></td><td>Join path components</td></tr>
-<tr><td><code>fs.extension(path)</code></td><td><code>string?</code></td><td>File extension without dot</td></tr>
+<tr><td><code>fs.extension(path)</code></td><td><code>string?</code></td><td>File extension (no dot)</td></tr>
 <tr><td><code>fs.stem(path)</code></td><td><code>string?</code></td><td>Filename without extension</td></tr>
 </tbody></table>
 <h3>Env</h3>
-<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>, env<span class="op">:</span> <span class="ty">Env</span>) {
-    <span class="kw">let</span> args <span class="op">=</span> env.<span class="fn">args</span>()
-    <span class="kw">for</span> arg <span class="kw">in</span> args {
-        stdout.<span class="fn">println</span>(arg)
-    }
-
-    <span class="kw">let</span> home <span class="op">=</span> env.<span class="fn">get</span>(<span class="st">"HOME"</span>)
-    <span class="kw">if</span> home <span class="kw">is</span> <span class="ty">string</span> {
-        stdout.<span class="fn">println</span>(<span class="st">"Home: "</span> <span class="op">+</span> home)
-    }
-}</code></pre>
 <table>
 <thead><tr><th>Method</th><th>Returns</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>env.args()</code></td><td><code>[string]</code></td><td>Command-line arguments</td></tr>
-<tr><td><code>env.get(name)</code></td><td><code>string?</code></td><td>Environment variable value</td></tr>
+<tr><td><code>env.get(name)</code></td><td><code>string?</code></td><td>Environment variable</td></tr>
 </tbody></table>
-<h3>How capabilities work</h3>
-<p>Capabilities are passed as parameters to <code>main</code>. You only get what you ask for:</p>
-<pre><code><span class="cm">// This program can print but cannot read files</span>
-<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    stdout.<span class="fn">println</span>(<span class="st">"I have no file access"</span>)
+<h2>Passing capabilities to helpers</h2>
+<p>Capabilities are regular values. Pass them as function parameters:</p>
+<pre><code><span class="kw">fn</span> <span class="fn">load_config</span>(fs<span class="op">:</span> <span class="ty">Fs</span>) <span class="op">-&gt;</span> <span class="ty">string</span><span class="op">!</span><span class="ty">string</span> {
+    <span class="kw">return</span> fs.<span class="fn">read_file</span>(<span class="st">"config.txt"</span>)
 }
 
-<span class="cm">// This program can read/write files and print</span>
-<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>, fs<span class="op">:</span> <span class="ty">Fs</span>) {
-    <span class="kw">guard</span> <span class="kw">let</span> data <span class="op">=</span> fs.<span class="fn">read_file</span>(<span class="st">"input.txt"</span>) <span class="kw">else</span> { <span class="kw">return</span> }
-    stdout.<span class="fn">println</span>(data)
-}</code></pre>
-<p>Pass capabilities to helper functions as regular parameters:</p>
-<pre><code><span class="kw">fn</span> <span class="fn">log</span>(msg<span class="op">:</span> <span class="ty">string</span>, stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+<span class="kw">fn</span> <span class="fn">log</span>(msg<span class="op">:</span> <span class="ty">string</span>, stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
     stdout.<span class="fn">println</span>(<span class="st">"[LOG] "</span> <span class="op">+</span> msg)
 }
 
-<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>, fs<span class="op">:</span> <span class="ty">Fs</span>) {
     <span class="fn">log</span>(<span class="st">"starting up"</span>, stdout)
+    <span class="kw">guard</span> <span class="kw">let</span> config <span class="op">=</span> <span class="fn">load_config</span>(fs) <span class="kw">else</span> {
+        <span class="fn">log</span>(<span class="st">"no config found, using defaults"</span>, stdout)
+        <span class="kw">return</span>
+    }
+    <span class="fn">log</span>(<span class="st">"loaded config: "</span> <span class="op">+</span> (config.length <span class="kw">as</span> <span class="ty">string</span>) <span class="op">+</span> <span class="st">" bytes"</span>, stdout)
 }</code></pre>
+<p>Every function that performs I/O declares exactly which capability it needs. You can read any function's signature and know whether it touches the file system, the network, or the environment. No hidden side effects.</p>
+<p>&lt;div class="callout callout-tip"&gt;&lt;strong&gt;Try this&lt;/strong&gt; Write a program with only &lt;code&gt;Stdout&lt;/code&gt;. Then try calling &lt;code&gt;fs.read_file&lt;/code&gt; — you'll get a compile error because &lt;code&gt;fs&lt;/code&gt; doesn't exist. Now add &lt;code&gt;fs: Fs&lt;/code&gt; to &lt;code&gt;main&lt;/code&gt; and watch it work. The compiler enforces the security model. &lt;/div&gt;</p>
+<h2>What's Next</h2>
+<p>The last piece of the language: <a href="conversions.html">Type Conversions</a> — how Basalt handles casting between types, and why it never guesses.</p>
 
         </article>
         <nav class="page-nav">

@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Standard Library — Basalt</title>
-    <meta name="description" content="Built-in methods and the math module">
+    <meta name="description" content="Strings, arrays, maps, and math — the tools you reach for every day.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -334,53 +334,55 @@
     <div class="page">
         <article class="content">
             <h1>Standard Library</h1>
-            <p class="subtitle">Built-in methods and the math module</p>
-            <h3>String Methods</h3>
+            <p class="subtitle">Strings, arrays, maps, and math — the tools you reach for every day.</p>
+            <p>Basalt's standard library is intentionally small. String, array, and map methods are built in — no imports needed. The <code>math</code> module is the only thing you import.</p>
+<h2>Strings</h2>
+<p>Strings are immutable, UTF-8 encoded sequences. All methods return new values.</p>
 <table>
 <thead><tr><th>Method</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>s.length</code></td><td>Character count (property, not a method)</td></tr>
-<tr><td><code>s.split(sep)</code></td><td>Split by delimiter, returns <code>[string]</code></td></tr>
+<tr><td><code>s.length</code></td><td>Character count (property)</td></tr>
+<tr><td><code>s.split(sep)</code></td><td>Split into array by delimiter</td></tr>
 <tr><td><code>s.trim()</code></td><td>Strip whitespace from both ends</td></tr>
 <tr><td><code>s.trim_start()</code></td><td>Strip leading whitespace</td></tr>
 <tr><td><code>s.trim_end()</code></td><td>Strip trailing whitespace</td></tr>
 <tr><td><code>s.replace(from, to)</code></td><td>Replace all occurrences</td></tr>
-<tr><td><code>s.find(needle)</code></td><td>Index of first match, returns <code>i64?</code></td></tr>
-<tr><td><code>s.index_of(sub)</code></td><td>Index of first occurrence</td></tr>
-<tr><td><code>s.last_index_of(sub)</code></td><td>Index of last occurrence</td></tr>
-<tr><td><code>s.substring(start, len)</code></td><td>Extract by char index and length</td></tr>
-<tr><td><code>s.slice(start, end)</code></td><td>Extract by start/end index</td></tr>
+<tr><td><code>s.contains(sub)</code></td><td>Substring test</td></tr>
 <tr><td><code>s.starts_with(prefix)</code></td><td>Prefix test</td></tr>
 <tr><td><code>s.ends_with(suffix)</code></td><td>Suffix test</td></tr>
-<tr><td><code>s.contains(sub)</code></td><td>Substring test</td></tr>
 <tr><td><code>s.upper()</code></td><td>Uppercase</td></tr>
 <tr><td><code>s.lower()</code></td><td>Lowercase</td></tr>
 <tr><td><code>s.repeat(n)</code></td><td>Repeat N times</td></tr>
-<tr><td><code>s.char_at(i)</code></td><td>Single character by index (negative indexes from end)</td></tr>
+<tr><td><code>s.substring(start, len)</code></td><td>Extract by start index and length</td></tr>
+<tr><td><code>s.slice(start, end)</code></td><td>Extract by start and end index</td></tr>
+<tr><td><code>s.index_of(sub)</code></td><td>Index of first occurrence</td></tr>
+<tr><td><code>s.last_index_of(sub)</code></td><td>Index of last occurrence</td></tr>
+<tr><td><code>s.char_at(i)</code></td><td>Character at index (negative indexes from end)</td></tr>
 <tr><td><code>s.chars()</code></td><td>Array of single-character strings</td></tr>
 <tr><td><code>s.bytes()</code></td><td>Array of byte values</td></tr>
 </tbody></table>
 <pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    <span class="kw">let</span> s <span class="op">=</span> <span class="st">"Hello, World!"</span>
-    stdout.<span class="fn">println</span>(s.<span class="fn">upper</span>())                  <span class="cm">// Output: HELLO, WORLD!</span>
-    stdout.<span class="fn">println</span>(s.<span class="fn">replace</span>(<span class="st">"World"</span>, <span class="st">"Basalt"</span>))  <span class="cm">// Output: Hello, Basalt!</span>
-    stdout.<span class="fn">println</span>(s.<span class="fn">substring</span>(<span class="nu">0</span>, <span class="nu">5</span>))          <span class="cm">// Output: Hello</span>
-    stdout.<span class="fn">println</span>(s.<span class="fn">contains</span>(<span class="st">"World"</span>) <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: true</span>
-    stdout.<span class="fn">println</span>(<span class="st">"  spaces  "</span>.<span class="fn">trim</span>())        <span class="cm">// Output: spaces</span>
-    stdout.<span class="fn">println</span>(<span class="st">"abc"</span>.<span class="fn">repeat</span>(<span class="nu">3</span>))            <span class="cm">// Output: abcabcabc</span>
+    <span class="kw">let</span> path <span class="op">=</span> <span class="st">"/users/alice/documents/report.txt"</span>
+    <span class="kw">let</span> parts <span class="op">=</span> path.<span class="fn">split</span>(<span class="st">"/"</span>)
+    <span class="kw">let</span> filename <span class="op">=</span> parts[<span class="op">-</span><span class="nu">1</span>]
+    stdout.<span class="fn">println</span>(filename)                    <span class="cm">// Output: report.txt</span>
+    stdout.<span class="fn">println</span>(filename.<span class="fn">upper</span>())            <span class="cm">// Output: REPORT.TXT</span>
+    stdout.<span class="fn">println</span>(path.<span class="fn">contains</span>(<span class="st">"alice"</span>) <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: true</span>
 
-    <span class="kw">let</span> parts <span class="op">=</span> <span class="st">"a,b,c"</span>.<span class="fn">split</span>(<span class="st">","</span>)
-    stdout.<span class="fn">println</span>(parts.<span class="fn">join</span>(<span class="st">" | "</span>))          <span class="cm">// Output: a | b | c</span>
+    <span class="kw">let</span> csv <span class="op">=</span> <span class="st">"  name, age, city  "</span>
+    stdout.<span class="fn">println</span>(csv.<span class="fn">trim</span>())                  <span class="cm">// Output: name, age, city</span>
+    stdout.<span class="fn">println</span>(<span class="st">"ha"</span>.<span class="fn">repeat</span>(<span class="nu">3</span>))              <span class="cm">// Output: hahaha</span>
 }</code></pre>
-<p>String interpolation uses <code>\(expr)</code>:</p>
+<h3>String interpolation</h3>
+<p>Use <code>\(expr)</code> inside double-quoted strings to embed any expression:</p>
 <pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    <span class="kw">let</span> name <span class="op">=</span> <span class="st">"world"</span>
-    <span class="kw">let</span> n <span class="op">=</span> <span class="nu">42</span>
-    stdout.<span class="fn">println</span>(<span class="st">"Hello, \(name)!"</span>)         <span class="cm">// Output: Hello, world!</span>
-    stdout.<span class="fn">println</span>(<span class="st">"The answer is \(n)"</span>)      <span class="cm">// Output: The answer is 42</span>
-    stdout.<span class="fn">println</span>(<span class="st">"2 + 2 = \(2 + 2)"</span>)       <span class="cm">// Output: 2 + 2 = 4</span>
+    <span class="kw">let</span> name <span class="op">=</span> <span class="st">"Basalt"</span>
+    <span class="kw">let</span> version <span class="op">=</span> <span class="nu">1</span>
+    stdout.<span class="fn">println</span>(<span class="st">"Welcome to \(name) v\(version)"</span>)  <span class="cm">// Output: Welcome to Basalt v1</span>
+    stdout.<span class="fn">println</span>(<span class="st">"2 + 2 = \(2 + 2)"</span>)                <span class="cm">// Output: 2 + 2 = 4</span>
 }</code></pre>
-<p>Multiline strings use <code>\\</code> prefix per line:</p>
+<h3>Multiline strings</h3>
+<p>Prefix each line with <code>\\</code> for multiline string literals:</p>
 <pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
     <span class="kw">let</span> json <span class="op">=</span>
         \\{
@@ -389,48 +391,48 @@
         \\}
     stdout.<span class="fn">println</span>(json)
 }</code></pre>
-<h3>Array Methods</h3>
+<h2>Arrays</h2>
+<p>Arrays are ordered, homogeneous collections. They grow dynamically.</p>
 <table>
 <thead><tr><th>Method</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>arr.length</code></td><td>Element count (property)</td></tr>
 <tr><td><code>arr.push(val)</code></td><td>Append element (requires <code>mut</code>)</td></tr>
-<tr><td><code>arr.pop()</code></td><td>Remove and return last element (requires <code>mut</code>)</td></tr>
+<tr><td><code>arr.pop()</code></td><td>Remove and return last (requires <code>mut</code>)</td></tr>
 <tr><td><code>arr.insert(i, val)</code></td><td>Insert at index (requires <code>mut</code>)</td></tr>
 <tr><td><code>arr.remove(i)</code></td><td>Remove at index (requires <code>mut</code>)</td></tr>
-<tr><td><code>arr.sort()</code></td><td>Sort in place (requires <code>mut</code>, <code>i64</code> or <code>string</code> only)</td></tr>
+<tr><td><code>arr.sort()</code></td><td>Sort in place (requires <code>mut</code>)</td></tr>
 <tr><td><code>arr.reverse()</code></td><td>Reverse in place (requires <code>mut</code>)</td></tr>
 <tr><td><code>arr.join(sep)</code></td><td>Join elements with separator</td></tr>
 <tr><td><code>arr.contains(val)</code></td><td>Element membership test</td></tr>
 <tr><td><code>arr.clone()</code></td><td>Deep copy</td></tr>
 <tr><td><code>arr.map(f)</code></td><td>Transform each element</td></tr>
-<tr><td><code>arr.filter(f)</code></td><td>Keep elements matching predicate</td></tr>
-<tr><td><code>arr.find(f)</code></td><td>First element matching predicate</td></tr>
+<tr><td><code>arr.filter(f)</code></td><td>Keep matching elements</td></tr>
+<tr><td><code>arr.find(f)</code></td><td>First matching element (returns optional)</td></tr>
 <tr><td><code>arr.any(f)</code></td><td>True if any element matches</td></tr>
-<tr><td><code>arr.all(f)</code></td><td>True if all elements match</td></tr>
+<tr><td><code>arr.all(f)</code></td><td>True if all match</td></tr>
 </tbody></table>
 <pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    <span class="kw">let</span> <span class="kw">mut</span> nums <span class="op">=</span> [<span class="nu">3</span>, <span class="nu">1</span>, <span class="nu">4</span>, <span class="nu">1</span>, <span class="nu">5</span>]
+    <span class="kw">let</span> <span class="kw">mut</span> tags <span class="op">=</span> [<span class="st">"draft"</span>, <span class="st">"review"</span>, <span class="st">"urgent"</span>]
+    tags.<span class="fn">push</span>(<span class="st">"published"</span>)
+    tags.<span class="fn">sort</span>()
+    stdout.<span class="fn">println</span>(tags.<span class="fn">join</span>(<span class="st">", "</span>))  <span class="cm">// Output: draft, published, review, urgent</span>
 
-    nums.<span class="fn">sort</span>()
-    stdout.<span class="fn">println</span>(nums.<span class="fn">join</span>(<span class="st">", "</span>))  <span class="cm">// Output: 1, 1, 3, 4, 5</span>
+    stdout.<span class="fn">println</span>(tags.<span class="fn">contains</span>(<span class="st">"review"</span>) <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: true</span>
+    stdout.<span class="fn">println</span>(tags[<span class="op">-</span><span class="nu">1</span>])  <span class="cm">// Output: urgent (negative indexing)</span>
 
-    nums.<span class="fn">reverse</span>()
-    stdout.<span class="fn">println</span>(nums.<span class="fn">join</span>(<span class="st">", "</span>))  <span class="cm">// Output: 5, 4, 3, 1, 1</span>
-
-    stdout.<span class="fn">println</span>(nums.<span class="fn">contains</span>(<span class="nu">3</span>) <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: true</span>
-
-    <span class="cm">// Negative indexing</span>
-    stdout.<span class="fn">println</span>(nums[<span class="op">-</span><span class="nu">1</span>] <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 1 (last element)</span>
+    <span class="kw">let</span> upper <span class="op">=</span> tags.<span class="fn">map</span>(<span class="kw">fn</span>(t<span class="op">:</span> <span class="ty">string</span>) <span class="op">-&gt;</span> <span class="ty">string</span> { <span class="kw">return</span> t.<span class="fn">upper</span>() })
+    stdout.<span class="fn">println</span>(upper[<span class="nu">0</span>])  <span class="cm">// Output: DRAFT</span>
 }</code></pre>
-<h3>Map Methods</h3>
+<h2>Maps</h2>
+<p>Maps are ordered key-value collections. Keys are strings or integers.</p>
 <table>
 <thead><tr><th>Method</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>m.length</code></td><td>Entry count (property)</td></tr>
-<tr><td><code>m[key]</code></td><td>Get value (panics if key missing)</td></tr>
+<tr><td><code>m[key]</code></td><td>Get value (panics if missing)</td></tr>
 <tr><td><code>m[key] = val</code></td><td>Set value (requires <code>mut</code>)</td></tr>
-<tr><td><code>m.get(key)</code></td><td>Safe lookup, returns <code>V?</code> (nil if missing)</td></tr>
+<tr><td><code>m.get(key)</code></td><td>Safe lookup, returns optional</td></tr>
 <tr><td><code>m.contains_key(key)</code></td><td>Key membership test</td></tr>
 <tr><td><code>m.keys()</code></td><td>Array of keys (insertion order)</td></tr>
 <tr><td><code>m.values()</code></td><td>Array of values (insertion order)</td></tr>
@@ -438,28 +440,25 @@
 <tr><td><code>m.clone()</code></td><td>Deep copy</td></tr>
 </tbody></table>
 <pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    <span class="kw">let</span> <span class="kw">mut</span> m <span class="op">=</span> {<span class="st">"name"</span><span class="op">:</span> <span class="st">"Alice"</span>, <span class="st">"city"</span><span class="op">:</span> <span class="st">"NYC"</span>}
+    <span class="kw">let</span> <span class="kw">mut</span> headers <span class="op">=</span> {<span class="st">"content-type"</span><span class="op">:</span> <span class="st">"text/html"</span>, <span class="st">"status"</span><span class="op">:</span> <span class="st">"200"</span>}
+    headers[<span class="st">"cache-control"</span>] <span class="op">=</span> <span class="st">"no-cache"</span>
 
-    stdout.<span class="fn">println</span>(m[<span class="st">"name"</span>])  <span class="cm">// Output: Alice</span>
-
-    <span class="cm">// Safe lookup (does not panic)</span>
-    <span class="kw">let</span> age <span class="op">=</span> m.<span class="fn">get</span>(<span class="st">"age"</span>)
-    <span class="kw">if</span> age <span class="kw">is</span> <span class="kw">nil</span> {
-        stdout.<span class="fn">println</span>(<span class="st">"no age set"</span>)  <span class="cm">// Output: no age set</span>
-    }
-
-    m[<span class="st">"age"</span>] <span class="op">=</span> <span class="st">"30"</span>
-    stdout.<span class="fn">println</span>(m.<span class="fn">keys</span>().<span class="fn">join</span>(<span class="st">", "</span>))  <span class="cm">// Output: name, city, age</span>
-
-    <span class="cm">// Iterate</span>
-    <span class="kw">for</span> key, value <span class="kw">in</span> m {
+    <span class="kw">for</span> key, value <span class="kw">in</span> headers {
         stdout.<span class="fn">println</span>(<span class="st">"\(key): \(value)"</span>)
+    }
+    <span class="cm">// Output: content-type: text/html</span>
+    <span class="cm">// Output: status: 200</span>
+    <span class="cm">// Output: cache-control: no-cache</span>
+
+    <span class="kw">let</span> ct <span class="op">=</span> headers.<span class="fn">get</span>(<span class="st">"content-type"</span>)
+    <span class="kw">if</span> ct <span class="kw">is</span> <span class="ty">string</span> {
+        stdout.<span class="fn">println</span>(<span class="st">"Found: "</span> <span class="op">+</span> (ct <span class="kw">as</span> <span class="ty">string</span>))  <span class="cm">// Output: Found: text/html</span>
     }
 }</code></pre>
 <p>Empty maps need a type annotation:</p>
 <pre><code><span class="kw">let</span> <span class="kw">mut</span> scores<span class="op">:</span> [<span class="ty">string</span><span class="op">:</span> <span class="ty">i64</span>] <span class="op">=</span> {}
 scores[<span class="st">"alice"</span>] <span class="op">=</span> <span class="nu">100</span></code></pre>
-<h3>Math Module</h3>
+<h2>Math module</h2>
 <pre><code><span class="kw">import</span> <span class="st">"std/math"</span></code></pre>
 <table>
 <thead><tr><th>Function</th><th>Description</th></tr></thead>
@@ -468,19 +467,25 @@ scores[<span class="st">"alice"</span>] <span class="op">=</span> <span class="n
 <tr><td><code>math.abs(x)</code></td><td>Absolute value</td></tr>
 <tr><td><code>math.floor(x)</code></td><td>Floor</td></tr>
 <tr><td><code>math.ceil(x)</code></td><td>Ceiling</td></tr>
-<tr><td><code>math.round(x)</code></td><td>Round</td></tr>
+<tr><td><code>math.round(x)</code></td><td>Round to nearest</td></tr>
 <tr><td><code>math.min(a, b)</code></td><td>Minimum</td></tr>
 <tr><td><code>math.max(a, b)</code></td><td>Maximum</td></tr>
 <tr><td><code>math.pow(base, exp)</code></td><td>Power</td></tr>
-<tr><td><code>math.log(x)</code></td><td>Natural log</td></tr>
-<tr><td><code>math.log2(x)</code></td><td>Base-2 log</td></tr>
-<tr><td><code>math.log10(x)</code></td><td>Base-10 log</td></tr>
-<tr><td><code>math.exp(x)</code></td><td>e^x</td></tr>
+<tr><td><code>math.log(x)</code>, <code>math.log2(x)</code>, <code>math.log10(x)</code></td><td>Logarithms</td></tr>
 <tr><td><code>math.sin(x)</code>, <code>math.cos(x)</code>, <code>math.tan(x)</code></td><td>Trigonometric</td></tr>
-<tr><td><code>math.asin(x)</code>, <code>math.acos(x)</code>, <code>math.atan(x)</code></td><td>Inverse trig</td></tr>
-<tr><td><code>math.atan2(y, x)</code></td><td>Two-argument arctangent</td></tr>
 <tr><td><code>math.pi</code>, <code>math.e</code>, <code>math.tau</code>, <code>math.inf</code></td><td>Constants</td></tr>
 </tbody></table>
+<pre><code><span class="kw">import</span> <span class="st">"std/math"</span>
+
+<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> hypotenuse <span class="op">=</span> math.<span class="fn">sqrt</span>(<span class="nu">3.0</span> <span class="op">*</span> <span class="nu">3.0</span> <span class="op">+</span> <span class="nu">4.0</span> <span class="op">*</span> <span class="nu">4.0</span>)
+    stdout.<span class="fn">println</span>(hypotenuse <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 5</span>
+
+    <span class="kw">let</span> clamped <span class="op">=</span> math.<span class="fn">max</span>(<span class="nu">0.0</span>, math.<span class="fn">min</span>(<span class="nu">100.0</span>, <span class="nu">150.0</span>))
+    stdout.<span class="fn">println</span>(clamped <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 100</span>
+}</code></pre>
+<h2>What's Next</h2>
+<p>You now know the tools the language gives you. <a href="capabilities.html">Capabilities</a> explain how Basalt controls what your program is allowed to do in the outside world.</p>
 
         </article>
         <nav class="page-nav">

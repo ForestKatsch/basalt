@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Structs — Basalt</title>
-    <meta name="description" content="Struct types, methods, and reference semantics">
+    <meta name="description" content="Named data with methods. Reference semantics, explicit cloning.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -334,21 +334,30 @@
     <div class="page">
         <article class="content">
             <h1>Structs</h1>
-            <p class="subtitle">Struct types, methods, and reference semantics</p>
-            <p>Define structs with the <code>type</code> keyword. Structs are reference types.</p>
-<pre><code><span class="kw">type</span> <span class="ty">Point</span> {
-    x<span class="op">:</span> <span class="ty">f64</span>
-    y<span class="op">:</span> <span class="ty">f64</span>
+            <p class="subtitle">Named data with methods. Reference semantics, explicit cloning.</p>
+            <p>Structs group related data under a name. You define them with the <code>type</code> keyword and construct them with field initializers.</p>
+<h2>Defining and using structs</h2>
+<pre><code><span class="kw">type</span> <span class="ty">User</span> {
+    name<span class="op">:</span> <span class="ty">string</span>
+    email<span class="op">:</span> <span class="ty">string</span>
+    login_count<span class="op">:</span> <span class="ty">i64</span>
 }
 
 <span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    <span class="kw">let</span> p <span class="op">=</span> <span class="ty">Point</span> { x<span class="op">:</span> <span class="nu">3.0</span>, y<span class="op">:</span> <span class="nu">4.0</span> }
-    stdout.<span class="fn">println</span>(p.x <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 3</span>
-    stdout.<span class="fn">println</span>(p.y <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 4</span>
+    <span class="kw">let</span> alice <span class="op">=</span> <span class="ty">User</span> {
+        name<span class="op">:</span> <span class="st">"Alice Chen"</span>,
+        email<span class="op">:</span> <span class="st">"alice@example.com"</span>,
+        login_count<span class="op">:</span> <span class="nu">0</span>,
+    }
+    stdout.<span class="fn">println</span>(alice.name)   <span class="cm">// Output: Alice Chen</span>
+    stdout.<span class="fn">println</span>(alice.email)  <span class="cm">// Output: alice@example.com</span>
 }</code></pre>
-<h3>Methods</h3>
-<p>Instance methods take <code>self: Self</code> as their first parameter. Static methods do not.</p>
-<pre><code><span class="kw">type</span> <span class="ty">Point</span> {
+<p>Every field must be set at construction. There are no default values — the compiler rejects partial initialization.</p>
+<h2>Methods</h2>
+<p>Methods are functions defined inside the type body. Instance methods take <code>self: Self</code> as their first parameter. Functions without <code>self</code> are static — called on the type, not an instance.</p>
+<pre><code><span class="kw">import</span> <span class="st">"std/math"</span>
+
+<span class="kw">type</span> <span class="ty">Point</span> {
     x<span class="op">:</span> <span class="ty">f64</span>
     y<span class="op">:</span> <span class="ty">f64</span>
 
@@ -361,24 +370,77 @@
         <span class="kw">let</span> dy <span class="op">=</span> self.y <span class="op">-</span> other.y
         <span class="kw">return</span> math.<span class="fn">sqrt</span>(dx <span class="op">*</span> dx <span class="op">+</span> dy <span class="op">*</span> dy)
     }
+
+    <span class="kw">fn</span> <span class="fn">translate</span>(self<span class="op">:</span> <span class="ty">Self</span>, dx<span class="op">:</span> <span class="ty">f64</span>, dy<span class="op">:</span> <span class="ty">f64</span>) <span class="op">-&gt;</span> <span class="ty">Point</span> {
+        <span class="kw">return</span> <span class="ty">Point</span> { x<span class="op">:</span> self.x <span class="op">+</span> dx, y<span class="op">:</span> self.y <span class="op">+</span> dy }
+    }
 }
 
 <span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
     <span class="kw">let</span> a <span class="op">=</span> <span class="ty">Point</span>.<span class="fn">origin</span>()
     <span class="kw">let</span> b <span class="op">=</span> <span class="ty">Point</span> { x<span class="op">:</span> <span class="nu">3.0</span>, y<span class="op">:</span> <span class="nu">4.0</span> }
     stdout.<span class="fn">println</span>(a.<span class="fn">distance</span>(b) <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 5</span>
-}</code></pre>
-<h3>Reference semantics</h3>
-<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    <span class="kw">let</span> <span class="kw">mut</span> p <span class="op">=</span> <span class="ty">Point</span> { x<span class="op">:</span> <span class="nu">1.0</span>, y<span class="op">:</span> <span class="nu">2.0</span> }
-    <span class="kw">let</span> <span class="kw">mut</span> q <span class="op">=</span> p        <span class="cm">// q and p refer to the same struct</span>
-    q.x <span class="op">=</span> <span class="nu">10.0</span>
-    stdout.<span class="fn">println</span>(p.x <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 10 (same object)</span>
 
-    <span class="kw">let</span> <span class="kw">mut</span> r <span class="op">=</span> p.<span class="fn">clone</span>()  <span class="cm">// independent copy</span>
-    r.x <span class="op">=</span> <span class="nu">99.0</span>
-    stdout.<span class="fn">println</span>(p.x <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 10 (unaffected)</span>
+    <span class="kw">let</span> c <span class="op">=</span> b.<span class="fn">translate</span>(<span class="nu">1.0</span>, <span class="op">-</span><span class="nu">1.0</span>)
+    stdout.<span class="fn">println</span>(c.x <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 4</span>
+    stdout.<span class="fn">println</span>(c.y <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 3</span>
 }</code></pre>
+<p>Static methods like <code>origin()</code> are called on the type name. Instance methods like <code>distance()</code> are called on a value.</p>
+<h2>Reference semantics</h2>
+<p>This is the most important thing to understand about structs in Basalt: <strong>assignment does not copy.</strong> When you assign a struct to a new variable, both variables refer to the same object.</p>
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> <span class="kw">mut</span> point <span class="op">=</span> <span class="ty">Point</span> { x<span class="op">:</span> <span class="nu">1.0</span>, y<span class="op">:</span> <span class="nu">2.0</span> }
+    <span class="kw">let</span> <span class="kw">mut</span> alias <span class="op">=</span> point
+
+    alias.x <span class="op">=</span> <span class="nu">99.0</span>
+    stdout.<span class="fn">println</span>(point.x <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 99</span>
+}</code></pre>
+<p>If you expected <code>point.x</code> to still be <code>1.0</code>, you are not alone. This is the most common surprise for new Basalt developers.</p>
+<p>&lt;div class="callout callout-warn"&gt;&lt;strong&gt;Structs are reference types&lt;/strong&gt; Assignment shares the object, not copies it. Mutating through one variable is visible through every other variable that refers to the same struct. This applies to function arguments too — if you pass a struct to a function, the function can see mutations you make later. &lt;/div&gt;</p>
+<h2>Cloning for independence</h2>
+<p>When you need a truly separate copy, call <code>clone()</code>:</p>
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> <span class="kw">mut</span> original <span class="op">=</span> <span class="ty">Point</span> { x<span class="op">:</span> <span class="nu">5.0</span>, y<span class="op">:</span> <span class="nu">10.0</span> }
+    <span class="kw">let</span> <span class="kw">mut</span> copy <span class="op">=</span> original.<span class="fn">clone</span>()
+
+    copy.x <span class="op">=</span> <span class="nu">0.0</span>
+    stdout.<span class="fn">println</span>(original.x <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 5 (unaffected)</span>
+    stdout.<span class="fn">println</span>(copy.x <span class="kw">as</span> <span class="ty">string</span>)      <span class="cm">// Output: 0</span>
+}</code></pre>
+<p><code>clone()</code> performs a deep copy. Changes to the clone never affect the original, and vice versa. Use it whenever you need to hand off data that the caller might mutate.</p>
+<h2>Passing structs to functions</h2>
+<p>Because structs are reference types, passing them to functions doesn't copy anything. This is efficient — but it means the function operates on the same object:</p>
+<pre><code><span class="kw">fn</span> <span class="fn">reset_origin</span>(p<span class="op">:</span> <span class="ty">Point</span>) {
+    p.x <span class="op">=</span> <span class="nu">0.0</span>
+    p.y <span class="op">=</span> <span class="nu">0.0</span>
+}
+
+<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> <span class="kw">mut</span> pos <span class="op">=</span> <span class="ty">Point</span> { x<span class="op">:</span> <span class="nu">7.0</span>, y<span class="op">:</span> <span class="nu">3.0</span> }
+    <span class="fn">reset_origin</span>(pos)
+    stdout.<span class="fn">println</span>(pos.x <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 0</span>
+}</code></pre>
+<p>If you want the function to work on its own copy, clone before passing — or clone inside the function and return the new value.</p>
+<h2>Structs with struct fields</h2>
+<p>Structs can contain other structs. The same reference semantics apply to nested structs:</p>
+<pre><code><span class="kw">type</span> <span class="ty">Segment</span> {
+    start<span class="op">:</span> <span class="ty">Point</span>
+    end<span class="op">:</span> <span class="ty">Point</span>
+
+    <span class="kw">fn</span> <span class="fn">length</span>(self<span class="op">:</span> <span class="ty">Self</span>) <span class="op">-&gt;</span> <span class="ty">f64</span> {
+        <span class="kw">return</span> self.start.<span class="fn">distance</span>(self.end)
+    }
+}
+
+<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> seg <span class="op">=</span> <span class="ty">Segment</span> {
+        start<span class="op">:</span> <span class="ty">Point</span> { x<span class="op">:</span> <span class="nu">0.0</span>, y<span class="op">:</span> <span class="nu">0.0</span> },
+        end<span class="op">:</span> <span class="ty">Point</span> { x<span class="op">:</span> <span class="nu">3.0</span>, y<span class="op">:</span> <span class="nu">4.0</span> },
+    }
+    stdout.<span class="fn">println</span>(seg.<span class="fn">length</span>() <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 5</span>
+}</code></pre>
+<h2>What's Next</h2>
+<p>Structs give you one shape of data. <a href="enums.html">Enums</a> give you a choice between shapes — a value that could be one of several distinct variants, each with its own data.</p>
 
         </article>
         <nav class="page-nav">

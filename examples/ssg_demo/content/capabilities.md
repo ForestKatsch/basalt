@@ -1,70 +1,98 @@
 title: Capabilities
 date: 2026-03-13
-description: Capability-based I/O system
+description: Your program only does what you allow it to do.
 
-IO in Basalt works through capability objects passed to `main`. A program can only perform IO that it explicitly requests.
+Most programs have unrestricted access to the outside world. They can read any file, connect to any server, access any environment variable — and you only find out what they actually do by reading every line of code.
 
-### Stdout
+Basalt inverts this. A program declares its capabilities in `main`'s parameter list, and the runtime provides only what is requested. If you don't ask for file system access, your program physically cannot read or write files.
+
+## A minimal program
 
 ```basalt
 fn main(stdout: Stdout) {
-    stdout.println("line with newline")
-    stdout.print("no newline")
-    stdout.flush()
+    stdout.println("Hello, world!")
 }
 ```
 
-### Stdin
+This program can write to the terminal. It cannot read files, access environment variables, or read user input. Not because of a policy — because the runtime never gave it the objects to do those things.
 
-```basalt
-fn main(stdout: Stdout, stdin: Stdin) {
-    stdout.print("What is your name? ")
-    stdout.flush()
-    let name = stdin.read_line()
-    stdout.println("Hello, \(name)!")
-}
-```
+## Adding capabilities
 
-| Method | Description |
-|---|---|
-| `stdin.read_line()` | Read one line (strips newline) |
-| `stdin.read_key()` | Read single character (raw mode) |
-
-### Fs (File System)
-
-The `Fs` capability is sandboxed to the directory containing the source file.
+Need to read files? Add `Fs` to the parameter list:
 
 ```basalt
 fn main(stdout: Stdout, fs: Fs) {
-    // Write a file
-    let write_result = fs.write_file("output.txt", "Hello from Basalt!")
-    match write_result {
-        !err => stdout.println("Write failed: " + err)
-        _ => stdout.println("Wrote output.txt")
-    }
-
-    // Read a file
-    guard let content = fs.read_file("output.txt") else {
-        stdout.println("Read failed")
+    guard let content = fs.read_file("config.txt") else {
+        stdout.println("No config found")
         return
     }
     stdout.println(content)
-
-    // Check existence
-    stdout.println(fs.exists("output.txt") as string)  // Output: true
-
-    // List directory
-    guard let files = fs.read_dir(".") else { return }
-    for file in files {
-        stdout.println(file)
-    }
-
-    // Path utilities
-    let p = fs.join("subdir", "page.html")   // "subdir/page.html"
-    let ext = fs.extension("photo.png")       // "png" (returns string?)
-    let name = fs.stem("photo.png")           // "photo" (returns string?)
 }
 ```
+
+Need command-line arguments? Add `Env`:
+
+```basalt
+fn main(stdout: Stdout, env: Env) {
+    let args = env.args()
+    if args.length == 0 {
+        stdout.println("Usage: program <name>")
+        return
+    }
+    stdout.println("Hello, \(args[0])!")
+}
+```
+
+Every capability you use is visible in one place — the function signature.
+
+<div class="callout callout-note"><strong>This is capability-based security, not access control</strong>
+Access control systems have a central authority that grants or denies permissions at runtime. Capability-based security is structural: if you don't have the object, you can't use it. There is no way to "escalate" — no global namespace to reach into, no ambient authority to exploit.
+</div>
+
+## The Fs sandbox
+
+The `Fs` capability is sandboxed to the directory containing the source file. Path traversal is blocked:
+
+```basalt
+fn main(stdout: Stdout, fs: Fs) {
+    // This works — reading a file in the project directory
+    guard let readme = fs.read_file("README.md") else {
+        stdout.println("no readme")
+        return
+    }
+    stdout.println(readme)
+
+    // This is blocked — trying to escape the sandbox
+    let result = fs.read_file("../../etc/passwd")
+    match result {
+        !err => stdout.println("Blocked: " + err)
+        _ => {}
+    }
+}
+```
+
+> **Error:** path traversal blocked: ../../etc/passwd is outside the sandbox
+
+Even with `Fs`, you can only reach files in your project directory. A downloaded script cannot read your SSH keys or browser cookies.
+
+## Capability reference
+
+### Stdout
+
+| Method | Description |
+|---|---|
+| `stdout.println(s)` | Print with newline |
+| `stdout.print(s)` | Print without newline |
+| `stdout.flush()` | Flush output buffer |
+
+### Stdin
+
+| Method | Returns | Description |
+|---|---|---|
+| `stdin.read_line()` | `string` | Read one line (strips newline) |
+| `stdin.read_key()` | `string` | Read single character (raw mode) |
+
+### Fs (File System)
 
 | Method | Returns | Description |
 |---|---|---|
@@ -72,58 +100,48 @@ fn main(stdout: Stdout, fs: Fs) {
 | `fs.write_file(path, data)` | `nil!string` | Write file |
 | `fs.read_dir(path)` | `[string]!string` | List directory entries |
 | `fs.exists(path)` | `bool` | Check if path exists |
-| `fs.is_dir(path)` | `bool` | Check if path is a directory |
+| `fs.is_dir(path)` | `bool` | Check if path is directory |
 | `fs.mkdir(path)` | `nil!string` | Create directory |
 | `fs.join(a, b)` | `string` | Join path components |
-| `fs.extension(path)` | `string?` | File extension without dot |
+| `fs.extension(path)` | `string?` | File extension (no dot) |
 | `fs.stem(path)` | `string?` | Filename without extension |
 
 ### Env
 
-```basalt
-fn main(stdout: Stdout, env: Env) {
-    let args = env.args()
-    for arg in args {
-        stdout.println(arg)
-    }
-
-    let home = env.get("HOME")
-    if home is string {
-        stdout.println("Home: " + home)
-    }
-}
-```
-
 | Method | Returns | Description |
 |---|---|---|
 | `env.args()` | `[string]` | Command-line arguments |
-| `env.get(name)` | `string?` | Environment variable value |
+| `env.get(name)` | `string?` | Environment variable |
 
-### How capabilities work
+## Passing capabilities to helpers
 
-Capabilities are passed as parameters to `main`. You only get what you ask for:
-
-```basalt
-// This program can print but cannot read files
-fn main(stdout: Stdout) {
-    stdout.println("I have no file access")
-}
-
-// This program can read/write files and print
-fn main(stdout: Stdout, fs: Fs) {
-    guard let data = fs.read_file("input.txt") else { return }
-    stdout.println(data)
-}
-```
-
-Pass capabilities to helper functions as regular parameters:
+Capabilities are regular values. Pass them as function parameters:
 
 ```basalt
+fn load_config(fs: Fs) -> string!string {
+    return fs.read_file("config.txt")
+}
+
 fn log(msg: string, stdout: Stdout) {
     stdout.println("[LOG] " + msg)
 }
 
-fn main(stdout: Stdout) {
+fn main(stdout: Stdout, fs: Fs) {
     log("starting up", stdout)
+    guard let config = load_config(fs) else {
+        log("no config found, using defaults", stdout)
+        return
+    }
+    log("loaded config: " + (config.length as string) + " bytes", stdout)
 }
 ```
+
+Every function that performs I/O declares exactly which capability it needs. You can read any function's signature and know whether it touches the file system, the network, or the environment. No hidden side effects.
+
+<div class="callout callout-tip"><strong>Try this</strong>
+Write a program with only <code>Stdout</code>. Then try calling <code>fs.read_file</code> — you'll get a compile error because <code>fs</code> doesn't exist. Now add <code>fs: Fs</code> to <code>main</code> and watch it work. The compiler enforces the security model.
+</div>
+
+## What's Next
+
+The last piece of the language: [Type Conversions](conversions.html) — how Basalt handles casting between types, and why it never guesses.

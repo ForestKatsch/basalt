@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Pattern Matching — Basalt</title>
-    <meta name="description" content="Exhaustive pattern matching with match expressions">
+    <meta name="description" content="The compiler checks every case. Forget one, it tells you.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -334,63 +334,103 @@
     <div class="page">
         <article class="content">
             <h1>Pattern Matching</h1>
-            <p class="subtitle">Exhaustive pattern matching with match expressions</p>
-            <p><code>match</code> is an expression with exhaustive checking. It works on literals, enums, results, and union types.</p>
-<h3>Literal patterns</h3>
-<pre><code><span class="kw">fn</span> <span class="fn">classify</span>(n<span class="op">:</span> <span class="ty">i64</span>) <span class="op">-&gt;</span> <span class="ty">string</span> {
-    <span class="kw">match</span> n {
-        <span class="nu">0</span> <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"zero"</span>
-        <span class="nu">1</span> <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"one"</span>
-        _ <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"other"</span>
+            <p class="subtitle">The compiler checks every case. Forget one, it tells you.</p>
+            <p>Pattern matching in Basalt isn't syntactic sugar — it's a safety mechanism. The <code>match</code> expression checks a value against patterns, and the compiler <strong>guarantees you've handled every possibility</strong>. If you add a variant to an enum and forget to update a <code>match</code>, the compiler stops you before the code ships.</p>
+<h2>Matching literals</h2>
+<p>At its simplest, <code>match</code> replaces chains of <code>if</code>/<code>else if</code>:</p>
+<pre><code><span class="kw">fn</span> <span class="fn">describe_status</span>(code<span class="op">:</span> <span class="ty">i64</span>) <span class="op">-&gt;</span> <span class="ty">string</span> {
+    <span class="kw">match</span> code {
+        <span class="nu">200</span> <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"OK"</span>
+        <span class="nu">301</span> <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"Moved Permanently"</span>
+        <span class="nu">404</span> <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"Not Found"</span>
+        <span class="nu">500</span> <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"Internal Server Error"</span>
+        _ <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"Unknown status"</span>
     }
-    <span class="kw">return</span> <span class="st">"unreachable"</span>
+    <span class="kw">return</span> <span class="st">""</span>
 }
 
 <span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    stdout.<span class="fn">println</span>(<span class="fn">classify</span>(<span class="nu">0</span>))   <span class="cm">// Output: zero</span>
-    stdout.<span class="fn">println</span>(<span class="fn">classify</span>(<span class="nu">42</span>))  <span class="cm">// Output: other</span>
+    stdout.<span class="fn">println</span>(<span class="fn">describe_status</span>(<span class="nu">404</span>))  <span class="cm">// Output: Not Found</span>
+    stdout.<span class="fn">println</span>(<span class="fn">describe_status</span>(<span class="nu">418</span>))  <span class="cm">// Output: Unknown status</span>
 }</code></pre>
-<h3>Enum variant patterns</h3>
-<pre><code><span class="kw">type</span> <span class="ty">Shape</span> {
-    <span class="ty">Circle</span>(<span class="ty">f64</span>)
-    <span class="ty">Rect</span>(<span class="ty">f64</span>, <span class="ty">f64</span>)
+<p>The <code>_</code> wildcard catches everything not explicitly listed. Without it, the compiler would reject this <code>match</code> — an <code>i64</code> has too many values to enumerate.</p>
+<h2>Matching enum variants</h2>
+<p>This is where <code>match</code> truly shines. Define an enum with associated data, then destructure it:</p>
+<pre><code><span class="kw">type</span> <span class="ty">HttpBody</span> {
+    <span class="ty">Text</span>(<span class="ty">string</span>)
+    <span class="ty">Json</span>(<span class="ty">string</span>)
+    <span class="ty">Empty</span>
 }
 
-<span class="kw">fn</span> <span class="fn">area</span>(s<span class="op">:</span> <span class="ty">Shape</span>) <span class="op">-&gt;</span> <span class="ty">f64</span> {
-    <span class="kw">match</span> s {
-        <span class="ty">Shape</span>.<span class="ty">Circle</span>(r) <span class="op">=&gt;</span> <span class="kw">return</span> <span class="nu">3.14159</span> <span class="op">*</span> r <span class="op">*</span> r
-        <span class="ty">Shape</span>.<span class="ty">Rect</span>(w, h) <span class="op">=&gt;</span> <span class="kw">return</span> w <span class="op">*</span> h
+<span class="kw">fn</span> <span class="fn">content_type</span>(body<span class="op">:</span> <span class="ty">HttpBody</span>) <span class="op">-&gt;</span> <span class="ty">string</span> {
+    <span class="kw">match</span> body {
+        <span class="ty">HttpBody</span>.<span class="ty">Text</span>(_) <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"text/plain"</span>
+        <span class="ty">HttpBody</span>.<span class="ty">Json</span>(_) <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"application/json"</span>
+        <span class="ty">HttpBody</span>.<span class="ty">Empty</span> <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"none"</span>
     }
-    <span class="kw">return</span> <span class="nu">0.0</span>
+    <span class="kw">return</span> <span class="st">""</span>
 }
 
 <span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    <span class="kw">let</span> c <span class="op">=</span> <span class="ty">Shape</span>.<span class="ty">Circle</span>(<span class="nu">5.0</span>)
-    stdout.<span class="fn">println</span>(<span class="fn">area</span>(c) <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 78.53975</span>
+    <span class="kw">let</span> body <span class="op">=</span> <span class="ty">HttpBody</span>.<span class="ty">Json</span>(<span class="st">"{\"ok\": true}"</span>)
+    stdout.<span class="fn">println</span>(<span class="fn">content_type</span>(body))  <span class="cm">// Output: application/json</span>
 }</code></pre>
-<h3>Type narrowing with is</h3>
-<p>Use <code>is</code> patterns to match union members:</p>
-<pre><code><span class="kw">fn</span> <span class="fn">to_string</span>(val<span class="op">:</span> <span class="ty">i64</span> <span class="op">|</span> <span class="ty">f64</span> <span class="op">|</span> <span class="ty">string</span>) <span class="op">-&gt;</span> <span class="ty">string</span> {
-    <span class="kw">match</span> val {
-        <span class="kw">is</span> <span class="ty">i64</span> <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"int: "</span> <span class="op">+</span> (val <span class="kw">as</span> <span class="ty">string</span>)
-        <span class="kw">is</span> <span class="ty">f64</span> <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"float: "</span> <span class="op">+</span> (val <span class="kw">as</span> <span class="ty">string</span>)
-        <span class="kw">is</span> <span class="ty">string</span> <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"str: "</span> <span class="op">+</span> val
+<p>Each pattern destructures the variant, binding inner values to names you can use in the body. Use <code>_</code> when you don't need the inner value.</p>
+<h2>Exhaustiveness: the safety net</h2>
+<p>Leave out a variant and the compiler tells you:</p>
+<pre><code><span class="kw">fn</span> <span class="fn">content_type</span>(body<span class="op">:</span> <span class="ty">HttpBody</span>) <span class="op">-&gt;</span> <span class="ty">string</span> {
+    <span class="kw">match</span> body {
+        <span class="ty">HttpBody</span>.<span class="ty">Text</span>(_) <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"text/plain"</span>
+        <span class="ty">HttpBody</span>.<span class="ty">Json</span>(_) <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"application/json"</span>
     }
     <span class="kw">return</span> <span class="st">""</span>
 }</code></pre>
-<h3>Matching results</h3>
+<blockquote>
+<p><strong>Error:</strong> Non-exhaustive match. Missing pattern: <code>HttpBody.Empty</code>.</p>
+</blockquote>
+<p>&lt;div class="callout callout-note"&gt;&lt;strong&gt;Why this matters&lt;/strong&gt; Imagine you add a &lt;code&gt;Binary(bytes)&lt;/code&gt; variant to &lt;code&gt;HttpBody&lt;/code&gt; six months from now. Without exhaustiveness checking, every &lt;code&gt;match&lt;/code&gt; on &lt;code&gt;HttpBody&lt;/code&gt; silently does the wrong thing. With it, the compiler finds every location that needs updating — instantly. This turns a runtime bug into a compile-time checklist. &lt;/div&gt;</p>
+<h2>Type narrowing with <code>is</code></h2>
+<p>For union types, <code>is</code> patterns narrow the type within each branch:</p>
+<pre><code><span class="kw">fn</span> <span class="fn">format_cell</span>(val<span class="op">:</span> <span class="ty">i64</span> <span class="op">|</span> <span class="ty">f64</span> <span class="op">|</span> <span class="ty">string</span> <span class="op">|</span> <span class="ty">bool</span>) <span class="op">-&gt;</span> <span class="ty">string</span> {
+    <span class="kw">match</span> val {
+        <span class="kw">is</span> <span class="ty">i64</span> <span class="op">=&gt;</span> <span class="kw">return</span> (val <span class="kw">as</span> <span class="ty">string</span>)
+        <span class="kw">is</span> <span class="ty">f64</span> <span class="op">=&gt;</span> <span class="kw">return</span> (val <span class="kw">as</span> <span class="ty">string</span>)
+        <span class="kw">is</span> <span class="ty">string</span> <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"\""</span> <span class="op">+</span> val <span class="op">+</span> <span class="st">"\""</span>
+        <span class="kw">is</span> <span class="ty">bool</span> <span class="op">=&gt;</span> <span class="kw">return</span> <span class="kw">if</span> val <span class="kw">as</span> <span class="ty">bool</span> { <span class="st">"yes"</span> } <span class="kw">else</span> { <span class="st">"no"</span> }
+    }
+    <span class="kw">return</span> <span class="st">""</span>
+}
+
+<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    stdout.<span class="fn">println</span>(<span class="fn">format_cell</span>(<span class="nu">42</span>))        <span class="cm">// Output: 42</span>
+    stdout.<span class="fn">println</span>(<span class="fn">format_cell</span>(<span class="st">"hello"</span>))   <span class="cm">// Output: "hello"</span>
+    stdout.<span class="fn">println</span>(<span class="fn">format_cell</span>(<span class="kw">true</span>))      <span class="cm">// Output: yes</span>
+}</code></pre>
+<p>Inside each <code>is</code> branch, the compiler knows the exact type — you can use type-specific operations without casting.</p>
+<h2>Matching results</h2>
+<p><code>match</code> handles result types cleanly. The <code>!err</code> pattern matches the error case:</p>
 <pre><code><span class="kw">fn</span> <span class="fn">divide</span>(a<span class="op">:</span> <span class="ty">f64</span>, b<span class="op">:</span> <span class="ty">f64</span>) <span class="op">-&gt;</span> <span class="ty">f64</span><span class="op">!</span><span class="ty">string</span> {
     <span class="kw">if</span> b <span class="op">==</span> <span class="nu">0.0</span> { <span class="kw">return</span> <span class="op">!</span>(<span class="st">"division by zero"</span>) }
     <span class="kw">return</span> a <span class="op">/</span> b
 }
 
 <span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">match</span> <span class="fn">divide</span>(<span class="nu">10.0</span>, <span class="nu">0.0</span>) {
+        <span class="op">!</span>err <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(<span class="st">"Error: "</span> <span class="op">+</span> err)
+        val <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(<span class="st">"Result: "</span> <span class="op">+</span> (val <span class="kw">as</span> <span class="ty">string</span>))
+    }
+    <span class="cm">// Output: Error: division by zero</span>
+
     <span class="kw">match</span> <span class="fn">divide</span>(<span class="nu">10.0</span>, <span class="nu">3.0</span>) {
         <span class="op">!</span>err <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(<span class="st">"Error: "</span> <span class="op">+</span> err)
         val <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(<span class="st">"Result: "</span> <span class="op">+</span> (val <span class="kw">as</span> <span class="ty">string</span>))
     }
     <span class="cm">// Output: Result: 3.3333333333333335</span>
 }</code></pre>
+<p>Both branches must be present — you can't ignore the error case. For lighter-weight error handling, see the <code>?</code> operator and <code>guard let</code> in <a href="error-handling.html">Error Handling</a>.</p>
+<p>&lt;div class="callout callout-tip"&gt;&lt;strong&gt;Try this&lt;/strong&gt; Define a &lt;code&gt;type Shape { Circle(f64), Rect(f64, f64), Triangle(f64, f64, f64) }&lt;/code&gt; and write an &lt;code&gt;area&lt;/code&gt; function using &lt;code&gt;match&lt;/code&gt;. Then add a &lt;code&gt;Point&lt;/code&gt; variant with no data and see what the compiler tells you. &lt;/div&gt;</p>
+<h2>What's Next</h2>
+<p>Pattern matching forces you to handle every case — including errors. But what's the best way to structure error handling across a whole program? Next up: <a href="error-handling.html">Error Handling</a>.</p>
 
         </article>
         <nav class="page-nav">

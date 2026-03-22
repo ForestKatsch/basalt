@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Modules — Basalt</title>
-    <meta name="description" content="Module system and imports">
+    <meta name="description" content="Each file is a module. All access is qualified. No ambiguity.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -334,8 +334,9 @@
     <div class="page">
         <article class="content">
             <h1>Modules</h1>
-            <p class="subtitle">Module system and imports</p>
-            <p>Each <code>.bas</code> file is a module. Import with the <code>import</code> keyword.</p>
+            <p class="subtitle">Each file is a module. All access is qualified. No ambiguity.</p>
+            <p>In Basalt, every <code>.bas</code> file is a module. There is no module declaration syntax — the filename is the module name. You import a module, then access its contents through the module name.</p>
+<h2>Importing and using modules</h2>
 <pre><code><span class="cm">// geometry.bas</span>
 <span class="kw">type</span> <span class="ty">Point</span> {
     x<span class="op">:</span> <span class="ty">f64</span>
@@ -353,17 +354,45 @@
 <span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
     <span class="kw">let</span> a <span class="op">=</span> geometry.<span class="ty">Point</span> { x<span class="op">:</span> <span class="nu">0.0</span>, y<span class="op">:</span> <span class="nu">0.0</span> }
     <span class="kw">let</span> b <span class="op">=</span> geometry.<span class="ty">Point</span> { x<span class="op">:</span> <span class="nu">3.0</span>, y<span class="op">:</span> <span class="nu">4.0</span> }
-    stdout.<span class="fn">println</span>(geometry.<span class="fn">distance</span>(a, b) <span class="kw">as</span> <span class="ty">string</span>)
+    stdout.<span class="fn">println</span>(geometry.<span class="fn">distance</span>(a, b) <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 5</span>
 }</code></pre>
-<p>All imported names are accessed with the module qualifier. There is no unqualified import. Circular imports are prohibited.</p>
-<p>Import with alias:</p>
-<pre><code><span class="kw">import</span> <span class="st">"lib/utils"</span> <span class="kw">as</span> helpers</code></pre>
-<p>Standard library modules use the <code>std/</code> prefix:</p>
+<p>All access is qualified: <code>geometry.Point</code>, <code>geometry.distance</code>. There is no unqualified import — you always know where a name comes from by reading the call site.</p>
+<p>&lt;div class="callout callout-note"&gt;&lt;strong&gt;Why qualified access?&lt;/strong&gt; When two modules export the same name, qualified access makes collisions impossible. You never have to guess which &lt;code&gt;parse&lt;/code&gt; or &lt;code&gt;Error&lt;/code&gt; you are looking at. The tradeoff is verbosity — but the code tells the truth about its dependencies at every use site. &lt;/div&gt;</p>
+<h2>Import aliases</h2>
+<p>When a module path is long, give it a shorter name:</p>
+<pre><code><span class="kw">import</span> <span class="st">"lib/validators"</span> <span class="kw">as</span> val
+
+<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> ok <span class="op">=</span> val.<span class="fn">is_email</span>(<span class="st">"user@example.com"</span>)
+    stdout.<span class="fn">println</span>(ok <span class="kw">as</span> <span class="ty">string</span>)
+}</code></pre>
+<p>The alias replaces the module name at all use sites. The original long name is not accessible.</p>
+<h2>Standard library imports</h2>
+<p>Standard library modules live under the <code>std/</code> prefix:</p>
 <pre><code><span class="kw">import</span> <span class="st">"std/math"</span>
 
 <span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    stdout.<span class="fn">println</span>(math.<span class="fn">sqrt</span>(<span class="nu">2.0</span>) <span class="kw">as</span> <span class="ty">string</span>)
+    stdout.<span class="fn">println</span>(math.<span class="fn">sqrt</span>(<span class="nu">2.0</span>) <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 1.4142135623730951</span>
+    stdout.<span class="fn">println</span>(math.pi <span class="kw">as</span> <span class="ty">string</span>)         <span class="cm">// Output: 3.141592653589793</span>
 }</code></pre>
+<p>Built-in types like <code>string</code>, <code>i64</code>, and array methods are available without any import. You only need <code>import</code> for the <code>math</code> module.</p>
+<h2>Subdirectories</h2>
+<p>Modules can live in subdirectories. The import path reflects the file path:</p>
+<pre><code><span class="kw">import</span> <span class="st">"models/user"</span>
+<span class="kw">import</span> <span class="st">"handlers/auth"</span>
+
+<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>, fs<span class="op">:</span> <span class="ty">Fs</span>) {
+    <span class="kw">let</span> u <span class="op">=</span> user.<span class="fn">load</span>(fs)
+    auth.<span class="fn">verify</span>(u, stdout)
+}</code></pre>
+<h2>No circular imports</h2>
+<p>Basalt forbids circular imports. If module A imports module B, then module B cannot import module A — directly or through any chain of intermediate imports.</p>
+<blockquote>
+<p><strong>Error:</strong> circular import detected: main.bas → auth.bas → main.bas</p>
+</blockquote>
+<p>This constraint keeps your dependency graph a tree, which makes builds fast and dependencies easy to reason about. If two modules need to share types, extract the shared types into a third module that both import.</p>
+<h2>What's Next</h2>
+<p>Now that you can organize code across files, explore the <a href="stdlib.html">Standard Library</a> — the built-in methods on strings, arrays, maps, and the math module.</p>
 
         </article>
         <nav class="page-nav">

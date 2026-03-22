@@ -1,26 +1,83 @@
 title: Functions
 date: 2026-03-04
-description: Function declarations and first-class functions
+description: Everything is explicit. Parameters, return types, return statements.
+
+Functions in Basalt have no hidden behavior. Every parameter has a type. Every non-void function declares its return type. Every value is returned explicitly. Reading a function signature tells you exactly what goes in and what comes out.
+
+## Declaring functions
 
 ```basalt
-fn add(a: i64, b: i64) -> i64 {
-    return a + b
-}
-
-fn greet(name: string, stdout: Stdout) {
-    stdout.println("Hello, \(name)!")
+fn celsius_to_fahrenheit(c: f64) -> f64 {
+    return c * 1.8 + 32.0
 }
 
 fn main(stdout: Stdout) {
-    let sum = add(3, 4)
-    stdout.println(sum as string)  // Output: 7
-    greet("world", stdout)         // Output: Hello, world!
+    let temp = celsius_to_fahrenheit(100.0)
+    stdout.println(temp as string)  // Output: 212
 }
 ```
 
-All parameters need type annotations. Return type is required unless the function returns `nil`. Explicit `return` is required — the last expression is not implicitly returned.
+Parameters require type annotations — always. The return type follows `->`. If a function returns nothing (only performs side effects), omit the return type:
 
-Functions are first-class values:
+```basalt
+fn log_request(method: string, path: string, stdout: Stdout) {
+    stdout.println("\(method) \(path)")
+}
+```
+
+## Explicit return
+
+Basalt requires you to write `return`. The last expression in a function body is **not** implicitly returned.
+
+<div class="callout callout-note"><strong>Why explicit return?</strong>
+In languages with implicit return, adding a logging line at the end of a function silently changes its return value to <code>nil</code>. Basalt avoids this class of bug entirely. If a function promises to return a value, the compiler verifies every code path has an explicit <code>return</code>.
+</div>
+
+If you declare a return type but forget to return:
+
+```basalt
+fn double(x: i64) -> i64 {
+    let result = x * 2
+}
+```
+
+> **Error:** Function `double` declares return type `i64` but not all code paths return a value.
+
+And if you return the wrong type:
+
+```basalt
+fn label(code: i64) -> string {
+    return code
+}
+```
+
+> **Error:** Cannot return `i64` from function with return type `string`.
+
+No ambiguity. The compiler catches it, points at the line, and tells you what's wrong.
+
+## Multiple parameters and early return
+
+Functions can return early from any point. This keeps the happy path unindented:
+
+```basalt
+fn http_status(code: i64) -> string {
+    if code < 100 { return "invalid" }
+    if code < 200 { return "informational" }
+    if code < 300 { return "success" }
+    if code < 400 { return "redirect" }
+    if code < 500 { return "client error" }
+    return "server error"
+}
+
+fn main(stdout: Stdout) {
+    stdout.println(http_status(404))  // Output: client error
+    stdout.println(http_status(200))  // Output: success
+}
+```
+
+## Functions as first-class values
+
+Functions are values. You can pass them as arguments, store them in variables, and return them from other functions:
 
 ```basalt
 fn apply(f: fn(i64) -> i64, x: i64) -> i64 {
@@ -31,8 +88,22 @@ fn double(x: i64) -> i64 {
     return x * 2
 }
 
+fn negate(x: i64) -> i64 {
+    return 0 - x
+}
+
 fn main(stdout: Stdout) {
-    let result = apply(double, 5)
-    stdout.println(result as string)  // Output: 10
+    stdout.println(apply(double, 5) as string)   // Output: 10
+    stdout.println(apply(negate, 3) as string)    // Output: -3
 }
 ```
+
+The type `fn(i64) -> i64` describes any function that takes one `i64` and returns an `i64`. This enables higher-order patterns — mapping, filtering, and composing operations — without any special syntax. We'll see this in action with [Closures](closures.html).
+
+<div class="callout callout-tip"><strong>Try this</strong>
+Write a function <code>fn clamp(val: i64, lo: i64, hi: i64) -> i64</code> that returns <code>val</code> if it's between <code>lo</code> and <code>hi</code>, otherwise the nearest bound. You'll need <code>if</code> expressions — which brings us to the next chapter.
+</div>
+
+## What's Next
+
+Functions describe *what* to compute. Control flow describes *when* and *how*. Next up: [Control Flow](control-flow.html).

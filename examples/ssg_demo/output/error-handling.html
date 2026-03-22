@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Error Handling — Basalt</title>
-    <meta name="description" content="Result types, error propagation, and recovery">
+    <meta name="description" content="No exceptions. No surprises. Errors are values you can see in the type.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -334,44 +334,103 @@
     <div class="page">
         <article class="content">
             <h1>Error Handling</h1>
-            <p class="subtitle">Result types, error propagation, and recovery</p>
-            <p>Basalt has no exceptions. Errors are values, carried by result types <code>T!E</code>.</p>
-<h3>Creating and returning errors</h3>
-<pre><code><span class="kw">fn</span> <span class="fn">parse_age</span>(s<span class="op">:</span> <span class="ty">string</span>) <span class="op">-&gt;</span> <span class="ty">i64</span><span class="op">!</span><span class="ty">string</span> {
-    <span class="kw">let</span> n <span class="op">=</span> s <span class="kw">as</span><span class="op">?</span> <span class="ty">i64</span>
+            <p class="subtitle">No exceptions. No surprises. Errors are values you can see in the type.</p>
+            <p>In most languages, any function can throw an exception. You don't know which ones until one crashes your program at 3 AM. You can't see it in the type signature. You can't grep for it reliably. You just have to <em>know</em> — or wrap everything in <code>try/catch</code> and hope.</p>
+<p>Basalt takes a different approach: <strong>errors are values</strong>. If a function can fail, its return type says so. The compiler ensures you handle every error before you can use the result.</p>
+<h2>Result types</h2>
+<p><code>T!E</code> is a type that holds either a success value of type <code>T</code> or an error of type <code>E</code>:</p>
+<pre><code><span class="kw">fn</span> <span class="fn">parse_temperature</span>(s<span class="op">:</span> <span class="ty">string</span>) <span class="op">-&gt;</span> <span class="ty">f64</span><span class="op">!</span><span class="ty">string</span> {
+    <span class="kw">let</span> trimmed <span class="op">=</span> s.<span class="fn">trim</span>()
+    <span class="kw">if</span> trimmed.length <span class="op">==</span> <span class="nu">0</span> {
+        <span class="kw">return</span> <span class="op">!</span>(<span class="st">"empty input"</span>)
+    }
+    <span class="kw">let</span> n <span class="op">=</span> trimmed <span class="kw">as</span><span class="op">?</span> <span class="ty">f64</span>
     <span class="kw">if</span> n <span class="kw">is</span> <span class="kw">nil</span> {
-        <span class="kw">return</span> <span class="op">!</span>(<span class="st">"invalid number: "</span> <span class="op">+</span> s)
+        <span class="kw">return</span> <span class="op">!</span>(<span class="st">"not a number: "</span> <span class="op">+</span> trimmed)
     }
-    <span class="kw">let</span> age <span class="op">=</span> n <span class="kw">as</span> <span class="ty">i64</span>
-    <span class="kw">if</span> age <span class="op">&lt;</span> <span class="nu">0</span> {
-        <span class="kw">return</span> <span class="op">!</span>(<span class="st">"age cannot be negative"</span>)
+    <span class="kw">return</span> n <span class="kw">as</span> <span class="ty">f64</span>
+}</code></pre>
+<p>Success values return normally. Errors are returned with <code>!(value)</code>. The caller sees both possibilities in the type — nothing is hidden.</p>
+<h2>Handling results with match</h2>
+<p>The most explicit way to handle a result is <code>match</code>:</p>
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">match</span> <span class="fn">parse_temperature</span>(<span class="st">"72.5"</span>) {
+        <span class="op">!</span>err <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(<span class="st">"Failed: "</span> <span class="op">+</span> err)
+        temp <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(<span class="st">"Temperature: "</span> <span class="op">+</span> (temp <span class="kw">as</span> <span class="ty">string</span>))
     }
-    <span class="kw">return</span> age
+    <span class="cm">// Output: Temperature: 72.5</span>
+
+    <span class="kw">match</span> <span class="fn">parse_temperature</span>(<span class="st">"warm"</span>) {
+        <span class="op">!</span>err <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(<span class="st">"Failed: "</span> <span class="op">+</span> err)
+        temp <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(<span class="st">"Temperature: "</span> <span class="op">+</span> (temp <span class="kw">as</span> <span class="ty">string</span>))
+    }
+    <span class="cm">// Output: Failed: not a number: warm</span>
 }</code></pre>
-<h3>Propagating with ?</h3>
-<p>The <code>?</code> operator propagates errors automatically. If the result is an error, it returns from the enclosing function. If successful, it unwraps the value.</p>
-<pre><code><span class="kw">fn</span> <span class="fn">load_and_parse</span>(fs<span class="op">:</span> <span class="ty">Fs</span>) <span class="op">-&gt;</span> <span class="ty">i64</span><span class="op">!</span><span class="ty">string</span> {
-    <span class="kw">let</span> content <span class="op">=</span> fs.<span class="fn">read_file</span>(<span class="st">"age.txt"</span>)<span class="op">?</span>  <span class="cm">// propagates read error</span>
-    <span class="kw">let</span> age <span class="op">=</span> <span class="fn">parse_age</span>(content.<span class="fn">trim</span>())<span class="op">?</span>     <span class="cm">// propagates parse error</span>
-    <span class="kw">return</span> age
+<p>Both arms are required. You cannot ignore the error case — the compiler enforces this.</p>
+<h2>Propagating with ?</h2>
+<p>When your function also returns a result, <code>?</code> propagates errors automatically. If the value is an error, it returns from the enclosing function immediately. If it's a success, it unwraps the value:</p>
+<pre><code><span class="kw">fn</span> <span class="fn">load_temperature</span>(fs<span class="op">:</span> <span class="ty">Fs</span>) <span class="op">-&gt;</span> <span class="ty">f64</span><span class="op">!</span><span class="ty">string</span> {
+    <span class="kw">let</span> content <span class="op">=</span> fs.<span class="fn">read_file</span>(<span class="st">"temperature.txt"</span>)<span class="op">?</span>
+    <span class="kw">let</span> temp <span class="op">=</span> <span class="fn">parse_temperature</span>(content)<span class="op">?</span>
+    <span class="kw">return</span> temp
 }</code></pre>
-<p>The enclosing function must return a compatible result type.</p>
-<h3>guard let for unwrapping</h3>
-<p>When you want to unwrap and diverge on failure without <code>match</code>:</p>
-<pre><code><span class="kw">fn</span> <span class="fn">process</span>(fs<span class="op">:</span> <span class="ty">Fs</span>, stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    <span class="kw">guard</span> <span class="kw">let</span> data <span class="op">=</span> fs.<span class="fn">read_file</span>(<span class="st">"input.txt"</span>) <span class="kw">else</span> {
-        stdout.<span class="fn">println</span>(<span class="st">"Cannot read input"</span>)
+<p>Two operations, two possible failure points, zero nesting. Compare this to the equivalent nested <code>match</code>:</p>
+<pre><code><span class="kw">fn</span> <span class="fn">load_temperature_verbose</span>(fs<span class="op">:</span> <span class="ty">Fs</span>) <span class="op">-&gt;</span> <span class="ty">f64</span><span class="op">!</span><span class="ty">string</span> {
+    <span class="kw">match</span> fs.<span class="fn">read_file</span>(<span class="st">"temperature.txt"</span>) {
+        <span class="op">!</span>err <span class="op">=&gt;</span> <span class="kw">return</span> <span class="op">!</span>(err)
+        content <span class="op">=&gt;</span> {
+            <span class="kw">match</span> <span class="fn">parse_temperature</span>(content) {
+                <span class="op">!</span>err <span class="op">=&gt;</span> <span class="kw">return</span> <span class="op">!</span>(err)
+                temp <span class="op">=&gt;</span> <span class="kw">return</span> temp
+            }
+        }
+    }
+    <span class="kw">return</span> <span class="op">!</span>(<span class="st">"unreachable"</span>)
+}</code></pre>
+<p>The <code>?</code> version says the same thing in three lines instead of eleven. The enclosing function must return a compatible result type — the compiler checks this.</p>
+<h2>guard let: unwrap or bail</h2>
+<p>When you're in a function that doesn't return a result (like <code>main</code>), use <code>guard let</code> to unwrap and handle the error in place:</p>
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>, fs<span class="op">:</span> <span class="ty">Fs</span>) {
+    <span class="kw">guard</span> <span class="kw">let</span> content <span class="op">=</span> fs.<span class="fn">read_file</span>(<span class="st">"config.txt"</span>) <span class="kw">else</span> {
+        stdout.<span class="fn">println</span>(<span class="st">"Could not read config file"</span>)
         <span class="kw">return</span>
     }
-    <span class="cm">// data is `string` here</span>
-    stdout.<span class="fn">println</span>(<span class="st">"Read "</span> <span class="op">+</span> (data.length <span class="kw">as</span> <span class="ty">string</span>) <span class="op">+</span> <span class="st">" chars"</span>)
+    <span class="cm">// content is `string` here — unwrapped and safe</span>
+    stdout.<span class="fn">println</span>(<span class="st">"Config: "</span> <span class="op">+</span> content)
 }</code></pre>
-<h3>panic for unrecoverable errors</h3>
-<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    <span class="fn">panic</span>(<span class="st">"something went terribly wrong"</span>)
-    <span class="cm">// Terminates with message and stack trace. Cannot be caught.</span>
+<p>The variable <code>content</code> is available in the <strong>enclosing scope</strong>, not just inside a block. The <code>else</code> branch must diverge — <code>return</code>, <code>break</code>, or <code>panic</code>.</p>
+<h2>A real example: read, parse, validate</h2>
+<p>Here's how these pieces compose in practice:</p>
+<pre><code><span class="kw">fn</span> <span class="fn">load_user_age</span>(fs<span class="op">:</span> <span class="ty">Fs</span>) <span class="op">-&gt;</span> <span class="ty">i64</span><span class="op">!</span><span class="ty">string</span> {
+    <span class="kw">let</span> content <span class="op">=</span> fs.<span class="fn">read_file</span>(<span class="st">"user_age.txt"</span>)<span class="op">?</span>
+    <span class="kw">let</span> trimmed <span class="op">=</span> content.<span class="fn">trim</span>()
+    <span class="kw">let</span> n <span class="op">=</span> trimmed <span class="kw">as</span><span class="op">?</span> <span class="ty">i64</span>
+    <span class="kw">if</span> n <span class="kw">is</span> <span class="kw">nil</span> {
+        <span class="kw">return</span> <span class="op">!</span>(<span class="st">"invalid age: "</span> <span class="op">+</span> trimmed)
+    }
+    <span class="kw">let</span> age <span class="op">=</span> n <span class="kw">as</span> <span class="ty">i64</span>
+    <span class="kw">if</span> age <span class="op">&lt;</span> <span class="nu">0</span> { <span class="kw">return</span> <span class="op">!</span>(<span class="st">"age cannot be negative"</span>) }
+    <span class="kw">if</span> age <span class="op">&gt;</span> <span class="nu">150</span> { <span class="kw">return</span> <span class="op">!</span>(<span class="st">"age seems unrealistic: "</span> <span class="op">+</span> (age <span class="kw">as</span> <span class="ty">string</span>)) }
+    <span class="kw">return</span> age
+}
+
+<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>, fs<span class="op">:</span> <span class="ty">Fs</span>) {
+    <span class="kw">match</span> <span class="fn">load_user_age</span>(fs) {
+        <span class="op">!</span>err <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(<span class="st">"Error: "</span> <span class="op">+</span> err)
+        age <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(<span class="st">"User age: "</span> <span class="op">+</span> (age <span class="kw">as</span> <span class="ty">string</span>))
+    }
 }</code></pre>
-<p>Use <code>panic</code> for programming errors. Use result types for expected failures.</p>
+<p>Each possible failure — file not found, not a number, out of range — is explicit. The caller sees a single <code>i64!string</code> and decides how to handle failure. No exception hierarchy to memorize. No hidden control flow.</p>
+<h2>What happens if you ignore a result?</h2>
+<p>You can't. If a function returns <code>T!E</code> and you don't handle the error, the compiler tells you:</p>
+<blockquote>
+<p><strong>Error:</strong> Result type <code>i64!string</code> must be handled. Use <code>match</code>, <code>?</code>, or <code>guard let</code>.</p>
+</blockquote>
+<p>This is the core guarantee: errors cannot be silently swallowed. Every result is either used, propagated, or explicitly handled.</p>
+<p>&lt;div class="callout callout-warn"&gt;&lt;strong&gt;panic is not error handling&lt;/strong&gt; &lt;code&gt;panic("message")&lt;/code&gt; terminates the program immediately with a stack trace. It cannot be caught. Use it for programming errors — violated invariants, impossible states, bugs. Use result types for expected failures — bad input, missing files, network timeouts. If a user can cause it, it's not a panic. &lt;/div&gt;</p>
+<p>&lt;div class="callout callout-tip"&gt;&lt;strong&gt;Try this&lt;/strong&gt; Write a function &lt;code&gt;fn parse_pair(s: string) -&gt; (i64, i64)!string&lt;/code&gt; that takes a string like &lt;code&gt;"3,7"&lt;/code&gt;, splits on &lt;code&gt;,&lt;/code&gt;, and parses both halves. Use &lt;code&gt;?&lt;/code&gt; to propagate parse errors. What error message does the user see for &lt;code&gt;"3,abc"&lt;/code&gt;? &lt;/div&gt;</p>
+<h2>What's Next</h2>
+<p>Errors are values, and now you know how to create, propagate, and handle them. Next, let's define our own data types. Next up: <a href="structs.html">Structs</a>.</p>
 
         </article>
         <nav class="page-nav">

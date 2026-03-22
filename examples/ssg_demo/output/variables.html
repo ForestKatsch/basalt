@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Variables — Basalt</title>
-    <meta name="description" content="Variables, mutability, and type inference">
+    <meta name="description" content="Immutable by default. Mutable when you need it.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -334,34 +334,67 @@
     <div class="page">
         <article class="content">
             <h1>Variables</h1>
-            <p class="subtitle">Variables, mutability, and type inference</p>
-            <p>Variables are immutable by default:</p>
+            <p class="subtitle">Immutable by default. Mutable when you need it.</p>
+            <p>Most bugs from mutable state follow the same pattern: something changed a value you assumed was stable. Basalt addresses this at the language level — variables are immutable by default, and the compiler enforces it.</p>
+<h2>Immutable by default</h2>
 <pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    <span class="kw">let</span> name <span class="op">=</span> <span class="st">"Basalt"</span>
-    <span class="kw">let</span> age <span class="op">=</span> <span class="nu">1</span>
-    stdout.<span class="fn">println</span>(<span class="st">"\(name) is \(age) year old"</span>)
-    <span class="cm">// Output: Basalt is 1 year old</span>
+    <span class="kw">let</span> name <span class="op">=</span> <span class="st">"config.json"</span>
+    <span class="kw">let</span> max_retries <span class="op">=</span> <span class="nu">3</span>
+    stdout.<span class="fn">println</span>(<span class="st">"Loading \(name), max \(max_retries as string) retries"</span>)
+    <span class="cm">// Output: Loading config.json, max 3 retries</span>
 }</code></pre>
-<p>Use <code>mut</code> when you need to reassign or mutate:</p>
+<p>These bindings cannot be changed. If you try:</p>
 <pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    <span class="kw">let</span> <span class="kw">mut</span> count <span class="op">=</span> <span class="nu">0</span>
-    count <span class="op">=</span> count <span class="op">+</span> <span class="nu">1</span>
-    stdout.<span class="fn">println</span>(count <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 1</span>
+    <span class="kw">let</span> name <span class="op">=</span> <span class="st">"config.json"</span>
+    name <span class="op">=</span> <span class="st">"settings.json"</span>
+}</code></pre>
+<blockquote>
+<p><strong>Error:</strong> Cannot assign to immutable variable <code>name</code>. Declare with <code>let mut</code> to allow reassignment.</p>
+</blockquote>
+<p>This isn't a suggestion — it's a compile error. Your program won't build until you make your intent explicit.</p>
+<h2>Mutable when you need it</h2>
+<p>When you genuinely need a value to change, say so with <code>let mut</code>:</p>
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> <span class="kw">mut</span> attempt <span class="op">=</span> <span class="nu">0</span>
+    <span class="kw">let</span> <span class="kw">mut</span> status <span class="op">=</span> <span class="st">"pending"</span>
 
-    <span class="cm">// mut is also required for mutating methods on collections</span>
-    <span class="kw">let</span> <span class="kw">mut</span> items <span class="op">=</span> [<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>]
-    items.<span class="fn">push</span>(<span class="nu">4</span>)
-    stdout.<span class="fn">println</span>(items.length <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 4</span>
-}</code></pre>
-<p>Type inference works for most declarations. Add annotations when needed:</p>
-<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    <span class="kw">let</span> x <span class="op">=</span> <span class="nu">42</span>                  <span class="cm">// inferred as i64</span>
-    <span class="kw">let</span> y<span class="op">:</span> <span class="ty">f64</span> <span class="op">=</span> <span class="nu">42.0</span>           <span class="cm">// annotated</span>
-    <span class="kw">let</span> byte<span class="op">:</span> <span class="ty">u8</span> <span class="op">=</span> <span class="nu">255</span>          <span class="cm">// required for non-default integer widths</span>
-    <span class="kw">let</span> <span class="kw">mut</span> m<span class="op">:</span> [<span class="ty">string</span><span class="op">:</span> <span class="ty">i64</span>] <span class="op">=</span> {}  <span class="cm">// required for empty collections</span>
+    attempt <span class="op">=</span> attempt <span class="op">+</span> <span class="nu">1</span>
+    status <span class="op">=</span> <span class="st">"complete"</span>
 
-    stdout.<span class="fn">println</span>(x <span class="kw">as</span> <span class="ty">string</span>)
+    stdout.<span class="fn">println</span>(<span class="st">"Attempt \(attempt as string): \(status)"</span>)
+    <span class="cm">// Output: Attempt 1: complete</span>
 }</code></pre>
+<p>The <code>mut</code> keyword serves as documentation. When you see <code>let mut</code> in code, you know this value will change — scan for where.</p>
+<p>&lt;div class="callout callout-warn"&gt;&lt;strong&gt;Gotcha: collections need mut too&lt;/strong&gt; Mutating methods like &lt;code&gt;push&lt;/code&gt;, &lt;code&gt;sort&lt;/code&gt;, and &lt;code&gt;remove&lt;/code&gt; require the variable to be &lt;code&gt;mut&lt;/code&gt;. An immutable binding to an array means you cannot modify that array at all — not just that you can't reassign the variable.</p>
+<p>&lt;pre&gt;&lt;code&gt;let items = [1, 2, 3] items.push(4)  // Error: Cannot call mutating method on immutable variable&lt;/code&gt;&lt;/pre&gt;</p>
+<p>Write &lt;code&gt;let mut items = [1, 2, 3]&lt;/code&gt; instead. &lt;/div&gt;</p>
+<h2>Type inference</h2>
+<p>Basalt infers types from the value you assign. You don't need to write them — but you can:</p>
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> x <span class="op">=</span> <span class="nu">42</span>                    <span class="cm">// inferred: i64</span>
+    <span class="kw">let</span> y<span class="op">:</span> <span class="ty">f64</span> <span class="op">=</span> <span class="nu">42.0</span>            <span class="cm">// annotated explicitly</span>
+    <span class="kw">let</span> byte<span class="op">:</span> <span class="ty">u8</span> <span class="op">=</span> <span class="nu">255</span>           <span class="cm">// required: non-default integer width</span>
+    <span class="kw">let</span> <span class="kw">mut</span> m<span class="op">:</span> [<span class="ty">string</span><span class="op">:</span> <span class="ty">i64</span>] <span class="op">=</span> {}  <span class="cm">// required: empty collection needs a type</span>
+
+    stdout.<span class="fn">println</span>(x <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 42</span>
+}</code></pre>
+<p>Annotations are required in two cases: when you want a non-default numeric type (like <code>u8</code> instead of <code>i64</code>), and when the compiler can't infer the type (like an empty map or array).</p>
+<h2>Shadowing</h2>
+<p>You can declare a new variable with the same name in the same scope. This <strong>shadows</strong> the previous binding — it doesn't mutate it:</p>
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> input <span class="op">=</span> <span class="st">"  42  "</span>
+    <span class="kw">let</span> input <span class="op">=</span> input.<span class="fn">trim</span>()        <span class="cm">// shadows: now "42"</span>
+    <span class="kw">let</span> input <span class="op">=</span> input <span class="kw">as</span><span class="op">?</span> <span class="ty">i64</span>       <span class="cm">// shadows: now i64?</span>
+
+    <span class="kw">if</span> input <span class="kw">is</span> <span class="ty">i64</span> {
+        stdout.<span class="fn">println</span>(<span class="st">"Parsed: "</span> <span class="op">+</span> (input <span class="kw">as</span> <span class="ty">string</span>))
+        <span class="cm">// Output: Parsed: 42</span>
+    }
+}</code></pre>
+<p>Each <code>let</code> creates a new binding. The old value is untouched — if anything else referenced it, they still see the original. Shadowing is useful for transforming a value through a pipeline without inventing new names for each step.</p>
+<p>This is different from mutation. With <code>let mut</code>, you change what a name points to. With shadowing, you create an entirely new binding that happens to reuse the name — and you can even change the type, as the example above shows.</p>
+<h2>What's Next</h2>
+<p>Variables hold values. Functions transform them. Next up: <a href="functions.html">Functions</a>.</p>
 
         </article>
         <nav class="page-nav">

@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Control Flow — Basalt</title>
-    <meta name="description" content="Conditionals, loops, guards, and pattern matching">
+    <meta name="description" content="Conditions are bool. Loops are clear. Guards catch problems early.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -334,105 +334,130 @@
     <div class="page">
         <article class="content">
             <h1>Control Flow</h1>
-            <p class="subtitle">Conditionals, loops, guards, and pattern matching</p>
-            <h3>if/else</h3>
-<p>Conditions must be <code>bool</code>. There is no truthiness — <code>if 0</code> and <code>if ""</code> are compile errors.</p>
-<p><code>if</code> is an expression that produces a value:</p>
+            <p class="subtitle">Conditions are bool. Loops are clear. Guards catch problems early.</p>
+            <p>Basalt's control flow has one principle: <strong>say what you mean</strong>. Conditions must be booleans — no truthy/falsy surprises. Loops iterate over real collections. Guards push error handling to the top so the happy path reads clean.</p>
+<h2>No truthiness</h2>
+<p>In JavaScript, <code>if (0)</code>, <code>if ("")</code>, and <code>if (null)</code> are all falsy. This leads to bugs where empty strings and zero are accidentally treated as "missing." Basalt rejects this entirely:</p>
 <pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    <span class="kw">let</span> x <span class="op">=</span> <span class="nu">10</span>
-    <span class="kw">let</span> label <span class="op">=</span> <span class="kw">if</span> x <span class="op">&gt;</span> <span class="nu">0</span> { <span class="st">"positive"</span> } <span class="kw">else</span> { <span class="st">"non-positive"</span> }
-    stdout.<span class="fn">println</span>(label)  <span class="cm">// Output: positive</span>
+    <span class="kw">let</span> count <span class="op">=</span> <span class="nu">0</span>
+    <span class="kw">if</span> count { stdout.<span class="fn">println</span>(<span class="st">"truthy"</span>) }
+}</code></pre>
+<blockquote>
+<p><strong>Error:</strong> Condition must be <code>bool</code>, found <code>i64</code>.</p>
+</blockquote>
+<p>Write what you mean: <code>if count &gt; 0 { ... }</code> or <code>if count != 0 { ... }</code>.</p>
+<h2>if/else as expressions</h2>
+<p><code>if</code> produces a value. You can bind it directly to a variable:</p>
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> temp <span class="op">=</span> <span class="nu">72</span>
+    <span class="kw">let</span> label <span class="op">=</span> <span class="kw">if</span> temp <span class="op">&gt;</span> <span class="nu">80</span> { <span class="st">"hot"</span> } <span class="kw">else</span> { <span class="st">"comfortable"</span> }
+    stdout.<span class="fn">println</span>(label)  <span class="cm">// Output: comfortable</span>
 
-    <span class="kw">let</span> grade <span class="op">=</span> <span class="kw">if</span> x <span class="op">&gt;=</span> <span class="nu">90</span> { <span class="st">"A"</span> }
-        <span class="kw">else</span> <span class="kw">if</span> x <span class="op">&gt;=</span> <span class="nu">80</span> { <span class="st">"B"</span> }
-        <span class="kw">else</span> <span class="kw">if</span> x <span class="op">&gt;=</span> <span class="nu">70</span> { <span class="st">"C"</span> }
+    <span class="kw">let</span> grade <span class="op">=</span> <span class="kw">if</span> temp <span class="op">&gt;=</span> <span class="nu">90</span> { <span class="st">"A"</span> }
+        <span class="kw">else</span> <span class="kw">if</span> temp <span class="op">&gt;=</span> <span class="nu">80</span> { <span class="st">"B"</span> }
+        <span class="kw">else</span> <span class="kw">if</span> temp <span class="op">&gt;=</span> <span class="nu">70</span> { <span class="st">"C"</span> }
         <span class="kw">else</span> { <span class="st">"F"</span> }
-    stdout.<span class="fn">println</span>(grade)  <span class="cm">// Output: F</span>
+    stdout.<span class="fn">println</span>(grade)  <span class="cm">// Output: C</span>
 }</code></pre>
-<h3>while</h3>
+<p>Both branches must produce the same type. If they don't, the compiler tells you:</p>
+<blockquote>
+<p><strong>Error:</strong> <code>if</code> branch returns <code>string</code> but <code>else</code> branch returns <code>i64</code>.</p>
+</blockquote>
+<h2>for-in loops</h2>
+<p><code>for</code> iterates over arrays, maps, strings, and ranges. No index variables, no off-by-one errors:</p>
 <pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    <span class="kw">let</span> <span class="kw">mut</span> i <span class="op">=</span> <span class="nu">1</span>
-    <span class="kw">while</span> i <span class="op">&lt;=</span> <span class="nu">5</span> {
-        stdout.<span class="fn">print</span>(i <span class="kw">as</span> <span class="ty">string</span> <span class="op">+</span> <span class="st">" "</span>)
-        i <span class="op">=</span> i <span class="op">+</span> <span class="nu">1</span>
-    }
-    stdout.<span class="fn">println</span>(<span class="st">""</span>)
-    <span class="cm">// Output: 1 2 3 4 5</span>
-}</code></pre>
-<h3>for-in</h3>
-<p>Iterate over arrays, maps, strings, and ranges:</p>
-<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    <span class="cm">// Array iteration</span>
-    <span class="kw">let</span> fruits <span class="op">=</span> [<span class="st">"apple"</span>, <span class="st">"banana"</span>, <span class="st">"cherry"</span>]
-    <span class="kw">for</span> fruit <span class="kw">in</span> fruits {
-        stdout.<span class="fn">println</span>(fruit)
+    <span class="cm">// Arrays</span>
+    <span class="kw">let</span> files <span class="op">=</span> [<span class="st">"main.bas"</span>, <span class="st">"utils.bas"</span>, <span class="st">"test.bas"</span>]
+    <span class="kw">for</span> file <span class="kw">in</span> files {
+        stdout.<span class="fn">println</span>(<span class="st">"Compiling \(file)"</span>)
     }
 
-    <span class="cm">// With index (value first, index second)</span>
-    <span class="kw">for</span> fruit, i <span class="kw">in</span> fruits {
-        stdout.<span class="fn">println</span>(<span class="st">"\(i as string): \(fruit)"</span>)
+    <span class="cm">// With index — value first, index second</span>
+    <span class="kw">for</span> file, i <span class="kw">in</span> files {
+        stdout.<span class="fn">println</span>(<span class="st">"\(i as string): \(file)"</span>)
     }
 
-    <span class="cm">// Map iteration (key first, value second)</span>
-    <span class="kw">let</span> ages <span class="op">=</span> {<span class="st">"alice"</span><span class="op">:</span> <span class="nu">30</span>, <span class="st">"bob"</span><span class="op">:</span> <span class="nu">25</span>}
-    <span class="kw">for</span> name, age <span class="kw">in</span> ages {
-        stdout.<span class="fn">println</span>(<span class="st">"\(name) is \(age as string)"</span>)
+    <span class="cm">// Maps — key first, value second</span>
+    <span class="kw">let</span> env <span class="op">=</span> {<span class="st">"HOME"</span><span class="op">:</span> <span class="st">"/Users/forest"</span>, <span class="st">"LANG"</span><span class="op">:</span> <span class="st">"en_US"</span>}
+    <span class="kw">for</span> key, value <span class="kw">in</span> env {
+        stdout.<span class="fn">println</span>(<span class="st">"\(key)=\(value)"</span>)
     }
 
-    <span class="cm">// Range (exclusive end)</span>
-    <span class="kw">let</span> <span class="kw">mut</span> sum <span class="op">=</span> <span class="nu">0</span>
-    <span class="kw">for</span> i <span class="kw">in</span> <span class="nu">0..10</span> {
-        sum <span class="op">=</span> sum <span class="op">+</span> i
+    <span class="cm">// Ranges — exclusive end</span>
+    <span class="kw">let</span> <span class="kw">mut</span> total <span class="op">=</span> <span class="nu">0</span>
+    <span class="kw">for</span> i <span class="kw">in</span> <span class="nu">1..6</span> {
+        total <span class="op">=</span> total <span class="op">+</span> i
     }
-    stdout.<span class="fn">println</span>(sum <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 45</span>
+    stdout.<span class="fn">println</span>(total <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 15</span>
 
-    <span class="cm">// String iteration (by character)</span>
-    <span class="kw">for</span> ch <span class="kw">in</span> <span class="st">"hi!"</span> {
+    <span class="cm">// Strings — iterates by character</span>
+    <span class="kw">for</span> ch <span class="kw">in</span> <span class="st">"OK!"</span> {
         stdout.<span class="fn">print</span>(<span class="st">"["</span> <span class="op">+</span> ch <span class="op">+</span> <span class="st">"]"</span>)
     }
-    stdout.<span class="fn">println</span>(<span class="st">""</span>)  <span class="cm">// Output: [h][i][!]</span>
+    stdout.<span class="fn">println</span>(<span class="st">""</span>)  <span class="cm">// Output: [O][K][!]</span>
 }</code></pre>
-<h3>loop, break, continue</h3>
+<h2>while and loop</h2>
+<p><code>while</code> runs as long as a condition holds. <code>loop</code> runs forever until you <code>break</code>:</p>
 <pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    <span class="cm">// Infinite loop with break</span>
-    <span class="kw">let</span> <span class="kw">mut</span> n <span class="op">=</span> <span class="nu">0</span>
-    <span class="kw">loop</span> {
-        n <span class="op">=</span> n <span class="op">+</span> <span class="nu">1</span>
-        <span class="kw">if</span> n <span class="op">&gt;</span> <span class="nu">5</span> { <span class="kw">break</span> }
+    <span class="cm">// while</span>
+    <span class="kw">let</span> <span class="kw">mut</span> retries <span class="op">=</span> <span class="nu">3</span>
+    <span class="kw">while</span> retries <span class="op">&gt;</span> <span class="nu">0</span> {
+        stdout.<span class="fn">println</span>(<span class="st">"Attempt \(retries as string)"</span>)
+        retries <span class="op">=</span> retries <span class="op">-</span> <span class="nu">1</span>
     }
-    stdout.<span class="fn">println</span>(n <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 6</span>
 
-    <span class="cm">// Skip odd numbers with continue</span>
-    <span class="kw">let</span> <span class="kw">mut</span> evens <span class="op">=</span> <span class="nu">0</span>
-    <span class="kw">for</span> i <span class="kw">in</span> <span class="nu">0..10</span> {
-        <span class="kw">if</span> i <span class="op">%</span> <span class="nu">2</span> <span class="op">!=</span> <span class="nu">0</span> { <span class="kw">continue</span> }
-        evens <span class="op">=</span> evens <span class="op">+</span> <span class="nu">1</span>
+    <span class="cm">// loop with break</span>
+    <span class="kw">let</span> <span class="kw">mut</span> n <span class="op">=</span> <span class="nu">1</span>
+    <span class="kw">loop</span> {
+        <span class="kw">if</span> n <span class="op">&gt;</span> <span class="nu">100</span> { <span class="kw">break</span> }
+        n <span class="op">=</span> n <span class="op">*</span> <span class="nu">2</span>
     }
-    stdout.<span class="fn">println</span>(evens <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 5</span>
+    stdout.<span class="fn">println</span>(n <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 128</span>
+
+    <span class="cm">// continue skips the current iteration</span>
+    <span class="kw">for</span> i <span class="kw">in</span> <span class="nu">0..10</span> {
+        <span class="kw">if</span> i <span class="op">%</span> <span class="nu">3</span> <span class="op">==</span> <span class="nu">0</span> { <span class="kw">continue</span> }
+        stdout.<span class="fn">print</span>(<span class="st">"\(i as string) "</span>)
+    }
+    stdout.<span class="fn">println</span>(<span class="st">""</span>)  <span class="cm">// Output: 1 2 4 5 7 8</span>
 }</code></pre>
-<h3>guard / guard let</h3>
-<p><code>guard</code> asserts a condition. If it fails, the <code>else</code> block must diverge (<code>return</code>, <code>break</code>, <code>continue</code>, or <code>panic</code>).</p>
-<pre><code><span class="kw">fn</span> <span class="fn">process</span>(x<span class="op">:</span> <span class="ty">i64</span>, stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    <span class="kw">guard</span> x <span class="op">&gt;</span> <span class="nu">0</span> <span class="kw">else</span> {
-        stdout.<span class="fn">println</span>(<span class="st">"must be positive"</span>)
+<h2>guard: assert and bail</h2>
+<p><code>guard</code> asserts a condition at the top of a function. If the condition is false, the <code>else</code> block must diverge — <code>return</code>, <code>break</code>, <code>continue</code>, or <code>panic</code>. This pushes failure handling upward so the rest of the function can assume success:</p>
+<pre><code><span class="kw">fn</span> <span class="fn">process_age</span>(input<span class="op">:</span> <span class="ty">string</span>, stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">guard</span> input.length <span class="op">&gt;</span> <span class="nu">0</span> <span class="kw">else</span> {
+        stdout.<span class="fn">println</span>(<span class="st">"Error: empty input"</span>)
         <span class="kw">return</span>
     }
-    stdout.<span class="fn">println</span>(<span class="st">"processing: "</span> <span class="op">+</span> (x <span class="kw">as</span> <span class="ty">string</span>))
+
+    <span class="kw">let</span> parsed <span class="op">=</span> input <span class="kw">as</span><span class="op">?</span> <span class="ty">i64</span>
+    <span class="kw">guard</span> parsed <span class="kw">is</span> <span class="ty">i64</span> <span class="kw">else</span> {
+        stdout.<span class="fn">println</span>(<span class="st">"Error: not a number"</span>)
+        <span class="kw">return</span>
+    }
+
+    <span class="cm">// Happy path — no nesting</span>
+    stdout.<span class="fn">println</span>(<span class="st">"Age: "</span> <span class="op">+</span> (parsed <span class="kw">as</span> <span class="ty">string</span>))
 }
 
 <span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
-    <span class="fn">process</span>(<span class="nu">5</span>, stdout)   <span class="cm">// Output: processing: 5</span>
-    <span class="fn">process</span>(<span class="op">-</span><span class="nu">1</span>, stdout)  <span class="cm">// Output: must be positive</span>
+    <span class="fn">process_age</span>(<span class="st">"25"</span>, stdout)   <span class="cm">// Output: Age: 25</span>
+    <span class="fn">process_age</span>(<span class="st">""</span>, stdout)     <span class="cm">// Output: Error: empty input</span>
+    <span class="fn">process_age</span>(<span class="st">"abc"</span>, stdout)  <span class="cm">// Output: Error: not a number</span>
 }</code></pre>
-<p><code>guard let</code> unwraps optionals and results into the enclosing scope:</p>
+<h2>guard let: unwrap or bail</h2>
+<p><code>guard let</code> combines unwrapping with early return. It extracts the success value from an optional or result into the <strong>enclosing scope</strong> — not a nested block:</p>
 <pre><code><span class="kw">fn</span> <span class="fn">load_config</span>(fs<span class="op">:</span> <span class="ty">Fs</span>, stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
     <span class="kw">guard</span> <span class="kw">let</span> content <span class="op">=</span> fs.<span class="fn">read_file</span>(<span class="st">"config.txt"</span>) <span class="kw">else</span> {
         stdout.<span class="fn">println</span>(<span class="st">"Could not read config"</span>)
         <span class="kw">return</span>
     }
     <span class="cm">// content is `string` here, not a result type</span>
-    stdout.<span class="fn">println</span>(<span class="st">"Config loaded: "</span> <span class="op">+</span> (content.length <span class="kw">as</span> <span class="ty">string</span>) <span class="op">+</span> <span class="st">" chars"</span>)
+    stdout.<span class="fn">println</span>(<span class="st">"Loaded \(content.length as string) bytes"</span>)
 }</code></pre>
+<p>Compare this to nested <code>if</code> or <code>match</code> — <code>guard let</code> keeps the happy path at the top indentation level. You'll see it everywhere once you start writing real Basalt. It's especially powerful with <a href="error-handling.html">Error Handling</a>.</p>
+<p>&lt;div class="callout callout-tip"&gt;&lt;strong&gt;Try this&lt;/strong&gt; Write a function that takes an array of strings and returns the first one that parses as an integer, using &lt;code&gt;guard let&lt;/code&gt; inside a &lt;code&gt;for&lt;/code&gt; loop with &lt;code&gt;continue&lt;/code&gt; in the else block. &lt;/div&gt;</p>
+<h2>What's Next</h2>
+<p><code>if</code> and <code>guard</code> handle simple conditions. When you need to match against multiple patterns at once — especially enum variants and union types — you want something more powerful. Next up: <a href="pattern-matching.html">Pattern Matching</a>.</p>
 
         </article>
         <nav class="page-nav">

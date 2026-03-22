@@ -1,68 +1,79 @@
 title: Types
 date: 2026-03-02
-description: Basalt's type system
+description: Every value has a type. Every type tells the truth.
 
-### Primitive Types
+Most bugs in dynamic languages come from a value being something you didn't expect — a string where you wanted a number, `null` where you wanted a record, `undefined` where you wanted anything at all. Basalt's type system eliminates these bugs at compile time. If your program type-checks, every value is exactly what the type says it is.
+
+## Primitives
+
+The building blocks. Every literal has a definite type:
 
 ```basalt
 fn main(stdout: Stdout) {
-    let i = 42              // i64 (default integer)
-    let f = 3.14            // f64
-    let b = true            // bool
-    let s = "hello"         // string (immutable, UTF-8)
-    let n = nil             // nil (absence of value)
+    let status_code = 200          // i64 — default integer type
+    let temperature = 98.6         // f64 — IEEE 754 double
+    let active = true              // bool
+    let greeting = "hello world"   // string — immutable, UTF-8
+    let nothing = nil              // nil — explicit absence
 
-    // Sized integer types require annotation
+    stdout.println(status_code as string)  // Output: 200
+}
+```
+
+Integer types come in signed (`i8`, `i16`, `i32`, `i64`) and unsigned (`u8`, `u16`, `u32`, `u64`). All integer literals default to `i64`. When you need a specific width, annotate:
+
+```basalt
+fn main(stdout: Stdout) {
     let byte: u8 = 255
-    let small: i16 = -1000
+    let port: u16 = 8080
     let id: u64 = 0xDEADBEEF
-
-    stdout.println(i as string)     // Output: 42
     stdout.println(byte as string)  // Output: 255
 }
 ```
 
-Integer types: `i8`, `i16`, `i32`, `i64` (signed) and `u8`, `u16`, `u32`, `u64` (unsigned). All integer literals default to `i64`. Integer arithmetic is checked — overflow panics at runtime.
+## No implicit conversions
 
-There is one float type: `f64` (IEEE 754 double precision).
+What happens if you mix integers and floats?
 
-### Collections
+```basalt
+fn main(stdout: Stdout) {
+    let x = 1 + 2.0
+}
+```
+
+> **Error:** Cannot apply operator `+` to types `i64` and `f64`.
+
+Basalt refuses to silently convert between numeric types. You might lose precision, change sign, or overflow — and the language won't pretend that's fine.
+
+<div class="callout callout-note"><strong>Design philosophy</strong>
+Implicit conversions hide data loss. In C, <code>int x = 3.9</code> silently gives you <code>3</code>. In Basalt, every conversion is explicit and visible in the code. See <a href="conversions.html">Type Conversions</a> for the full story.
+</div>
+
+## Collections
+
+Three built-in collection types cover most data structures:
 
 ```basalt
 fn main(stdout: Stdout) {
     // Arrays: ordered, growable, homogeneous
-    let nums = [1, 2, 3]
-    stdout.println(nums[0] as string)  // Output: 1
+    let temps = [72.0, 68.5, 74.1]
+    stdout.println(temps[0] as string)  // Output: 72
 
     // Maps: ordered by insertion, key-value pairs
-    let ages = {"alice": 30, "bob": 25}
-    stdout.println(ages["alice"] as string)  // Output: 30
+    let headers = {"Content-Type": "text/html", "Status": "200 OK"}
+    stdout.println(headers["Status"])  // Output: 200 OK
 
     // Tuples: fixed-size, heterogeneous, immutable
-    let pair = (42, "hello")
-    stdout.println(pair.0 as string)  // Output: 42
-    stdout.println(pair.1)            // Output: hello
+    let user = ("Alice", 30, true)
+    stdout.println(user.0)             // Output: Alice
 }
 ```
 
-Arrays and maps are reference types — assignment shares the same object. Use `.clone()` for an independent copy. Tuples are value types — assignment copies.
+Arrays and maps are reference types — assignment shares the same object. Use `.clone()` for an independent copy. Tuples are value types and copy on assignment.
 
-```basalt
-fn main(stdout: Stdout) {
-    let mut a = [1, 2, 3]
-    let mut b = a         // b and a point to the same array
-    b.push(4)
-    stdout.println(a.length as string)  // Output: 4 (same object!)
+## Optional types: null done right
 
-    let mut c = a.clone() // independent copy
-    c.push(5)
-    stdout.println(a.length as string)  // Output: 4 (unaffected)
-}
-```
-
-### Optional Types
-
-`T?` represents a value that might be absent. It is equivalent to `T | nil`.
+In languages with `null`, any reference can be null. You don't know until it blows up at runtime. Basalt has no null references. Instead, `T?` (shorthand for `T | nil`) makes absence explicit in the type:
 
 ```basalt
 fn find_user(id: i64) -> string? {
@@ -71,21 +82,21 @@ fn find_user(id: i64) -> string? {
 }
 
 fn main(stdout: Stdout) {
-    let name = find_user(1)
+    let name = find_user(42)
+    // name is `string?` — you CANNOT use it as a string directly
     if name is string {
-        stdout.println("Found: " + name)  // Output: Found: Alice
-    }
-
-    let missing = find_user(99)
-    if missing is nil {
+        stdout.println("Found: " + name)
+    } else {
         stdout.println("Not found")  // Output: Not found
     }
 }
 ```
 
-### Result Types
+The compiler forces you to handle `nil` before using the value. No null pointer exceptions. Ever.
 
-`T!E` represents either a success value of type `T` or an error of type `E`. Errors are values, not exceptions.
+## Result types
+
+When an operation can fail, the return type says so: `T!E` is either a success value of type `T` or an error of type `E`. Errors are values, not exceptions thrown from unknown depths.
 
 ```basalt
 fn parse_port(s: string) -> i64!string {
@@ -94,46 +105,38 @@ fn parse_port(s: string) -> i64!string {
     if n is nil { return !("not a number: " + s) }
     return n as i64
 }
-
-fn main(stdout: Stdout) {
-    match parse_port("8080") {
-        !err => stdout.println("Error: " + err)
-        port => stdout.println("Port: " + (port as string))
-    }
-    // Output: Port: 8080
-
-    match parse_port("abc") {
-        !err => stdout.println("Error: " + err)
-        _ => stdout.println("OK")
-    }
-    // Output: Error: not a number: abc
-}
 ```
 
-See [Error Handling](error-handling.html) for the full story.
+This is a deep topic — see [Error Handling](error-handling.html) for propagation, `guard let`, and real-world patterns.
 
-### Union Types
+## Union types
 
-A union `A | B` accepts values of either type. Use `is` to narrow to a specific member.
+Sometimes a value can legitimately be one of several types. Union types make this explicit:
 
 ```basalt
-fn describe(val: i64 | string) -> string {
-    if val is i64 {
-        return "number: " + (val as string)
-    } else {
-        return "text: " + val
-    }
+fn respond(code: i64) -> i64 | string {
+    if code == 200 { return "OK" }
+    return code
 }
 
 fn main(stdout: Stdout) {
-    stdout.println(describe(42))       // Output: number: 42
-    stdout.println(describe("hello"))  // Output: text: hello
+    let result = respond(200)
+    match result {
+        is string => stdout.println(result as string)
+        is i64 => stdout.println("Code: " + (result as string))
+    }
+    // Output: OK
 }
 ```
 
-You can name unions with type aliases:
+You can name unions with type aliases for readability:
 
 ```basalt
-type Numeric = i64 | f64
-type JsonPrimitive = bool | f64 | string | nil
+type JsonValue = bool | f64 | string | nil
 ```
+
+The compiler ensures you handle every member of the union — you can't accidentally forget the `nil` case.
+
+## What's Next
+
+Now that you know what values can be, let's look at how to bind them to names. Next up: [Variables](variables.html).
