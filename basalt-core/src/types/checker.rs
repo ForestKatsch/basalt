@@ -2345,7 +2345,6 @@ impl TypeChecker {
         }
     }
 
-
     fn check_method_call(
         &mut self,
         obj: &Expr,
