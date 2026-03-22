@@ -1,5 +1,5 @@
 use super::*;
-use crate::error::CompileError;
+use crate::error::{CompileError, CompileErrors};
 use std::collections::HashMap;
 
 /// Levenshtein edit distance between two strings.
@@ -57,7 +57,7 @@ struct TypeChecker {
     current_type_name: Option<String>,
 }
 
-pub fn check(program: &Program) -> Result<TypedProgram, CompileError> {
+pub fn check(program: &Program) -> Result<TypedProgram, CompileErrors> {
     let mut checker = TypeChecker::new();
     checker.check_program(program)
 }
@@ -322,7 +322,7 @@ impl TypeChecker {
         false
     }
 
-    fn check_program(&mut self, program: &Program) -> Result<TypedProgram, CompileError> {
+    fn check_program(&mut self, program: &Program) -> Result<TypedProgram, CompileErrors> {
         // First pass: register all type definitions and function signatures
         self.register_types(program)?;
         self.register_module_types(program)?;
@@ -348,9 +348,12 @@ impl TypeChecker {
 
         // Second pass: type check function bodies
         let mut typed_items = Vec::new();
+        let mut errors = Vec::new();
         for item in &program.items {
-            let typed = self.check_item(item)?;
-            typed_items.push(typed);
+            match self.check_item(item) {
+                Ok(typed) => typed_items.push(typed),
+                Err(e) => errors.push(e),
+            }
         }
 
         // Third pass: type-check and compile method bodies as functions
@@ -380,12 +383,23 @@ impl TypeChecker {
                     };
                     if let Some(info) = method_info {
                         self.current_type_name = Some(td.name.clone());
-                        let typed_fn = self.check_method_def(method, &info)?;
-                        self.current_type_name = None;
-                        typed_items.push(TypedItem::Function(typed_fn));
+                        match self.check_method_def(method, &info) {
+                            Ok(typed_fn) => {
+                                self.current_type_name = None;
+                                typed_items.push(TypedItem::Function(typed_fn));
+                            }
+                            Err(e) => {
+                                self.current_type_name = None;
+                                errors.push(e);
+                            }
+                        }
                     }
                 }
             }
+        }
+
+        if !errors.is_empty() {
+            return Err(CompileErrors::new(errors));
         }
 
         Ok(TypedProgram {
@@ -2311,6 +2325,33 @@ impl TypeChecker {
                     return Err(CompileError::new("char_at takes 1 argument", span));
                 }
                 Ok(Type::String)
+            }
+            "index_of" | "last_index_of" => {
+                if args.len() != 1 {
+                    return Err(CompileError::new(
+                        format!("{} takes 1 argument", method),
+                        span,
+                    ));
+                }
+                Ok(Type::I64)
+            }
+            "slice" => {
+                if args.len() != 2 {
+                    return Err(CompileError::new("slice takes 2 arguments", span));
+                }
+                Ok(Type::String)
+            }
+            "chars" => {
+                if !args.is_empty() {
+                    return Err(CompileError::new("chars takes 0 arguments", span));
+                }
+                Ok(Type::Array(Box::new(Type::String)))
+            }
+            "bytes" => {
+                if !args.is_empty() {
+                    return Err(CompileError::new("bytes takes 0 arguments", span));
+                }
+                Ok(Type::Array(Box::new(Type::I64)))
             }
             _ => Err(CompileError::new(
                 format!("unknown string method '{}'", method),

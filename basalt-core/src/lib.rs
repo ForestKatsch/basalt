@@ -6,7 +6,7 @@ pub mod parser;
 pub mod types;
 
 pub use compiler::Program;
-pub use error::CompileError;
+pub use error::{CompileError, CompileErrors};
 
 use std::path::Path;
 
@@ -28,11 +28,11 @@ pub fn compile(source: &str) -> Result<Program, String> {
 
 /// Compile a file, returning a CompileResult with source for diagnostics.
 /// On error, returns a CompileError with source location info.
-pub fn compile_file_rich(path: &Path) -> Result<CompileResult, (CompileError, String, String)> {
+pub fn compile_file_rich(path: &Path) -> Result<CompileResult, (CompileErrors, String, String)> {
     let source = std::fs::read_to_string(path).map_err(|e| {
         let msg = format!("cannot read {}: {}", path.display(), e);
         (
-            CompileError::bare(&msg),
+            CompileErrors::single(CompileError::bare(&msg)),
             String::new(),
             path.display().to_string(),
         )
@@ -42,19 +42,39 @@ pub fn compile_file_rich(path: &Path) -> Result<CompileResult, (CompileError, St
         .map(|f| f.to_string_lossy().to_string())
         .unwrap_or_else(|| path.display().to_string());
 
-    let tokens = lexer::lex(&source)
-        .map_err(|e| (CompileError::bare(&e), source.clone(), filename.clone()))?;
-    let mut ast = parser::parse(tokens)
-        .map_err(|e| (CompileError::bare(&e), source.clone(), filename.clone()))?;
+    let tokens = lexer::lex(&source).map_err(|e| {
+        (
+            CompileErrors::single(CompileError::bare(&e)),
+            source.clone(),
+            filename.clone(),
+        )
+    })?;
+    let mut ast = parser::parse(tokens).map_err(|e| {
+        (
+            CompileErrors::single(CompileError::bare(&e)),
+            source.clone(),
+            filename.clone(),
+        )
+    })?;
 
     // Resolve imports
     let dir = path.parent().unwrap_or(Path::new("."));
-    resolve_imports(&mut ast, dir)
-        .map_err(|e| (CompileError::bare(&e), source.clone(), filename.clone()))?;
+    resolve_imports(&mut ast, dir).map_err(|e| {
+        (
+            CompileErrors::single(CompileError::bare(&e)),
+            source.clone(),
+            filename.clone(),
+        )
+    })?;
 
     let checked = types::check(&ast).map_err(|e| (e, source.clone(), filename.clone()))?;
-    let program = compiler::compile(&checked)
-        .map_err(|e| (CompileError::bare(&e), source.clone(), filename.clone()))?;
+    let program = compiler::compile(&checked).map_err(|e| {
+        (
+            CompileErrors::single(CompileError::bare(&e)),
+            source.clone(),
+            filename.clone(),
+        )
+    })?;
 
     Ok(CompileResult {
         program,

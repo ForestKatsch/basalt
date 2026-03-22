@@ -1339,6 +1339,57 @@ impl VM {
                     s.chars().nth(i as usize).unwrap().to_string(),
                 ))
             }
+            "index_of" => {
+                if args.len() != 1 {
+                    return Err("index_of takes 1 argument".into());
+                }
+                let needle = self.val_to_string(args.first().unwrap_or(&Value::Nil));
+                Ok(Value::int(s.find(&needle).map(|i| i as i64).unwrap_or(-1)))
+            }
+            "last_index_of" => {
+                if args.len() != 1 {
+                    return Err("last_index_of takes 1 argument".into());
+                }
+                let needle = self.val_to_string(args.first().unwrap_or(&Value::Nil));
+                Ok(Value::int(s.rfind(&needle).map(|i| i as i64).unwrap_or(-1)))
+            }
+            "slice" => {
+                if args.len() != 2 {
+                    return Err("slice takes 2 arguments".into());
+                }
+                let chars: Vec<char> = s.chars().collect();
+                let len = chars.len() as i64;
+                let mut start = args[0].as_int();
+                let mut end = args[1].as_int();
+                if start < 0 {
+                    start += len;
+                }
+                if end < 0 {
+                    end += len;
+                }
+                let start = (start.max(0) as usize).min(chars.len());
+                let end = (end.max(0) as usize).min(chars.len());
+                if start >= end {
+                    Ok(Value::string(String::new()))
+                } else {
+                    Ok(Value::string(chars[start..end].iter().collect()))
+                }
+            }
+            "chars" => {
+                if !args.is_empty() {
+                    return Err("chars takes 0 arguments".into());
+                }
+                let char_strings: Vec<Value> =
+                    s.chars().map(|c| Value::string(c.to_string())).collect();
+                Ok(Value::array(char_strings))
+            }
+            "bytes" => {
+                if !args.is_empty() {
+                    return Err("bytes takes 0 arguments".into());
+                }
+                let byte_values: Vec<Value> = s.bytes().map(|b| Value::int(b as i64)).collect();
+                Ok(Value::array(byte_values))
+            }
             _ => Err(format!("unknown string method '{}'", method)),
         }
     }

@@ -87,8 +87,8 @@ fn check_file(path: &str) -> Result<(), CliError> {
 
     match basalt_core::compile_file_rich(file_path) {
         Ok(_) => Ok(()),
-        Err((err, source, filename)) => {
-            eprint!("{}", err.render(&source, &filename));
+        Err((errs, source, filename)) => {
+            eprint!("{}", errs.render_all(&source, &filename));
             Err(CliError::Compile)
         }
     }
@@ -103,8 +103,8 @@ fn run_file(path: &str) -> Result<(), CliError> {
 
     let result = match basalt_core::compile_file_rich(file_path) {
         Ok(r) => r,
-        Err((err, source, filename)) => {
-            eprint!("{}", err.render(&source, &filename));
+        Err((errs, source, filename)) => {
+            eprint!("{}", errs.render_all(&source, &filename));
             return Err(CliError::Compile);
         }
     };

@@ -142,3 +142,58 @@ impl From<CompileError> for String {
         e.to_string()
     }
 }
+
+/// A collection of compile errors. The compiler continues after recoverable errors
+/// to report as many issues as possible in a single pass.
+#[derive(Debug, Clone)]
+pub struct CompileErrors {
+    pub errors: Vec<CompileError>,
+}
+
+impl CompileErrors {
+    pub fn new(errors: Vec<CompileError>) -> Self {
+        CompileErrors { errors }
+    }
+
+    pub fn single(error: CompileError) -> Self {
+        CompileErrors {
+            errors: vec![error],
+        }
+    }
+
+    pub fn render_all(&self, source: &str, filename: &str) -> String {
+        self.errors
+            .iter()
+            .map(|e| e.render(source, filename))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.errors.is_empty()
+    }
+}
+
+impl std::fmt::Display for CompileErrors {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (i, e) in self.errors.iter().enumerate() {
+            if i > 0 {
+                writeln!(f)?;
+            }
+            write!(f, "{}", e)?;
+        }
+        Ok(())
+    }
+}
+
+impl From<CompileErrors> for String {
+    fn from(e: CompileErrors) -> String {
+        e.to_string()
+    }
+}
+
+impl From<CompileError> for CompileErrors {
+    fn from(e: CompileError) -> Self {
+        CompileErrors::single(e)
+    }
+}

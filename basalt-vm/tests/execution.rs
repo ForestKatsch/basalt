@@ -2591,3 +2591,88 @@ fn test_did_you_mean_field() {
         "did you mean",
     );
 }
+
+#[test]
+fn test_string_index_of() {
+    run_expect_output(
+        r#"
+        fn main(stdout: Stdout) {
+            let s = "hello world"
+            stdout.println(s.index_of("world") as string)
+            stdout.println(s.index_of("xyz") as string)
+            stdout.println(s.last_index_of("l") as string)
+        }
+        "#,
+        &["6", "-1", "9"],
+    );
+}
+
+#[test]
+fn test_string_slice() {
+    run_expect_output(
+        r#"
+        fn main(stdout: Stdout) {
+            let s = "hello world"
+            stdout.println(s.slice(0, 5))
+            stdout.println(s.slice(6, 11))
+            stdout.println(s.slice(-5, -1))
+        }
+        "#,
+        &["hello", "world", "worl"],
+    );
+}
+
+#[test]
+fn test_string_chars() {
+    run_expect_output(
+        r#"
+        fn main(stdout: Stdout) {
+            let chars = "abc".chars()
+            stdout.println(chars.length as string)
+            stdout.println(chars.join("-"))
+        }
+        "#,
+        &["3", "a-b-c"],
+    );
+}
+
+#[test]
+fn test_string_bytes() {
+    run_expect_output(
+        r#"
+        fn main(stdout: Stdout) {
+            let bytes = "ABC".bytes()
+            stdout.println(bytes.length as string)
+            stdout.println(bytes[0] as string)
+            stdout.println(bytes[1] as string)
+            stdout.println(bytes[2] as string)
+        }
+        "#,
+        &["3", "65", "66", "67"],
+    );
+}
+
+#[test]
+fn test_multiple_errors_reported() {
+    let source = r#"
+        fn foo() -> i64 { return "hello" }
+        fn bar() -> string { return 42 }
+        fn main(stdout: Stdout) { }
+    "#;
+    let result = basalt_core::compile(source);
+    match result {
+        Err(msg) => {
+            assert!(
+                msg.contains("foo") || msg.contains("string"),
+                "Expected error about foo, got: {}",
+                msg,
+            );
+            assert!(
+                msg.contains("bar") || msg.contains("i64"),
+                "Expected error about bar, got: {}",
+                msg,
+            );
+        }
+        Ok(_) => panic!("Expected compile errors"),
+    }
+}
