@@ -31,7 +31,7 @@ fn main(stdout: Stdout) {
 | `u8` | 1 byte | 0 to 255 |
 | `u16` | 2 bytes | 0 to 65,535 |
 | `u32` | 4 bytes | 0 to 4,294,967,295 |
-| `u64` | 8 bytes | 0 to 1.8 x 10^19 |
+| `u64` | 8 bytes | 0 to 9.2 x 10^18 (see note) |
 
 All integer literals default to `i64`. Use a type annotation for other widths:
 
@@ -46,6 +46,8 @@ fn main(stdout: Stdout) {
 ```
 
 Integer literals also support hex (`0xFF`) and binary (`0b1010`) notation.
+
+**u64 range note:** all integers are stored internally as signed 64-bit values. `u64` enforces non-negativity but shares `i64`'s upper bound of 9,223,372,036,854,775,807. The theoretical u64 maximum of 1.8 x 10^19 is not representable.
 
 ### Checked arithmetic
 

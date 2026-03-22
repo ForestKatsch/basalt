@@ -365,8 +365,11 @@ implies continuation. Semicolons are not used.
 | `u8`  | 1 byte  | 0 to 255          |
 | `u16` | 2 bytes | 0 to 65,535       |
 | `u32` | 4 bytes | 0 to 2^32-1       |
-| `u64` | 8 bytes | 0 to 2^64-1       |
+| `u64` | 8 bytes | 0 to 2^63-1       |
 
+**Implementation note:** all integer values are stored in signed 64-bit
+registers. `u64` enforces non-negativity but cannot represent values above
+2^63-1 (the `i64` maximum). This is a known limitation of the current VM.
 Integer literals default to `i64`. Use type annotations for other widths:
 
 ```
