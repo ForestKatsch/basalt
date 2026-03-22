@@ -9,139 +9,128 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-
         :root {
-            --bg: #fafaf8;
-            --text: #1a1a18;
-            --text-2: #52524e;
-            --text-3: #8a8a84;
-            --accent: #c05e00;
-            --accent-hover: #a04e00;
-            --accent-bg: #fef3e8;
-            --border: #d0d0c8;
-            --border-dot: #c0c0b8;
-            --surface: #f2f2ee;
-            --code-bg: #f0ede6;
-            --code-text: #6b4c1a;
-            --pre-bg: #1c1c1a;
-            --pre-text: #e8e4da;
-            --radius: 2px;
+            --text: #111;
+            --text-2: #555;
+            --text-3: #999;
+            --accent: #c45200;
+            --accent-light: #fef6f0;
+            --code-bg: #faf6f1;
+            --code-text: #7c4a10;
+            --pre-bg: #1a1612;
+            --pre-text: #e8e0d4;
+            --pre-border: #c45200;
+            --rule: #e5e5e5;
+            --surface: #fafafa;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-            font-size: 16px;
-            line-height: 1.7;
+            font-size: 17px;
+            line-height: 1.8;
             color: var(--text);
-            background: var(--bg);
-            font-weight: 400;
+            background: #fff;
+            -webkit-font-smoothing: antialiased;
         }
 
-        .page { max-width: 50rem; margin: 0 auto; padding: 0 2rem; }
+        .page { max-width: 44rem; margin: 0 auto; padding: 0 2rem; }
 
-        /* --- Top bar --- */
-        .topbar {
-            background: var(--pre-bg);
-            padding: 0.6rem 0;
+        .site-header {
+            padding: 1.5rem 0 0;
+            margin-bottom: 0.5rem;
+        }
+        .site-header .page {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+        }
+        .site-header .brand {
             font-size: 0.8rem;
-            letter-spacing: 0.04em;
-        }
-        .topbar .page { display: flex; align-items: center; justify-content: space-between; }
-        .topbar .brand {
-            font-weight: 700;
-            font-size: 0.85rem;
-            color: var(--accent);
+            font-weight: 600;
+            color: var(--text-3);
             text-decoration: none;
             text-transform: uppercase;
-            letter-spacing: 0.1em;
+            letter-spacing: 0.12em;
         }
-        .topbar .brand:hover { color: #fff; }
-        .topbar .tagline { color: #706a60; font-size: 0.75rem; letter-spacing: 0.06em; }
+        .site-header .brand:hover { color: var(--accent); }
 
-        /* --- Navigation --- */
         .nav-bar {
-            border-bottom: 1px dotted var(--border-dot);
-            padding: 0.6rem 0;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-            background: var(--bg);
+            padding: 0 0 1rem;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid var(--rule);
         }
-        .nav-bar .page { display: flex; flex-wrap: wrap; gap: 0; }
+        .nav-bar .page {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0;
+        }
         .nav-bar a {
-            color: var(--text-2);
+            color: var(--text-3);
             text-decoration: none;
             font-size: 0.78rem;
             font-weight: 500;
-            padding: 0.25rem 0.6rem;
-            letter-spacing: 0.02em;
-            border-radius: var(--radius);
+            padding: 0.2rem 0.5rem;
         }
-        .nav-bar a:hover { color: var(--accent); background: var(--accent-bg); }
+        .nav-bar a:hover { color: var(--accent); }
 
-        /* --- Content --- */
-        .content { padding: 3rem 0 4rem; }
+        article { padding: 1rem 0 3rem; }
 
-        .content h1 {
-            font-size: 2rem;
+        article h1 {
+            font-size: 2.2rem;
             font-weight: 700;
-            letter-spacing: -0.02em;
-            margin-bottom: 0.25rem;
-        }
-        .content .subtitle {
-            color: var(--text-3);
-            font-size: 0.95rem;
-            margin-bottom: 2.5rem;
-            padding-bottom: 1.5rem;
-            border-bottom: 1px dotted var(--border-dot);
-        }
-
-        .content h2 {
-            font-size: 1.25rem;
-            font-weight: 600;
-            letter-spacing: -0.01em;
-            margin-top: 3rem;
-            margin-bottom: 0.6rem;
-            padding-top: 1.5rem;
-            border-top: 1px dotted var(--border-dot);
-        }
-        .content h2:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
-
-        .content h3 {
-            font-size: 1rem;
-            font-weight: 600;
-            color: var(--text-2);
-            margin-top: 1.75rem;
+            letter-spacing: -0.03em;
+            line-height: 1.2;
             margin-bottom: 0.4rem;
         }
+        article .subtitle {
+            color: var(--text-2);
+            font-size: 1rem;
+            margin-bottom: 3rem;
+        }
 
-        .content p { margin: 0.7rem 0; }
-        .content ul, .content ol { margin: 0.7rem 0; padding-left: 1.4rem; }
-        .content li { margin: 0.2rem 0; }
-        .content li::marker { color: var(--text-3); }
+        article h2 {
+            font-size: 1.3rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-top: 3.5rem;
+            margin-bottom: 0.75rem;
+        }
+        article h3 {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--text);
+            margin-top: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        article p { margin: 0.8rem 0; }
+        article ul, article ol { margin: 0.8rem 0; padding-left: 1.5rem; }
+        article li { margin: 0.25rem 0; }
 
         /* --- Code --- */
-        .content code {
-            font-family: 'JetBrains Mono', 'SF Mono', Menlo, monospace;
-            font-size: 0.85em;
+        article code {
+            font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', Menlo, monospace;
+            font-size: 0.84em;
             background: var(--code-bg);
             color: var(--code-text);
-            padding: 0.12em 0.35em;
-            border-radius: var(--radius);
+            padding: 0.15em 0.4em;
+            border-radius: 3px;
         }
-        .content pre {
+
+        article pre {
             background: var(--pre-bg);
             color: var(--pre-text);
-            padding: 1.25rem 1.5rem;
-            border-radius: var(--radius);
+            padding: 1.4rem 1.6rem;
+            border-radius: 4px;
+            border-left: 3px solid var(--pre-border);
             overflow-x: auto;
-            margin: 1rem 0;
-            line-height: 1.5;
-            border: 1px solid #2a2a28;
+            margin: 1.5rem 0;
+            line-height: 1.55;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.15);
         }
-        .content pre code {
+        article pre code {
             background: none;
             color: inherit;
             padding: 0;
@@ -149,107 +138,110 @@
             font-weight: 400;
         }
 
-        /* --- Syntax highlighting --- */
-        .kw { color: #e0a040; }
-        .ty { color: #8cbd6a; }
-        .st { color: #8cbd6a; }
-        .nu { color: #d4a0c0; }
-        .cm { color: #666660; font-style: italic; }
-        .fn { color: #6abcd4; }
+        .kw { color: #e8a840; }
+        .ty { color: #8cb86a; }
+        .st { color: #8cb86a; }
+        .nu { color: #d0a0c0; }
+        .cm { color: #706858; font-style: italic; }
+        .fn { color: #6ab8d0; }
         .op { color: #b8a080; }
 
         /* --- Links --- */
-        .content a { color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--border-dot); }
-        .content a:hover { color: var(--accent-hover); border-bottom-color: var(--accent); }
+        article a { color: var(--accent); text-decoration: none; }
+        article a:hover { text-decoration: underline; }
 
         /* --- Blockquotes --- */
-        .content blockquote {
+        article blockquote {
             border-left: 3px solid var(--accent);
-            padding: 0.6rem 1rem;
-            margin: 1rem 0;
-            background: var(--accent-bg);
-            border-radius: var(--radius);
+            padding: 0.5rem 1.2rem;
+            margin: 1.2rem 0;
             color: var(--text-2);
         }
-        .content blockquote p { margin: 0.2rem 0; }
+        article blockquote p { margin: 0.2rem 0; }
 
-        .content strong { font-weight: 600; }
-        .content em { color: var(--text-2); }
-        .content hr { border: none; border-top: 1px dotted var(--border-dot); margin: 2.5rem 0; }
+        article strong { font-weight: 600; }
+        article em { color: var(--text-2); }
+        article hr { border: none; border-top: 1px solid var(--rule); margin: 3rem 0; }
 
         /* --- Tables --- */
-        .content table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: 0.88em; }
-        .content th {
-            background: var(--surface);
+        article table { border-collapse: collapse; width: 100%; margin: 1.2rem 0; font-size: 0.9em; }
+        article th {
             font-weight: 600;
             text-align: left;
             padding: 0.5rem 0.75rem;
-            border-bottom: 1px solid var(--border);
+            border-bottom: 2px solid var(--rule);
         }
-        .content td { padding: 0.45rem 0.75rem; border-bottom: 1px dotted var(--border-dot); }
-        .content tr:last-child td { border-bottom: none; }
+        article td {
+            padding: 0.45rem 0.75rem;
+            border-bottom: 1px solid var(--rule);
+        }
+        article tr:last-child td { border-bottom: none; }
 
         /* --- Callouts --- */
-        .content .callout {
-            padding: 0.9rem 1.1rem;
-            border-radius: var(--radius);
-            margin: 1.25rem 0;
+        article .callout {
+            padding: 1rem 1.2rem;
+            margin: 1.5rem 0;
             font-size: 0.92em;
             border-left: 3px solid;
+            border-radius: 0 4px 4px 0;
         }
-        .content .callout-tip { background: #f0f7ee; border-color: #4a8c3f; }
-        .content .callout-warn { background: var(--accent-bg); border-color: var(--accent); }
-        .content .callout-note { background: #eef3fa; border-color: #4a72a0; }
-        .content .callout p { margin: 0.25rem 0; }
-        .content .callout strong { display: block; margin-bottom: 0.2rem; font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.05em; }
+        article .callout-tip { border-color: #2d8a4e; background: #f4faf6; }
+        article .callout-warn { border-color: #c45200; background: var(--accent-light); }
+        article .callout-note { border-color: #3b6fa0; background: #f2f6fa; }
+        article .callout p { margin: 0.25rem 0; }
+        article .callout strong {
+            display: block;
+            font-size: 0.82em;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 0.3rem;
+            color: inherit;
+        }
+        article .callout-tip strong { color: #2d8a4e; }
+        article .callout-warn strong { color: #c45200; }
+        article .callout-note strong { color: #3b6fa0; }
 
         /* --- Prev/Next --- */
         .page-nav {
             display: flex;
             justify-content: space-between;
-            padding: 1.5rem 0;
-            margin-top: 2rem;
-            border-top: 1px dotted var(--border-dot);
+            margin-top: 4rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--rule);
         }
         .page-nav a {
             color: var(--text-2);
             text-decoration: none;
-            font-weight: 500;
             font-size: 0.88rem;
-            padding: 0.4rem 0.8rem;
-            border: 1px dotted var(--border-dot);
-            border-radius: var(--radius);
+            font-weight: 500;
         }
-        .page-nav a:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-bg); }
-        .page-nav .prev::before { content: '\2190\00a0'; }
-        .page-nav .next::after { content: '\00a0\2192'; }
+        .page-nav a:hover { color: var(--accent); }
+        .page-nav .prev::before { content: '\2190\00a0\00a0'; color: var(--text-3); }
+        .page-nav .next::after { content: '\00a0\00a0\2192'; color: var(--text-3); }
 
-        /* --- Footer --- */
         .footer {
-            padding: 1.5rem 0;
-            border-top: 1px dotted var(--border-dot);
+            padding: 2rem 0;
             color: var(--text-3);
             font-size: 0.78rem;
             text-align: center;
-            letter-spacing: 0.03em;
         }
 
         @media (max-width: 640px) {
-            body { font-size: 15px; }
-            .page { padding: 0 1rem; }
-            .content h1 { font-size: 1.6rem; }
-            .content pre { padding: 0.9rem 1rem; font-size: 0.8em; }
+            body { font-size: 16px; }
+            .page { padding: 0 1.25rem; }
+            article h1 { font-size: 1.75rem; }
+            article pre { padding: 1rem 1.2rem; }
         }
     </style>
 </head>
 <body>
-    <div class="topbar"><div class="page">
+    <div class="site-header"><div class="page">
         <a href="index.html" class="brand">Basalt</a>
-        <span class="tagline">a language that tells the truth</span>
     </div></div>
     <div class="nav-bar"><div class="page"><a href="index.html">Home</a> <a href="types.html">Types</a> <a href="variables.html">Variables</a> <a href="functions.html">Functions</a> <a href="control-flow.html">Control Flow</a> <a href="pattern-matching.html">Pattern Matching</a> <a href="error-handling.html">Error Handling</a> <a href="structs.html">Structs</a> <a href="enums.html">Enums</a> <a href="closures.html">Closures</a> <a href="modules.html">Modules</a> <a href="stdlib.html">Standard Library</a> <a href="capabilities.html">Capabilities</a> <a href="conversions.html">Type Conversions</a></div></div>
     <div class="page">
-        <article class="content">
+        <article>
             <h1>Capabilities</h1>
             <p class="subtitle">Stdout, Stdin, Fs, Env — how I/O works and why it is sandboxed.</p>
             <p>Most programs have unrestricted access to the outside world. They can read any file, connect to any server, access any environment variable — and you only find out what they actually do by reading every line of code.</p>
@@ -372,7 +364,7 @@ Access control systems have a central authority that grants or denies permission
             <a href="stdlib.html" class="prev">Standard Library</a>
             <a href="conversions.html" class="next">Type Conversions</a>
         </nav>
-        <footer class="footer">Built with a static site generator written in Basalt</footer>
+        <footer class="footer">Built with Basalt</footer>
     </div>
 </body>
 </html>
