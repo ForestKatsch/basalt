@@ -323,27 +323,26 @@ fn struct_length_field_works() {
 // --- Local variable shadows module name ---
 
 #[test]
-fn error_local_shadows_module_method_call() {
-    // When a local variable shadows a module name, method calls go to the variable
-    let e = expect_error(
-        "import \"std/math\"\nfn main(stdout: Stdout) {\n    let math: f64 = 1.0\n    stdout.println(math.sqrt(math) as string)\n}",
-    );
+fn error_variable_name_collides_with_module() {
+    // Defining a variable with the same name as an imported module is an error
+    let e =
+        expect_error("import \"std/math\"\nfn main(stdout: Stdout) {\n    let math: f64 = 1.0\n}");
     assert!(
-        e.message.contains("unknown method") && e.message.contains("sqrt"),
-        "should reject sqrt on f64: {}",
+        e.message.contains("already the name of an imported module"),
+        "should reject name collision: {}",
         e.message
     );
 }
 
 #[test]
-fn error_local_shadows_module_static_call() {
-    // StaticMethodCall path also respects local variable shadowing
+fn error_function_name_collides_with_module() {
+    // Defining a function with the same name as an imported module is an error
     let e = expect_error(
-        "import \"std/math\"\nfn main(stdout: Stdout) {\n    let math: f64 = 1.0\n    math.sqrt(4.0)\n}",
+        "import \"std/math\"\nfn math() -> i64 { return 1 }\nfn main(stdout: Stdout) { }",
     );
     assert!(
-        e.message.contains("unknown method") || e.message.contains("sqrt"),
-        "should treat math as f64, not module: {}",
+        e.message.contains("already the name of an imported module"),
+        "should reject name collision: {}",
         e.message
     );
 }

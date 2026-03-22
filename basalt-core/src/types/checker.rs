@@ -92,10 +92,18 @@ impl TypeChecker {
         self.scopes.pop();
     }
 
-    fn define_var(&mut self, name: &str, ty: Type, mutable: bool) {
+    fn define_var(&mut self, name: &str, ty: Type, mutable: bool) -> Result<(), CompileError> {
+        // Reject names that collide with imported module names
+        if self.type_info.modules.contains_key(name) {
+            return Err(CompileError::bare(format!(
+                "'{}' is already the name of an imported module",
+                name
+            )));
+        }
         if let Some(scope) = self.scopes.last_mut() {
             scope.insert(name.to_string(), (ty, mutable));
         }
+        Ok(())
     }
 
     /// Remove a type from a union, returning the remaining type.
@@ -400,7 +408,7 @@ impl TypeChecker {
             })
             .collect();
         for (name, func_type) in func_entries {
-            self.define_var(&name, func_type, false);
+            self.define_var(&name, func_type, false)?;
         }
 
         // Second pass: type check function bodies
@@ -1005,7 +1013,7 @@ impl TypeChecker {
 
         // Bind parameters
         for (name, ty) in &info.params {
-            self.define_var(name, ty.clone(), false);
+            self.define_var(name, ty.clone(), false)?;
         }
 
         // Scan for mutable variables captured by closures (for narrowing safety)
@@ -1052,7 +1060,7 @@ impl TypeChecker {
 
         // Bind parameters
         for (name, ty) in &info.params {
-            self.define_var(name, ty.clone(), false);
+            self.define_var(name, ty.clone(), false)?;
         }
 
         let body = self.check_block(&method.body)?;
@@ -1117,7 +1125,7 @@ impl TypeChecker {
             value.ty.clone()
         };
 
-        self.define_var(&decl.name, ty.clone(), decl.mutable);
+        self.define_var(&decl.name, ty.clone(), decl.mutable)?;
 
         Ok(TypedLetDecl {
             name: decl.name.clone(),
@@ -1174,7 +1182,7 @@ impl TypeChecker {
                         let mut bindings = Vec::new();
                         for (i, name) in names.iter().enumerate() {
                             let ty = types[i].clone();
-                            self.define_var(name, ty.clone(), false);
+                            self.define_var(name, ty.clone(), false)?;
                             bindings.push((name.clone(), ty));
                         }
                         Ok(TypedStmt::LetTuple(bindings, typed_value))
@@ -1846,7 +1854,7 @@ impl TypeChecker {
                 // Apply narrowing in then block
                 if let Some((name, narrow_ty)) = &narrowing {
                     self.push_scope();
-                    self.define_var(name, narrow_ty.clone(), false);
+                    self.define_var(name, narrow_ty.clone(), false)?;
                 }
 
                 let typed_then = self.check_block(then_block)?;
@@ -1875,7 +1883,7 @@ impl TypeChecker {
 
                     if let Some((ref name, ref complement_ty)) = else_narrowing {
                         self.push_scope();
-                        self.define_var(name, complement_ty.clone(), false);
+                        self.define_var(name, complement_ty.clone(), false)?;
                     }
                     let result = self.check_expr(else_expr)?;
                     if else_narrowing.is_some() {
@@ -1931,7 +1939,7 @@ impl TypeChecker {
 
                     self.push_scope();
                     for (name, ty) in &bindings {
-                        self.define_var(name, ty.clone(), false);
+                        self.define_var(name, ty.clone(), false)?;
                     }
 
                     let typed_body = self.check_expr(&arm.body)?;
@@ -1990,25 +1998,25 @@ impl TypeChecker {
 
                 match &typed_iterable.ty {
                     Type::Array(elem_ty) => {
-                        self.define_var(var1, *elem_ty.clone(), false);
+                        self.define_var(var1, *elem_ty.clone(), false)?;
                         if let Some(var2) = var2 {
-                            self.define_var(var2, Type::I64, false);
+                            self.define_var(var2, Type::I64, false)?;
                         }
                     }
                     Type::Map(key_ty, val_ty) => {
-                        self.define_var(var1, *key_ty.clone(), false);
+                        self.define_var(var1, *key_ty.clone(), false)?;
                         if let Some(var2) = var2 {
-                            self.define_var(var2, *val_ty.clone(), false);
+                            self.define_var(var2, *val_ty.clone(), false)?;
                         }
                     }
                     Type::String => {
-                        self.define_var(var1, Type::String, false);
+                        self.define_var(var1, Type::String, false)?;
                         if let Some(var2) = var2 {
-                            self.define_var(var2, Type::I64, false);
+                            self.define_var(var2, Type::I64, false)?;
                         }
                     }
                     Type::Range => {
-                        self.define_var(var1, Type::I64, false);
+                        self.define_var(var1, Type::I64, false)?;
                     }
                     _ => {
                         return Err(CompileError::new(
@@ -2087,7 +2095,7 @@ impl TypeChecker {
                     };
 
                     // The binding is available in the enclosing scope (after the guard)
-                    self.define_var(name, unwrapped_ty.clone(), false);
+                    self.define_var(name, unwrapped_ty.clone(), false)?;
 
                     Ok(TypedExpr {
                         kind: TypedExprKind::Guard(
@@ -2143,7 +2151,7 @@ impl TypeChecker {
                     let ty = self
                         .resolve_type_expr(&p.ty)
                         .map_err(|e| e.with_span(expr.span))?;
-                    self.define_var(&p.name, ty.clone(), false);
+                    self.define_var(&p.name, ty.clone(), false)?;
                     param_types.push((p.name.clone(), ty));
                 }
                 let ret_ty = ret_type
@@ -2337,21 +2345,6 @@ impl TypeChecker {
         }
     }
 
-    /// Method call on an already-typed object with already-typed args.
-    fn check_method_call_typed(
-        &mut self,
-        typed_obj: TypedExpr,
-        method: &str,
-        typed_args: Vec<TypedExpr>,
-        span: Span,
-    ) -> Result<TypedExpr, CompileError> {
-        let result_ty = self.check_builtin_method(&typed_obj.ty, method, &typed_args, span)?;
-        Ok(TypedExpr {
-            kind: TypedExprKind::MethodCall(Box::new(typed_obj), method.to_string(), typed_args),
-            ty: result_ty,
-            span,
-        })
-    }
 
     fn check_method_call(
         &mut self,
@@ -2364,11 +2357,9 @@ impl TypeChecker {
             return self.check_static_method_call(type_name, method, args, obj.span);
         }
 
-        // If obj is an Ident that resolves to a module AND is not a local variable,
-        // treat as static method call. Local variables shadow module names.
+        // If obj is an Ident that resolves to a module, treat as static method call
         if let ExprKind::Ident(name) = &obj.kind {
-            let is_local = self.lookup_var(name.as_str()).is_some();
-            if !is_local && self.type_info.modules.contains_key(name.as_str()) {
+            if self.type_info.modules.contains_key(name.as_str()) {
                 return self.check_static_method_call(name, method, args, obj.span);
             }
         }
@@ -2969,16 +2960,8 @@ impl TypeChecker {
             typed_args.push(self.check_expr(arg)?);
         }
 
-        // If name is a local variable, treat as method call on its value,
-        // not a module/type static call. Local variables shadow modules.
-        if let Some((var_ty, _)) = self.lookup_var(name) {
-            let typed_obj = TypedExpr {
-                kind: TypedExprKind::Ident(name.to_string()),
-                ty: var_ty.clone(),
-                span,
-            };
-            return self.check_method_call_typed(typed_obj, method, typed_args, span);
-        }
+        // Note: define_var rejects names that collide with module names,
+        // so a local variable with the same name as a module cannot exist.
 
         // Check if name is a module
         if let Some(mod_info) = self.type_info.modules.get(name).cloned() {
