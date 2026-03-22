@@ -126,21 +126,46 @@ impl Value {
     pub fn as_int(&self) -> i64 {
         match self {
             Value::Int(n) => *n,
-            _ => panic!("expected Int, got {:?}", self.type_tag()),
+            _ => panic!("VM bug: expected Int, got {}", self.type_tag()),
         }
     }
 
     pub fn as_float(&self) -> f64 {
         match self {
             Value::Float(f) => *f,
-            _ => panic!("expected Float, got {:?}", self.type_tag()),
+            _ => panic!("VM bug: expected Float, got {}", self.type_tag()),
         }
     }
 
     pub fn as_bool(&self) -> bool {
         match self {
             Value::Bool(b) => *b,
-            _ => panic!("expected Bool, got {:?}", self.type_tag()),
+            _ => panic!("VM bug: expected Bool, got {}", self.type_tag()),
+        }
+    }
+
+    /// Safe extraction — returns Err instead of panicking.
+    pub fn try_as_int(&self) -> Result<i64, String> {
+        match self {
+            Value::Int(n) => Ok(*n),
+            _ => Err(format!(
+                "expected integer, got {}",
+                self.display_as_string()
+            )),
+        }
+    }
+
+    pub fn try_as_float(&self) -> Result<f64, String> {
+        match self {
+            Value::Float(f) => Ok(*f),
+            _ => Err(format!("expected float, got {}", self.display_as_string())),
+        }
+    }
+
+    pub fn try_as_bool(&self) -> Result<bool, String> {
+        match self {
+            Value::Bool(b) => Ok(*b),
+            _ => Err(format!("expected bool, got {}", self.display_as_string())),
         }
     }
 

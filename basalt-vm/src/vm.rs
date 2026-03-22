@@ -195,8 +195,8 @@ impl VM {
 
                 // === Integer Arithmetic ===
                 Op::AddInt(d, a, b) => {
-                    let va = reg[a as usize].as_int();
-                    let vb = reg[b as usize].as_int();
+                    let va = reg[a as usize].try_as_int()?;
+                    let vb = reg[b as usize].try_as_int()?;
                     reg[d as usize] = match va.checked_add(vb) {
                         Some(r) => Value::int(r),
                         None => {
@@ -208,8 +208,8 @@ impl VM {
                     };
                 }
                 Op::SubInt(d, a, b) => {
-                    let va = reg[a as usize].as_int();
-                    let vb = reg[b as usize].as_int();
+                    let va = reg[a as usize].try_as_int()?;
+                    let vb = reg[b as usize].try_as_int()?;
                     reg[d as usize] = match va.checked_sub(vb) {
                         Some(r) => Value::int(r),
                         None => {
@@ -221,8 +221,8 @@ impl VM {
                     };
                 }
                 Op::MulInt(d, a, b) => {
-                    let va = reg[a as usize].as_int();
-                    let vb = reg[b as usize].as_int();
+                    let va = reg[a as usize].try_as_int()?;
+                    let vb = reg[b as usize].try_as_int()?;
                     reg[d as usize] = match va.checked_mul(vb) {
                         Some(r) => Value::int(r),
                         None => {
@@ -234,22 +234,22 @@ impl VM {
                     };
                 }
                 Op::DivInt(d, a, b) => {
-                    let vb = reg[b as usize].as_int();
+                    let vb = reg[b as usize].try_as_int()?;
                     if vb == 0 {
                         return Err("division by zero".to_string());
                     }
-                    reg[d as usize] = Value::int(reg[a as usize].as_int() / vb);
+                    reg[d as usize] = Value::int(reg[a as usize].try_as_int()? / vb);
                 }
                 Op::ModInt(d, a, b) => {
-                    let vb = reg[b as usize].as_int();
+                    let vb = reg[b as usize].try_as_int()?;
                     if vb == 0 {
                         return Err("modulo by zero".to_string());
                     }
-                    reg[d as usize] = Value::int(reg[a as usize].as_int() % vb);
+                    reg[d as usize] = Value::int(reg[a as usize].try_as_int()? % vb);
                 }
                 Op::PowInt(d, a, b) => {
-                    let base = reg[a as usize].as_int();
-                    let exp = reg[b as usize].as_int();
+                    let base = reg[a as usize].try_as_int()?;
+                    let exp = reg[b as usize].try_as_int()?;
                     if exp < 0 {
                         return Err("negative exponent for integer power".to_string());
                     }
@@ -264,7 +264,7 @@ impl VM {
                     };
                 }
                 Op::NegInt(d, s) => {
-                    let v = reg[s as usize].as_int();
+                    let v = reg[s as usize].try_as_int()?;
                     reg[d as usize] = match v.checked_neg() {
                         Some(r) => Value::int(r),
                         None => return Err(format!("integer overflow: -{} exceeds i64 range", v)),
@@ -273,31 +273,39 @@ impl VM {
 
                 // === Float Arithmetic ===
                 Op::AddFloat(d, a, b) => {
-                    reg[d as usize] =
-                        Value::float(reg[a as usize].as_float() + reg[b as usize].as_float());
+                    reg[d as usize] = Value::float(
+                        reg[a as usize].try_as_float()? + reg[b as usize].try_as_float()?,
+                    );
                 }
                 Op::SubFloat(d, a, b) => {
-                    reg[d as usize] =
-                        Value::float(reg[a as usize].as_float() - reg[b as usize].as_float());
+                    reg[d as usize] = Value::float(
+                        reg[a as usize].try_as_float()? - reg[b as usize].try_as_float()?,
+                    );
                 }
                 Op::MulFloat(d, a, b) => {
-                    reg[d as usize] =
-                        Value::float(reg[a as usize].as_float() * reg[b as usize].as_float());
+                    reg[d as usize] = Value::float(
+                        reg[a as usize].try_as_float()? * reg[b as usize].try_as_float()?,
+                    );
                 }
                 Op::DivFloat(d, a, b) => {
-                    reg[d as usize] =
-                        Value::float(reg[a as usize].as_float() / reg[b as usize].as_float());
+                    reg[d as usize] = Value::float(
+                        reg[a as usize].try_as_float()? / reg[b as usize].try_as_float()?,
+                    );
                 }
                 Op::ModFloat(d, a, b) => {
-                    reg[d as usize] =
-                        Value::float(reg[a as usize].as_float() % reg[b as usize].as_float());
+                    reg[d as usize] = Value::float(
+                        reg[a as usize].try_as_float()? % reg[b as usize].try_as_float()?,
+                    );
                 }
                 Op::PowFloat(d, a, b) => {
-                    reg[d as usize] =
-                        Value::float(reg[a as usize].as_float().powf(reg[b as usize].as_float()));
+                    reg[d as usize] = Value::float(
+                        reg[a as usize]
+                            .try_as_float()?
+                            .powf(reg[b as usize].try_as_float()?),
+                    );
                 }
                 Op::NegFloat(d, s) => {
-                    reg[d as usize] = Value::float(-reg[s as usize].as_float());
+                    reg[d as usize] = Value::float(-reg[s as usize].try_as_float()?);
                 }
 
                 // === String ===
@@ -310,53 +318,59 @@ impl VM {
                 // === Integer Comparisons ===
                 Op::EqInt(d, a, b) => {
                     reg[d as usize] =
-                        Value::bool(reg[a as usize].as_int() == reg[b as usize].as_int());
+                        Value::bool(reg[a as usize].try_as_int()? == reg[b as usize].try_as_int()?);
                 }
                 Op::NeqInt(d, a, b) => {
                     reg[d as usize] =
-                        Value::bool(reg[a as usize].as_int() != reg[b as usize].as_int());
+                        Value::bool(reg[a as usize].try_as_int()? != reg[b as usize].try_as_int()?);
                 }
                 Op::LtInt(d, a, b) => {
                     reg[d as usize] =
-                        Value::bool(reg[a as usize].as_int() < reg[b as usize].as_int());
+                        Value::bool(reg[a as usize].try_as_int()? < reg[b as usize].try_as_int()?);
                 }
                 Op::LteInt(d, a, b) => {
                     reg[d as usize] =
-                        Value::bool(reg[a as usize].as_int() <= reg[b as usize].as_int());
+                        Value::bool(reg[a as usize].try_as_int()? <= reg[b as usize].try_as_int()?);
                 }
                 Op::GtInt(d, a, b) => {
                     reg[d as usize] =
-                        Value::bool(reg[a as usize].as_int() > reg[b as usize].as_int());
+                        Value::bool(reg[a as usize].try_as_int()? > reg[b as usize].try_as_int()?);
                 }
                 Op::GteInt(d, a, b) => {
                     reg[d as usize] =
-                        Value::bool(reg[a as usize].as_int() >= reg[b as usize].as_int());
+                        Value::bool(reg[a as usize].try_as_int()? >= reg[b as usize].try_as_int()?);
                 }
 
                 // === Float Comparisons ===
                 Op::EqFloat(d, a, b) => {
-                    reg[d as usize] =
-                        Value::bool(reg[a as usize].as_float() == reg[b as usize].as_float());
+                    reg[d as usize] = Value::bool(
+                        reg[a as usize].try_as_float()? == reg[b as usize].try_as_float()?,
+                    );
                 }
                 Op::NeqFloat(d, a, b) => {
-                    reg[d as usize] =
-                        Value::bool(reg[a as usize].as_float() != reg[b as usize].as_float());
+                    reg[d as usize] = Value::bool(
+                        reg[a as usize].try_as_float()? != reg[b as usize].try_as_float()?,
+                    );
                 }
                 Op::LtFloat(d, a, b) => {
-                    reg[d as usize] =
-                        Value::bool(reg[a as usize].as_float() < reg[b as usize].as_float());
+                    reg[d as usize] = Value::bool(
+                        reg[a as usize].try_as_float()? < reg[b as usize].try_as_float()?,
+                    );
                 }
                 Op::LteFloat(d, a, b) => {
-                    reg[d as usize] =
-                        Value::bool(reg[a as usize].as_float() <= reg[b as usize].as_float());
+                    reg[d as usize] = Value::bool(
+                        reg[a as usize].try_as_float()? <= reg[b as usize].try_as_float()?,
+                    );
                 }
                 Op::GtFloat(d, a, b) => {
-                    reg[d as usize] =
-                        Value::bool(reg[a as usize].as_float() > reg[b as usize].as_float());
+                    reg[d as usize] = Value::bool(
+                        reg[a as usize].try_as_float()? > reg[b as usize].try_as_float()?,
+                    );
                 }
                 Op::GteFloat(d, a, b) => {
-                    reg[d as usize] =
-                        Value::bool(reg[a as usize].as_float() >= reg[b as usize].as_float());
+                    reg[d as usize] = Value::bool(
+                        reg[a as usize].try_as_float()? >= reg[b as usize].try_as_float()?,
+                    );
                 }
 
                 // === String Comparisons ===
@@ -397,12 +411,14 @@ impl VM {
 
                 // === Bool Comparisons ===
                 Op::EqBool(d, a, b) => {
-                    reg[d as usize] =
-                        Value::bool(reg[a as usize].as_bool() == reg[b as usize].as_bool());
+                    reg[d as usize] = Value::bool(
+                        reg[a as usize].try_as_bool()? == reg[b as usize].try_as_bool()?,
+                    );
                 }
                 Op::NeqBool(d, a, b) => {
-                    reg[d as usize] =
-                        Value::bool(reg[a as usize].as_bool() != reg[b as usize].as_bool());
+                    reg[d as usize] = Value::bool(
+                        reg[a as usize].try_as_bool()? != reg[b as usize].try_as_bool()?,
+                    );
                 }
 
                 // === Generic Equality ===
@@ -415,61 +431,63 @@ impl VM {
 
                 // === Logical ===
                 Op::Not(d, s) => {
-                    reg[d as usize] = Value::bool(!reg[s as usize].as_bool());
+                    reg[d as usize] = Value::bool(!reg[s as usize].try_as_bool()?);
                 }
                 Op::And(d, a, b) => {
-                    reg[d as usize] =
-                        Value::bool(reg[a as usize].as_bool() && reg[b as usize].as_bool());
+                    reg[d as usize] = Value::bool(
+                        reg[a as usize].try_as_bool()? && reg[b as usize].try_as_bool()?,
+                    );
                 }
                 Op::Or(d, a, b) => {
-                    reg[d as usize] =
-                        Value::bool(reg[a as usize].as_bool() || reg[b as usize].as_bool());
+                    reg[d as usize] = Value::bool(
+                        reg[a as usize].try_as_bool()? || reg[b as usize].try_as_bool()?,
+                    );
                 }
 
                 // === Bitwise ===
                 Op::BitAnd(d, a, b) => {
                     reg[d as usize] =
-                        Value::int(reg[a as usize].as_int() & reg[b as usize].as_int());
+                        Value::int(reg[a as usize].try_as_int()? & reg[b as usize].try_as_int()?);
                 }
                 Op::BitOr(d, a, b) => {
                     reg[d as usize] =
-                        Value::int(reg[a as usize].as_int() | reg[b as usize].as_int());
+                        Value::int(reg[a as usize].try_as_int()? | reg[b as usize].try_as_int()?);
                 }
                 Op::BitXor(d, a, b) => {
                     reg[d as usize] =
-                        Value::int(reg[a as usize].as_int() ^ reg[b as usize].as_int());
+                        Value::int(reg[a as usize].try_as_int()? ^ reg[b as usize].try_as_int()?);
                 }
                 Op::BitNot(d, s) => {
-                    reg[d as usize] = Value::int(!reg[s as usize].as_int());
+                    reg[d as usize] = Value::int(!reg[s as usize].try_as_int()?);
                 }
                 Op::ShiftLeft(d, a, b) => {
-                    let shift = reg[b as usize].as_int();
+                    let shift = reg[b as usize].try_as_int()?;
                     if !(0..=63).contains(&shift) {
                         return Err(format!("shift amount {} out of range", shift));
                     }
-                    reg[d as usize] = Value::int(reg[a as usize].as_int() << shift);
+                    reg[d as usize] = Value::int(reg[a as usize].try_as_int()? << shift);
                 }
                 Op::ShiftRight(d, a, b) => {
-                    let shift = reg[b as usize].as_int();
+                    let shift = reg[b as usize].try_as_int()?;
                     if !(0..=63).contains(&shift) {
                         return Err(format!("shift amount {} out of range", shift));
                     }
-                    reg[d as usize] = Value::int(reg[a as usize].as_int() >> shift);
+                    reg[d as usize] = Value::int(reg[a as usize].try_as_int()? >> shift);
                 }
 
                 // === Type Conversions ===
                 Op::IntToFloat(d, s) => {
-                    reg[d as usize] = Value::float(reg[s as usize].as_int() as f64);
+                    reg[d as usize] = Value::float(reg[s as usize].try_as_int()? as f64);
                 }
                 Op::FloatToInt(d, s) => {
-                    let f = reg[s as usize].as_float();
+                    let f = reg[s as usize].try_as_float()?;
                     if f.is_nan() || f.is_infinite() {
                         return Err(format!("cannot convert {} to integer", f));
                     }
                     reg[d as usize] = Value::int(f as i64);
                 }
                 Op::FloatToIntSafe(d, s) => {
-                    let f = reg[s as usize].as_float();
+                    let f = reg[s as usize].try_as_float()?;
                     if f.is_nan() || f.is_infinite() || f > i64::MAX as f64 || f < i64::MIN as f64 {
                         reg[d as usize] = Value::Nil;
                     } else {
@@ -477,14 +495,14 @@ impl VM {
                     }
                 }
                 Op::IntToString(d, s) => {
-                    reg[d as usize] = Value::string(reg[s as usize].as_int().to_string());
+                    reg[d as usize] = Value::string(reg[s as usize].try_as_int()?.to_string());
                 }
                 Op::FloatToString(d, s) => {
-                    reg[d as usize] = Value::string(format_float(reg[s as usize].as_float()));
+                    reg[d as usize] = Value::string(format_float(reg[s as usize].try_as_float()?));
                 }
                 Op::BoolToString(d, s) => {
                     reg[d as usize] = Value::string(
-                        if reg[s as usize].as_bool() {
+                        if reg[s as usize].try_as_bool()? {
                             "true"
                         } else {
                             "false"
@@ -523,10 +541,10 @@ impl VM {
                     };
                 }
                 Op::IntNarrow(d, s, it) => {
-                    reg[d as usize] = Value::int(narrow_int(reg[s as usize].as_int(), it)?);
+                    reg[d as usize] = Value::int(narrow_int(reg[s as usize].try_as_int()?, it)?);
                 }
                 Op::IntNarrowSafe(d, s, it) => {
-                    reg[d as usize] = match narrow_int(reg[s as usize].as_int(), it) {
+                    reg[d as usize] = match narrow_int(reg[s as usize].try_as_int()?, it) {
                         Ok(v) => Value::int(v),
                         Err(_) => Value::Nil,
                     };
@@ -547,12 +565,12 @@ impl VM {
                     pc = (pc as i32 + off - 1) as usize;
                 }
                 Op::JumpIfTrue(r, off) => {
-                    if reg[r as usize].as_bool() {
+                    if reg[r as usize].try_as_bool()? {
                         pc = (pc as i32 + off - 1) as usize;
                     }
                 }
                 Op::JumpIfFalse(r, off) => {
-                    if !reg[r as usize].as_bool() {
+                    if !reg[r as usize].try_as_bool()? {
                         pc = (pc as i32 + off - 1) as usize;
                     }
                 }
@@ -594,7 +612,7 @@ impl VM {
                             return Err("cannot call non-function value".to_string());
                         }
                     } else {
-                        let func_call_idx = func_val.as_int() as usize;
+                        let func_call_idx = func_val.try_as_int()? as usize;
                         if func_call_idx < self.program.functions.len() {
                             reg[d as usize] = self.call_function(func_call_idx, &args)?;
                         } else {
@@ -799,7 +817,7 @@ impl VM {
                 // === Range ===
                 Op::MakeRange(d, s, e) => {
                     reg[d as usize] =
-                        Value::range(reg[s as usize].as_int(), reg[e as usize].as_int());
+                        Value::range(reg[s as usize].try_as_int()?, reg[e as usize].try_as_int()?);
                 }
 
                 // === Iterators ===
@@ -937,7 +955,7 @@ impl VM {
 
                 // === Closures ===
                 Op::MakeClosure(d, func_reg, capture_count) => {
-                    let func_idx = reg[func_reg as usize].as_int() as usize;
+                    let func_idx = reg[func_reg as usize].try_as_int()? as usize;
                     let cap_start = func_reg as usize + 1;
                     let mut captures = Vec::with_capacity(capture_count as usize);
                     for i in 0..capture_count as usize {
@@ -1028,14 +1046,15 @@ impl VM {
         let o = href.borrow();
         match &*o {
             HeapObject::Array(vals) => {
-                let mut i = idx.as_int();
+                let orig_i = idx.try_as_int()?;
+                let mut i = orig_i;
                 if i < 0 {
                     i += vals.len() as i64;
                 }
                 vals.get(i as usize).cloned().ok_or_else(|| {
                     format!(
                         "array index {} out of bounds (length {})",
-                        idx.as_int(),
+                        orig_i,
                         vals.len()
                     )
                 })
@@ -1056,14 +1075,15 @@ impl VM {
         let mut o = href.borrow_mut();
         match &mut *o {
             HeapObject::Array(vals) => {
-                let mut i = idx.as_int();
+                let orig_i = idx.try_as_int()?;
+                let mut i = orig_i;
                 if i < 0 {
                     i += vals.len() as i64;
                 }
                 if i < 0 || i as usize >= vals.len() {
                     return Err(format!(
                         "array index {} out of bounds (length {})",
-                        idx.as_int(),
+                        orig_i,
                         vals.len()
                     ));
                 }
@@ -1426,75 +1446,159 @@ impl VM {
     fn call_math(&self, name: &str, args: &[Value]) -> Result<Value, String> {
         match name {
             "sqrt" => Ok(Value::float(
-                args.first().map(|a| a.as_float()).unwrap_or(0.0).sqrt(),
+                args.first()
+                    .map(|a| a.try_as_float())
+                    .transpose()?
+                    .unwrap_or(0.0)
+                    .sqrt(),
             )),
             "abs" => Ok(Value::float(
-                args.first().map(|a| a.as_float()).unwrap_or(0.0).abs(),
+                args.first()
+                    .map(|a| a.try_as_float())
+                    .transpose()?
+                    .unwrap_or(0.0)
+                    .abs(),
             )),
             "floor" => Ok(Value::float(
-                args.first().map(|a| a.as_float()).unwrap_or(0.0).floor(),
+                args.first()
+                    .map(|a| a.try_as_float())
+                    .transpose()?
+                    .unwrap_or(0.0)
+                    .floor(),
             )),
             "ceil" => Ok(Value::float(
-                args.first().map(|a| a.as_float()).unwrap_or(0.0).ceil(),
+                args.first()
+                    .map(|a| a.try_as_float())
+                    .transpose()?
+                    .unwrap_or(0.0)
+                    .ceil(),
             )),
             "round" => Ok(Value::float(
-                args.first().map(|a| a.as_float()).unwrap_or(0.0).round(),
+                args.first()
+                    .map(|a| a.try_as_float())
+                    .transpose()?
+                    .unwrap_or(0.0)
+                    .round(),
             )),
             "min" => {
                 let (a, b) = (
-                    args.first().map(|v| v.as_float()).unwrap_or(0.0),
-                    args.get(1).map(|v| v.as_float()).unwrap_or(0.0),
+                    args.first()
+                        .map(|v| v.try_as_float())
+                        .transpose()?
+                        .unwrap_or(0.0),
+                    args.get(1)
+                        .map(|v| v.try_as_float())
+                        .transpose()?
+                        .unwrap_or(0.0),
                 );
                 Ok(Value::float(a.min(b)))
             }
             "max" => {
                 let (a, b) = (
-                    args.first().map(|v| v.as_float()).unwrap_or(0.0),
-                    args.get(1).map(|v| v.as_float()).unwrap_or(0.0),
+                    args.first()
+                        .map(|v| v.try_as_float())
+                        .transpose()?
+                        .unwrap_or(0.0),
+                    args.get(1)
+                        .map(|v| v.try_as_float())
+                        .transpose()?
+                        .unwrap_or(0.0),
                 );
                 Ok(Value::float(a.max(b)))
             }
             "sin" => Ok(Value::float(
-                args.first().map(|a| a.as_float()).unwrap_or(0.0).sin(),
+                args.first()
+                    .map(|a| a.try_as_float())
+                    .transpose()?
+                    .unwrap_or(0.0)
+                    .sin(),
             )),
             "cos" => Ok(Value::float(
-                args.first().map(|a| a.as_float()).unwrap_or(0.0).cos(),
+                args.first()
+                    .map(|a| a.try_as_float())
+                    .transpose()?
+                    .unwrap_or(0.0)
+                    .cos(),
             )),
             "tan" => Ok(Value::float(
-                args.first().map(|a| a.as_float()).unwrap_or(0.0).tan(),
+                args.first()
+                    .map(|a| a.try_as_float())
+                    .transpose()?
+                    .unwrap_or(0.0)
+                    .tan(),
             )),
             "asin" => Ok(Value::float(
-                args.first().map(|a| a.as_float()).unwrap_or(0.0).asin(),
+                args.first()
+                    .map(|a| a.try_as_float())
+                    .transpose()?
+                    .unwrap_or(0.0)
+                    .asin(),
             )),
             "acos" => Ok(Value::float(
-                args.first().map(|a| a.as_float()).unwrap_or(0.0).acos(),
+                args.first()
+                    .map(|a| a.try_as_float())
+                    .transpose()?
+                    .unwrap_or(0.0)
+                    .acos(),
             )),
             "atan" => Ok(Value::float(
-                args.first().map(|a| a.as_float()).unwrap_or(0.0).atan(),
+                args.first()
+                    .map(|a| a.try_as_float())
+                    .transpose()?
+                    .unwrap_or(0.0)
+                    .atan(),
             )),
             "atan2" => {
                 let (y, x) = (
-                    args.first().map(|v| v.as_float()).unwrap_or(0.0),
-                    args.get(1).map(|v| v.as_float()).unwrap_or(0.0),
+                    args.first()
+                        .map(|v| v.try_as_float())
+                        .transpose()?
+                        .unwrap_or(0.0),
+                    args.get(1)
+                        .map(|v| v.try_as_float())
+                        .transpose()?
+                        .unwrap_or(0.0),
                 );
                 Ok(Value::float(y.atan2(x)))
             }
             "log" => Ok(Value::float(
-                args.first().map(|a| a.as_float()).unwrap_or(0.0).ln(),
+                args.first()
+                    .map(|a| a.try_as_float())
+                    .transpose()?
+                    .unwrap_or(0.0)
+                    .ln(),
             )),
             "log2" => Ok(Value::float(
-                args.first().map(|a| a.as_float()).unwrap_or(0.0).log2(),
+                args.first()
+                    .map(|a| a.try_as_float())
+                    .transpose()?
+                    .unwrap_or(0.0)
+                    .log2(),
             )),
             "log10" => Ok(Value::float(
-                args.first().map(|a| a.as_float()).unwrap_or(0.0).log10(),
+                args.first()
+                    .map(|a| a.try_as_float())
+                    .transpose()?
+                    .unwrap_or(0.0)
+                    .log10(),
             )),
             "exp" => Ok(Value::float(
-                args.first().map(|a| a.as_float()).unwrap_or(0.0).exp(),
+                args.first()
+                    .map(|a| a.try_as_float())
+                    .transpose()?
+                    .unwrap_or(0.0)
+                    .exp(),
             )),
             "pow" => {
                 let (base, exp) = (
-                    args.first().map(|v| v.as_float()).unwrap_or(0.0),
-                    args.get(1).map(|v| v.as_float()).unwrap_or(0.0),
+                    args.first()
+                        .map(|v| v.try_as_float())
+                        .transpose()?
+                        .unwrap_or(0.0),
+                    args.get(1)
+                        .map(|v| v.try_as_float())
+                        .transpose()?
+                        .unwrap_or(0.0),
                 );
                 Ok(Value::float(base.powf(exp)))
             }
@@ -1532,8 +1636,8 @@ impl VM {
                 }
             }
             "substring" => {
-                let start = args[0].as_int();
-                let len = args[1].as_int();
+                let start = args[0].try_as_int()?;
+                let len = args[1].try_as_int()?;
                 if start < 0 || len < 0 {
                     return Err(format!(
                         "substring: start ({}) and length ({}) must be non-negative",
@@ -1550,7 +1654,7 @@ impl VM {
             "upper" => Ok(Value::string(s.to_uppercase())),
             "lower" => Ok(Value::string(s.to_lowercase())),
             "repeat" => {
-                let n = args[0].as_int();
+                let n = args[0].try_as_int()?;
                 if n < 0 {
                     return Err("negative repeat count".to_string());
                 }
@@ -1560,7 +1664,7 @@ impl VM {
                 Ok(Value::string(s.repeat(n as usize)))
             }
             "char_at" => {
-                let mut i = args[0].as_int();
+                let mut i = args[0].try_as_int()?;
                 let len = s.chars().count() as i64;
                 if i < 0 {
                     i += len;
@@ -1592,8 +1696,8 @@ impl VM {
                 }
                 let chars: Vec<char> = s.chars().collect();
                 let len = chars.len() as i64;
-                let mut start = args[0].as_int();
-                let mut end = args[1].as_int();
+                let mut start = args[0].try_as_int()?;
+                let mut end = args[1].try_as_int()?;
                 if start < 0 {
                     start += len;
                 }
@@ -1650,7 +1754,7 @@ impl VM {
                 }
             }
             "insert" => {
-                let i = args[0].as_int();
+                let i = args[0].try_as_int()?;
                 let mut o = href.borrow_mut();
                 if let HeapObject::Array(v) = &mut *o {
                     if i < 0 || i as usize > v.len() {
@@ -1665,7 +1769,7 @@ impl VM {
                 Ok(Value::Nil)
             }
             "remove" => {
-                let i = args[0].as_int();
+                let i = args[0].try_as_int()?;
                 let mut o = href.borrow_mut();
                 if let HeapObject::Array(v) = &mut *o {
                     if i < 0 || i as usize >= v.len() {
@@ -1693,7 +1797,7 @@ impl VM {
                             sa.cmp(&sb)
                         });
                     } else {
-                        v.sort_by_key(|a| a.as_int());
+                        v.sort_by_key(|a| a.try_as_int().unwrap_or(0));
                     }
                 }
                 Ok(Value::Nil)
@@ -1768,7 +1872,7 @@ impl VM {
                     let mut call_args = captures.clone();
                     call_args.push(elem.clone());
                     let keep = self.call_function(func_idx, &call_args)?;
-                    if keep.as_bool() {
+                    if keep.try_as_bool()? {
                         result.push(elem);
                     }
                 }
@@ -1788,7 +1892,7 @@ impl VM {
                     let mut call_args = captures.clone();
                     call_args.push(elem.clone());
                     let matched = self.call_function(func_idx, &call_args)?;
-                    if matched.as_bool() {
+                    if matched.try_as_bool()? {
                         return Ok(elem);
                     }
                 }
@@ -1807,7 +1911,7 @@ impl VM {
                 for elem in elements {
                     let mut call_args = captures.clone();
                     call_args.push(elem);
-                    if self.call_function(func_idx, &call_args)?.as_bool() {
+                    if self.call_function(func_idx, &call_args)?.try_as_bool()? {
                         return Ok(Value::bool(true));
                     }
                 }
@@ -1826,7 +1930,7 @@ impl VM {
                 for elem in elements {
                     let mut call_args = captures.clone();
                     call_args.push(elem);
-                    if !self.call_function(func_idx, &call_args)?.as_bool() {
+                    if !self.call_function(func_idx, &call_args)?.try_as_bool()? {
                         return Ok(Value::bool(false));
                     }
                 }

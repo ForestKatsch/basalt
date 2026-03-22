@@ -288,10 +288,9 @@ impl TypeChecker {
             (Type::Array(inner_from), Type::Array(inner_to)) => {
                 **inner_from == Type::Nil || **inner_from == **inner_to
             }
-            // Empty map [nil:nil] is compatible with any map type
+            // Maps are invariant for the same reason as arrays: shared references.
             (Type::Map(kf, vf), Type::Map(kt, vt)) => {
-                (**kf == Type::Nil && **vf == Type::Nil)
-                    || (self.is_assignable(kf, kt) && self.is_assignable(vf, vt))
+                (**kf == Type::Nil && **vf == Type::Nil) || (**kf == **kt && **vf == **vt)
             }
             // Subtype compatibility
             (Type::Struct(sub), Type::Struct(parent))
