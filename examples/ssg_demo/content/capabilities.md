@@ -138,9 +138,16 @@ fn main(stdout: Stdout, fs: Fs) {
 
 Every function that performs I/O declares exactly which capability it needs. You can read any function's signature and know whether it touches the file system, the network, or the environment. No hidden side effects.
 
-<div class="callout callout-tip"><strong>Try this</strong>
-Write a program with only <code>Stdout</code>. Then try calling <code>fs.read_file</code> — you'll get a compile error because <code>fs</code> doesn't exist. Now add <code>fs: Fs</code> to <code>main</code> and watch it work. The compiler enforces the security model.
-</div>
+Without `Fs`, file access is a compile error — there's no API to call:
+
+```basalt
+fn main(stdout: Stdout) {
+    let data = fs.read_file("config.txt")
+    // error: undefined variable 'fs'
+}
+```
+
+Add `fs: Fs` and the code compiles. Remove it and it doesn't. The type system is the security boundary.
 
 ## What's Next
 

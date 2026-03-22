@@ -121,11 +121,13 @@ fn md_to_html(md: string, highlight: Highlight) -> string {
     let lines = md.split("\n")
     let mut html = ""
     let mut in_list = false
+    let mut in_ordered_list = false
     let mut in_table = false
     let mut in_code_block = false
     let mut code_content = ""
     let mut code_lang = ""
     let mut in_blockquote = false
+    let mut in_html_block = false
     let mut para_lines: [string] = []
     let mut i = 0
 
@@ -155,6 +157,10 @@ fn md_to_html(md: string, highlight: Highlight) -> string {
                     html = html + "</ul>\n"
                     in_list = false
                 }
+                if in_ordered_list {
+                    html = html + "</ol>\n"
+                    in_ordered_list = false
+                }
                 if in_blockquote {
                     html = html + "</blockquote>\n"
                     in_blockquote = false
@@ -181,6 +187,44 @@ fn md_to_html(md: string, highlight: Highlight) -> string {
             continue
         }
 
+        // HTML block: pass through everything between <div...> and </div>
+        if in_html_block {
+            html = html + line + "\n"
+            if line.trim().starts_with("</div") {
+                in_html_block = false
+            }
+            continue
+        }
+        if line.trim().starts_with("<div") {
+            // Flush open structures
+            if para_lines.length > 0 {
+                html = html + "<p>" + inline_md(para_lines.join(" ")) + "</p>\n"
+                para_lines = []
+            }
+            if in_list {
+                html = html + "</ul>\n"
+                in_list = false
+            }
+            if in_ordered_list {
+                html = html + "</ol>\n"
+                in_ordered_list = false
+            }
+            if in_table {
+                html = html + "</tbody></table>\n"
+                in_table = false
+            }
+            if in_blockquote {
+                html = html + "</blockquote>\n"
+                in_blockquote = false
+            }
+            html = html + line + "\n"
+            // Multi-line block: if no closing </div> on same line, track state
+            if !line.contains("</div") {
+                in_html_block = true
+            }
+            continue
+        }
+
         // Blank line: flush paragraph, close list/blockquote
         if line.trim().length == 0 {
             if in_table {
@@ -194,6 +238,10 @@ fn md_to_html(md: string, highlight: Highlight) -> string {
             if in_list {
                 html = html + "</ul>\n"
                 in_list = false
+            }
+            if in_ordered_list {
+                html = html + "</ol>\n"
+                in_ordered_list = false
             }
             if in_blockquote {
                 html = html + "</blockquote>\n"
@@ -230,6 +278,10 @@ fn md_to_html(md: string, highlight: Highlight) -> string {
                 html = html + "</ul>\n"
                 in_list = false
             }
+            if in_ordered_list {
+                html = html + "</ol>\n"
+                in_ordered_list = false
+            }
             html = html + "<h3>" + inline_md(line.slice(4, line.length)) + "</h3>\n"
             continue
         }
@@ -246,6 +298,10 @@ fn md_to_html(md: string, highlight: Highlight) -> string {
                 html = html + "</ul>\n"
                 in_list = false
             }
+            if in_ordered_list {
+                html = html + "</ol>\n"
+                in_ordered_list = false
+            }
             html = html + "<h2>" + inline_md(line.slice(3, line.length)) + "</h2>\n"
             continue
         }
@@ -261,6 +317,10 @@ fn md_to_html(md: string, highlight: Highlight) -> string {
             if in_list {
                 html = html + "</ul>\n"
                 in_list = false
+            }
+            if in_ordered_list {
+                html = html + "</ol>\n"
+                in_ordered_list = false
             }
             html = html + "<h1>" + inline_md(line.slice(2, line.length)) + "</h1>\n"
             continue
@@ -280,12 +340,47 @@ fn md_to_html(md: string, highlight: Highlight) -> string {
                 html = html + "</blockquote>\n"
                 in_blockquote = false
             }
+            if in_ordered_list {
+                html = html + "</ol>\n"
+                in_ordered_list = false
+            }
             if !in_list {
                 html = html + "<ul>\n"
                 in_list = true
             }
             html = html + "<li>" + inline_md(line.slice(2, line.length)) + "</li>\n"
             continue
+        }
+
+        // Ordered list: 1. item, 2. item, etc.
+        let first_char = line.chars()[0]
+        if first_char >= "0" && first_char <= "9" {
+            let dot_pos = line.index_of(". ")
+            if dot_pos >= 0 && dot_pos <= 3 {
+                let item_text = line.slice(dot_pos + 2, line.length)
+                if para_lines.length > 0 {
+                    html = html + "<p>" + inline_md(para_lines.join(" ")) + "</p>\n"
+                    para_lines = []
+                }
+                if in_table {
+                    html = html + "</tbody></table>\n"
+                    in_table = false
+                }
+                if in_list {
+                    html = html + "</ul>\n"
+                    in_list = false
+                }
+                if in_blockquote {
+                    html = html + "</blockquote>\n"
+                    in_blockquote = false
+                }
+                if !in_ordered_list {
+                    html = html + "<ol>\n"
+                    in_ordered_list = true
+                }
+                html = html + "<li>" + inline_md(item_text) + "</li>\n"
+                continue
+            }
         }
 
         // Blockquote: > text
@@ -301,6 +396,10 @@ fn md_to_html(md: string, highlight: Highlight) -> string {
             if in_list {
                 html = html + "</ul>\n"
                 in_list = false
+            }
+            if in_ordered_list {
+                html = html + "</ol>\n"
+                in_ordered_list = false
             }
             if !in_blockquote {
                 html = html + "<blockquote>\n"
@@ -321,6 +420,10 @@ fn md_to_html(md: string, highlight: Highlight) -> string {
                 if in_list {
                     html = html + "</ul>\n"
                     in_list = false
+                }
+                if in_ordered_list {
+                    html = html + "</ol>\n"
+                    in_ordered_list = false
                 }
                 if in_blockquote {
                     html = html + "</blockquote>\n"
@@ -354,10 +457,16 @@ fn md_to_html(md: string, highlight: Highlight) -> string {
             in_table = false
         }
 
+        // (HTML passthrough handled above by in_html_block state)
+
         // Regular text line: accumulate for paragraph
         if in_list {
             html = html + "</ul>\n"
             in_list = false
+        }
+        if in_ordered_list {
+            html = html + "</ol>\n"
+            in_ordered_list = false
         }
         if in_blockquote {
             html = html + "</blockquote>\n"
@@ -375,6 +484,9 @@ fn md_to_html(md: string, highlight: Highlight) -> string {
     }
     if in_list {
         html = html + "</ul>\n"
+    }
+    if in_ordered_list {
+        html = html + "</ol>\n"
     }
     if in_blockquote {
         html = html + "</blockquote>\n"

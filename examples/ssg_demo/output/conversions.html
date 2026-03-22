@@ -400,14 +400,28 @@
 <table>
 <thead><tr><th>From</th><th>To</th><th>Behavior</th></tr></thead>
 <tbody>
-<tr><td>any integer</td><td>any integer</td><td>Range-checked (panics/nil on overflow)</td></tr>
-<tr><td>any integer</td><td><code>f64</code></td><td>Always succeeds (widening)</td></tr>
-<tr><td><code>f64</code></td><td>any integer</td><td>Truncates toward zero, range-checked</td></tr>
-<tr><td>any numeric</td><td><code>string</code></td><td>Display representation</td></tr>
-<tr><td><code>string</code></td><td>any numeric</td><td>Parses (panics/nil on invalid input)</td></tr>
-<tr><td><code>bool</code></td><td><code>string</code></td><td><code>"true"</code> or <code>"false"</code></td></tr>
+<tr><td>any integer</td><td>any integer</td><td>Range-checked. Panics on overflow (<code>as</code>), nil (<code>as?</code>).</td></tr>
+<tr><td>any integer</td><td><code>f64</code></td><td>Always succeeds. May lose precision for values &gt; 2^53.</td></tr>
+<tr><td><code>f64</code></td><td>any integer</td><td>Truncates toward zero. Panics on NaN, infinity, or out of range.</td></tr>
+<tr><td>integer</td><td><code>string</code></td><td>Decimal digits, no leading zeros. <code>-7</code> becomes <code>"-7"</code>.</td></tr>
+<tr><td><code>f64</code></td><td><code>string</code></td><td>Shortest decimal that round-trips. Whole numbers get one decimal: <code>3.0</code> becomes <code>"3.0"</code>, <code>3.14</code> stays <code>"3.14"</code>.</td></tr>
+<tr><td><code>bool</code></td><td><code>string</code></td><td><code>"true"</code> or <code>"false"</code>.</td></tr>
+<tr><td><code>string</code></td><td>integer</td><td>Decimal only, leading/trailing whitespace trimmed. No hex, no underscores.</td></tr>
+<tr><td><code>string</code></td><td><code>f64</code></td><td>Accepts <code>"3.14"</code>, <code>"1e10"</code>, <code>"inf"</code>, <code>"-inf"</code>, <code>"NaN"</code>. Whitespace trimmed.</td></tr>
 </tbody></table>
-<p>&lt;div class="callout callout-warn"&gt;&lt;strong&gt;No implicit widening&lt;/strong&gt; Even "safe" conversions like &lt;code&gt;i32&lt;/code&gt; to &lt;code&gt;i64&lt;/code&gt; require an explicit &lt;code&gt;as&lt;/code&gt;. Basalt treats all conversions the same — visible and intentional. This catches bugs where you accidentally mix integer widths. &lt;/div&gt;</p>
+<h2>Formatting details</h2>
+<p>All numeric formatting and parsing is <strong>locale-independent</strong>. The decimal separator is always <code>.</code>, never <code>,</code>. There are no thousands separators. <code>"1,000"</code> does not parse as an integer — it fails.</p>
+<p>Float-to-string uses the shortest representation that round-trips back to the same <code>f64</code> value. For whole-number floats, one decimal place is always shown to distinguish from integers:</p>
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    stdout.<span class="fn">println</span>(<span class="nu">3.0</span> <span class="kw">as</span> <span class="ty">string</span>)       <span class="cm">// Output: 3.0  (not "3")</span>
+    stdout.<span class="fn">println</span>(<span class="nu">3.14</span> <span class="kw">as</span> <span class="ty">string</span>)      <span class="cm">// Output: 3.14</span>
+    stdout.<span class="fn">println</span>(<span class="nu">0.1</span> <span class="op">+</span> <span class="nu">0.2</span> <span class="kw">as</span> <span class="ty">string</span>) <span class="cm">// Output: 0.30000000000000004</span>
+    stdout.<span class="fn">println</span>(<span class="nu">1e20</span> <span class="kw">as</span> <span class="ty">string</span>)      <span class="cm">// Output: 100000000000000000000.0</span>
+}</code></pre>
+<p>String-to-number parsing trims whitespace before and after, then uses strict decimal parsing. Hex (<code>0xFF</code>) and binary (<code>0b1010</code>) are valid in source code literals but are <strong>not</strong> accepted by <code>as</code> or <code>as?</code> from strings.</p>
+<div class="callout callout-warn"><strong>No implicit widening</strong>
+Even "safe" conversions like <code>i32</code> to <code>i64</code> require an explicit <code>as</code>. Basalt treats all conversions the same — visible and intentional. This catches bugs where you accidentally mix integer widths.
+</div>
 <h2>Cross-width arithmetic</h2>
 <p>You cannot mix integer sizes in arithmetic. The compiler rejects it at compile time:</p>
 <pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {

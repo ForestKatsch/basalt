@@ -83,12 +83,31 @@ fn parse_port(s: string) -> i64!string {
 
 | From | To | Behavior |
 |---|---|---|
-| any integer | any integer | Range-checked (panics/nil on overflow) |
-| any integer | `f64` | Always succeeds (widening) |
-| `f64` | any integer | Truncates toward zero, range-checked |
-| any numeric | `string` | Display representation |
-| `string` | any numeric | Parses (panics/nil on invalid input) |
-| `bool` | `string` | `"true"` or `"false"` |
+| any integer | any integer | Range-checked. Panics on overflow (`as`), nil (`as?`). |
+| any integer | `f64` | Always succeeds. May lose precision for values > 2^53. |
+| `f64` | any integer | Truncates toward zero. Panics on NaN, infinity, or out of range. |
+| integer | `string` | Decimal digits, no leading zeros. `-7` becomes `"-7"`. |
+| `f64` | `string` | Shortest decimal that round-trips. Whole numbers get one decimal: `3.0` becomes `"3.0"`, `3.14` stays `"3.14"`. |
+| `bool` | `string` | `"true"` or `"false"`. |
+| `string` | integer | Decimal only, leading/trailing whitespace trimmed. No hex, no underscores. |
+| `string` | `f64` | Accepts `"3.14"`, `"1e10"`, `"inf"`, `"-inf"`, `"NaN"`. Whitespace trimmed. |
+
+## Formatting details
+
+All numeric formatting and parsing is **locale-independent**. The decimal separator is always `.`, never `,`. There are no thousands separators. `"1,000"` does not parse as an integer — it fails.
+
+Float-to-string uses the shortest representation that round-trips back to the same `f64` value. For whole-number floats, one decimal place is always shown to distinguish from integers:
+
+```basalt
+fn main(stdout: Stdout) {
+    stdout.println(3.0 as string)       // Output: 3.0  (not "3")
+    stdout.println(3.14 as string)      // Output: 3.14
+    stdout.println(0.1 + 0.2 as string) // Output: 0.30000000000000004
+    stdout.println(1e20 as string)      // Output: 100000000000000000000.0
+}
+```
+
+String-to-number parsing trims whitespace before and after, then uses strict decimal parsing. Hex (`0xFF`) and binary (`0b1010`) are valid in source code literals but are **not** accepted by `as` or `as?` from strings.
 
 <div class="callout callout-warn"><strong>No implicit widening</strong>
 Even "safe" conversions like <code>i32</code> to <code>i64</code> require an explicit <code>as</code>. Basalt treats all conversions the same — visible and intentional. This catches bugs where you accidentally mix integer widths.

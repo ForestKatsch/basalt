@@ -438,7 +438,9 @@
     stdout.<span class="fn">println</span>(<span class="fn">describe_state</span>(next))
     <span class="cm">// Output: connected to api.example.com:443</span>
 }</code></pre>
-<p>&lt;div class="callout callout-note"&gt;&lt;strong&gt;Enums vs. type unions&lt;/strong&gt; Basalt also has union types like &lt;code&gt;string | i64&lt;/code&gt; for ad-hoc combinations. Enums are different — they define a &lt;em&gt;named, closed&lt;/em&gt; set of possibilities with meaningful variant names. Use unions when combining existing types; use enums when defining a domain concept. &lt;/div&gt;</p>
+<div class="callout callout-note"><strong>Enums vs. type unions</strong>
+Basalt also has union types like <code>string | i64</code> for ad-hoc combinations. Enums are different — they define a <em>named, closed</em> set of possibilities with meaningful variant names. Use unions when combining existing types; use enums when defining a domain concept.
+</div>
 <h2>What's Next</h2>
 <p>Enums and match give you powerful data modeling. <a href="closures.html">Closures</a> add another dimension — functions you can create on the fly and pass around as values.</p>
 

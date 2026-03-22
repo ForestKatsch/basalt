@@ -388,7 +388,9 @@
 <blockquote>
 <p><strong>Error:</strong> Non-exhaustive match. Missing pattern: <code>HttpBody.Empty</code>.</p>
 </blockquote>
-<p>&lt;div class="callout callout-note"&gt;&lt;strong&gt;Why this matters&lt;/strong&gt; Imagine you add a &lt;code&gt;Binary(bytes)&lt;/code&gt; variant to &lt;code&gt;HttpBody&lt;/code&gt; six months from now. Without exhaustiveness checking, every &lt;code&gt;match&lt;/code&gt; on &lt;code&gt;HttpBody&lt;/code&gt; silently does the wrong thing. With it, the compiler finds every location that needs updating — instantly. This turns a runtime bug into a compile-time checklist. &lt;/div&gt;</p>
+<div class="callout callout-note"><strong>Why this matters</strong>
+Imagine you add a <code>Binary(bytes)</code> variant to <code>HttpBody</code> six months from now. Without exhaustiveness checking, every <code>match</code> on <code>HttpBody</code> silently does the wrong thing. With it, the compiler finds every location that needs updating — instantly. This turns a runtime bug into a compile-time checklist.
+</div>
 <h2>Type narrowing with <code>is</code></h2>
 <p>For union types, <code>is</code> patterns narrow the type within each branch:</p>
 <pre><code><span class="kw">fn</span> <span class="fn">format_cell</span>(val<span class="op">:</span> <span class="ty">i64</span> <span class="op">|</span> <span class="ty">f64</span> <span class="op">|</span> <span class="ty">string</span> <span class="op">|</span> <span class="ty">bool</span>) <span class="op">-&gt;</span> <span class="ty">string</span> {
@@ -428,7 +430,9 @@
     <span class="cm">// Output: Result: 3.3333333333333335</span>
 }</code></pre>
 <p>Both branches must be present — you can't ignore the error case. For lighter-weight error handling, see the <code>?</code> operator and <code>guard let</code> in <a href="error-handling.html">Error Handling</a>.</p>
-<p>&lt;div class="callout callout-tip"&gt;&lt;strong&gt;Try this&lt;/strong&gt; Define a &lt;code&gt;type Shape { Circle(f64), Rect(f64, f64), Triangle(f64, f64, f64) }&lt;/code&gt; and write an &lt;code&gt;area&lt;/code&gt; function using &lt;code&gt;match&lt;/code&gt;. Then add a &lt;code&gt;Point&lt;/code&gt; variant with no data and see what the compiler tells you. &lt;/div&gt;</p>
+<div class="callout callout-tip"><strong>Try this</strong>
+Define a <code>type Shape { Circle(f64), Rect(f64, f64), Triangle(f64, f64, f64) }</code> and write an <code>area</code> function using <code>match</code>. Then add a <code>Point</code> variant with no data and see what the compiler tells you.
+</div>
 <h2>What's Next</h2>
 <p>Pattern matching forces you to handle every case — including errors. But what's the best way to structure error handling across a whole program? Next up: <a href="error-handling.html">Error Handling</a>.</p>
 

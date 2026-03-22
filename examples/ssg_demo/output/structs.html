@@ -396,7 +396,9 @@
     stdout.<span class="fn">println</span>(point.x <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 99</span>
 }</code></pre>
 <p>If you expected <code>point.x</code> to still be <code>1.0</code>, you are not alone. This is the most common surprise for new Basalt developers.</p>
-<p>&lt;div class="callout callout-warn"&gt;&lt;strong&gt;Structs are reference types&lt;/strong&gt; Assignment shares the object, not copies it. Mutating through one variable is visible through every other variable that refers to the same struct. This applies to function arguments too — if you pass a struct to a function, the function can see mutations you make later. &lt;/div&gt;</p>
+<div class="callout callout-warn"><strong>Structs are reference types</strong>
+Assignment shares the object, not copies it. Mutating through one variable is visible through every other variable that refers to the same struct. This applies to function arguments too — if you pass a struct to a function, the function can see mutations you make later.
+</div>
 <h2>Cloning for independence</h2>
 <p>When you need a truly separate copy, call <code>clone()</code>:</p>
 <pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {

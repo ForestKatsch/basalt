@@ -9,7 +9,7 @@ Welcome to Basalt. This guide teaches the language from first principles, with e
 Install Basalt and build the compiler:
 
 ```sh
-git clone https://github.com/example/basalt
+git clone https://github.com/ForestKatsch/basalt
 cd basalt
 cargo build --release
 ```
@@ -36,7 +36,7 @@ That's it. You just wrote and ran a Basalt program.
 
 ## The capability system
 
-Notice the `stdout: Stdout` parameter on `main`. That's not decoration — it's the **capability system**. Your program only gets access to the resources it asks for. No `Stdout` parameter, no printing. No `Fs` parameter, no file system access. No `Net` parameter, no network.
+The `stdout: Stdout` parameter is how I/O works in Basalt. Programs receive capabilities as parameters — `Stdout` for printing, `Fs` for file access, `Env` for environment variables. If a capability isn't in the parameter list, the program can't use it.
 
 This means you can read any Basalt function signature and know exactly what side effects it can perform. A function that takes no capability parameters is pure — it can't touch the outside world. We'll explore this fully in [Capabilities](capabilities.html).
 
@@ -54,18 +54,4 @@ Change <code>stdout.println</code> to <code>stdout.printn</code> and run <code>b
 
 ## How this guide is organized
 
-Each chapter builds on the last. You'll learn the type system, then variables, then functions — layering concepts so nothing feels like magic. Every chapter has examples you can paste into a `.bas` file and run.
-
-1. [Types](types.html) — every value has a type, every type tells the truth
-2. [Variables](variables.html) — immutable by default, mutable when you need it
-3. [Functions](functions.html) — explicit parameters, return types, and returns
-4. [Control Flow](control-flow.html) — conditions, loops, and guards
-5. [Pattern Matching](pattern-matching.html) — the compiler checks every case
-6. [Error Handling](error-handling.html) — errors are values, not surprises
-7. [Structs](structs.html) — define your own data types
-8. [Enums](enums.html) — variants with associated data
-9. [Closures](closures.html) — functions that capture their environment
-10. [Modules](modules.html) — organize code across files
-11. [Standard Library](stdlib.html) — what's built in
-12. [Capabilities](capabilities.html) — controlled access to the outside world
-13. [Type Conversions](conversions.html) — safe, explicit, no surprises
+Each chapter builds on the last, layering concepts so nothing feels like magic. Every chapter has examples you can paste into a `.bas` file and run. Start with [Types](types.html) and work your way through.

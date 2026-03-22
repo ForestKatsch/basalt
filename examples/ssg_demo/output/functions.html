@@ -351,7 +351,9 @@
 }</code></pre>
 <h2>Explicit return</h2>
 <p>Basalt requires you to write <code>return</code>. The last expression in a function body is <strong>not</strong> implicitly returned.</p>
-<p>&lt;div class="callout callout-note"&gt;&lt;strong&gt;Why explicit return?&lt;/strong&gt; In languages with implicit return, adding a logging line at the end of a function silently changes its return value to &lt;code&gt;nil&lt;/code&gt;. Basalt avoids this class of bug entirely. If a function promises to return a value, the compiler verifies every code path has an explicit &lt;code&gt;return&lt;/code&gt;. &lt;/div&gt;</p>
+<div class="callout callout-note"><strong>Why explicit return?</strong>
+In languages with implicit return, adding a logging line at the end of a function silently changes its return value to <code>nil</code>. Basalt avoids this class of bug entirely. If a function promises to return a value, the compiler verifies every code path has an explicit <code>return</code>.
+</div>
 <p>If you declare a return type but forget to return:</p>
 <pre><code><span class="kw">fn</span> <span class="fn">double</span>(x<span class="op">:</span> <span class="ty">i64</span>) <span class="op">-&gt;</span> <span class="ty">i64</span> {
     <span class="kw">let</span> result <span class="op">=</span> x <span class="op">*</span> <span class="nu">2</span>
@@ -401,7 +403,9 @@
     stdout.<span class="fn">println</span>(<span class="fn">apply</span>(negate, <span class="nu">3</span>) <span class="kw">as</span> <span class="ty">string</span>)    <span class="cm">// Output: -3</span>
 }</code></pre>
 <p>The type <code>fn(i64) -&gt; i64</code> describes any function that takes one <code>i64</code> and returns an <code>i64</code>. This enables higher-order patterns — mapping, filtering, and composing operations — without any special syntax. We'll see this in action with <a href="closures.html">Closures</a>.</p>
-<p>&lt;div class="callout callout-tip"&gt;&lt;strong&gt;Try this&lt;/strong&gt; Write a function &lt;code&gt;fn clamp(val: i64, lo: i64, hi: i64) -&gt; i64&lt;/code&gt; that returns &lt;code&gt;val&lt;/code&gt; if it's between &lt;code&gt;lo&lt;/code&gt; and &lt;code&gt;hi&lt;/code&gt;, otherwise the nearest bound. You'll need &lt;code&gt;if&lt;/code&gt; expressions — which brings us to the next chapter. &lt;/div&gt;</p>
+<div class="callout callout-tip"><strong>Try this</strong>
+Write a function <code>fn clamp(val: i64, lo: i64, hi: i64) -> i64</code> that returns <code>val</code> if it's between <code>lo</code> and <code>hi</code>, otherwise the nearest bound. You'll need <code>if</code> expressions — which brings us to the next chapter.
+</div>
 <h2>What's Next</h2>
 <p>Functions describe <em>what</em> to compute. Control flow describes <em>when</em> and <em>how</em>. Next up: <a href="control-flow.html">Control Flow</a>.</p>
 

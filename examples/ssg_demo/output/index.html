@@ -303,7 +303,7 @@
     <div class="page">
         <div class="hero">
             <h1>Learn Basalt</h1>
-            <p class="lead">A statically typed language with no null, no exceptions, and no surprises. This guide will take you from hello world to building real programs.</p>
+            <p class="lead">A statically typed language where absence is always visible in the type, errors are always visible in the return type, and nothing happens that the code doesn't say.</p>
             <div class="hero-code">
 <span style="color:#fbbf24">fn</span> <span style="color:#7dd3fc">main</span>(stdout: <span style="color:#a7d28b">Stdout</span>) {<br>
 &nbsp;&nbsp;&nbsp;&nbsp;stdout.<span style="color:#7dd3fc">println</span>(<span style="color:#a7d28b">"Hello! You're running Basalt."</span>)<br>
@@ -314,7 +314,7 @@
             <p>Welcome to Basalt. This guide teaches the language from first principles, with examples you can run at every step. No prior Basalt experience needed — just a terminal and curiosity.</p>
 <h2>Your first three minutes</h2>
 <p>Install Basalt and build the compiler:</p>
-<pre><code>git clone https<span class="op">:</span><span class="op">/</span><span class="op">/</span>github.com<span class="op">/</span>example<span class="op">/</span>basalt
+<pre><code>git clone https<span class="op">:</span><span class="op">/</span><span class="op">/</span>github.com<span class="op">/</span><span class="ty">ForestKatsch</span><span class="op">/</span>basalt
 <span class="kw">cd</span> basalt
 cargo build <span class="op">-</span><span class="op">-</span>release</code></pre>
 <p>Create a file called <code>hello.bas</code>:</p>
@@ -326,15 +326,16 @@ cargo build <span class="op">-</span><span class="op">-</span>release</code></pr
 <pre><code>Hello! You're running Basalt.</code></pre>
 <p>That's it. You just wrote and ran a Basalt program.</p>
 <h2>The capability system</h2>
-<p>Notice the <code>stdout: Stdout</code> parameter on <code>main</code>. That's not decoration — it's the <strong>capability system</strong>. Your program only gets access to the resources it asks for. No <code>Stdout</code> parameter, no printing. No <code>Fs</code> parameter, no file system access. No <code>Net</code> parameter, no network.</p>
+<p>The <code>stdout: Stdout</code> parameter is how I/O works in Basalt. Programs receive capabilities as parameters — <code>Stdout</code> for printing, <code>Fs</code> for file access, <code>Env</code> for environment variables. If a capability isn't in the parameter list, the program can't use it.</p>
 <p>This means you can read any Basalt function signature and know exactly what side effects it can perform. A function that takes no capability parameters is pure — it can't touch the outside world. We'll explore this fully in <a href="capabilities.html">Capabilities</a>.</p>
 <h2>Type-check without running</h2>
 <p>You don't have to run your program to find mistakes. Basalt's type checker catches errors before a single line executes:</p>
 <pre><code>basalt check hello.bas</code></pre>
-<p>&lt;div class="callout callout-tip"&gt;&lt;strong&gt;Try this&lt;/strong&gt; Change &lt;code&gt;stdout.println&lt;/code&gt; to &lt;code&gt;stdout.printn&lt;/code&gt; and run &lt;code&gt;basalt check hello.bas&lt;/code&gt;. Basalt will point at the exact character, show you the source line, and suggest what you meant. Error messages are a feature, not an afterthought. &lt;/div&gt;</p>
+<div class="callout callout-tip"><strong>Try this</strong>
+Change <code>stdout.println</code> to <code>stdout.printn</code> and run <code>basalt check hello.bas</code>. Basalt will point at the exact character, show you the source line, and suggest what you meant. Error messages are a feature, not an afterthought.
+</div>
 <h2>How this guide is organized</h2>
-<p>Each chapter builds on the last. You'll learn the type system, then variables, then functions — layering concepts so nothing feels like magic. Every chapter has examples you can paste into a <code>.bas</code> file and run.</p>
-<p>1. <a href="types.html">Types</a> — every value has a type, every type tells the truth 2. <a href="variables.html">Variables</a> — immutable by default, mutable when you need it 3. <a href="functions.html">Functions</a> — explicit parameters, return types, and returns 4. <a href="control-flow.html">Control Flow</a> — conditions, loops, and guards 5. <a href="pattern-matching.html">Pattern Matching</a> — the compiler checks every case 6. <a href="error-handling.html">Error Handling</a> — errors are values, not surprises 7. <a href="structs.html">Structs</a> — define your own data types 8. <a href="enums.html">Enums</a> — variants with associated data 9. <a href="closures.html">Closures</a> — functions that capture their environment 10. <a href="modules.html">Modules</a> — organize code across files 11. <a href="stdlib.html">Standard Library</a> — what's built in 12. <a href="capabilities.html">Capabilities</a> — controlled access to the outside world 13. <a href="conversions.html">Type Conversions</a> — safe, explicit, no surprises</p>
+<p>Each chapter builds on the last, layering concepts so nothing feels like magic. Every chapter has examples you can paste into a <code>.bas</code> file and run. Start with <a href="types.html">Types</a> and work your way through.</p>
 <h2>Chapters</h2>
 <ul class="chapters">
 <li>

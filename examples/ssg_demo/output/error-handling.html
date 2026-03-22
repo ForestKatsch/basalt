@@ -427,8 +427,12 @@
 <p><strong>Error:</strong> Result type <code>i64!string</code> must be handled. Use <code>match</code>, <code>?</code>, or <code>guard let</code>.</p>
 </blockquote>
 <p>This is the core guarantee: errors cannot be silently swallowed. Every result is either used, propagated, or explicitly handled.</p>
-<p>&lt;div class="callout callout-warn"&gt;&lt;strong&gt;panic is not error handling&lt;/strong&gt; &lt;code&gt;panic("message")&lt;/code&gt; terminates the program immediately with a stack trace. It cannot be caught. Use it for programming errors — violated invariants, impossible states, bugs. Use result types for expected failures — bad input, missing files, network timeouts. If a user can cause it, it's not a panic. &lt;/div&gt;</p>
-<p>&lt;div class="callout callout-tip"&gt;&lt;strong&gt;Try this&lt;/strong&gt; Write a function &lt;code&gt;fn parse_pair(s: string) -&gt; (i64, i64)!string&lt;/code&gt; that takes a string like &lt;code&gt;"3,7"&lt;/code&gt;, splits on &lt;code&gt;,&lt;/code&gt;, and parses both halves. Use &lt;code&gt;?&lt;/code&gt; to propagate parse errors. What error message does the user see for &lt;code&gt;"3,abc"&lt;/code&gt;? &lt;/div&gt;</p>
+<div class="callout callout-warn"><strong>panic is not error handling</strong>
+<code>panic("message")</code> terminates the program immediately with a stack trace. It cannot be caught. Use it for programming errors — violated invariants, impossible states, bugs. Use result types for expected failures — bad input, missing files, network timeouts. If a user can cause it, it's not a panic.
+</div>
+<div class="callout callout-tip"><strong>Try this</strong>
+Write a function <code>fn parse_pair(s: string) -> (i64, i64)!string</code> that takes a string like <code>"3,7"</code>, splits on <code>,</code>, and parses both halves. Use <code>?</code> to propagate parse errors. What error message does the user see for <code>"3,abc"</code>?
+</div>
 <h2>What's Next</h2>
 <p>Errors are values, and now you know how to create, propagate, and handle them. Next, let's define our own data types. Next up: <a href="structs.html">Structs</a>.</p>
 

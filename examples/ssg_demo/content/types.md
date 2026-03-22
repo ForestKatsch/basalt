@@ -71,9 +71,9 @@ fn main(stdout: Stdout) {
 
 Arrays and maps are reference types — assignment shares the same object. Use `.clone()` for an independent copy. Tuples are value types and copy on assignment.
 
-## Optional types: null done right
+## Optional types: absence you can see
 
-In languages with `null`, any reference can be null. You don't know until it blows up at runtime. Basalt has no null references. Instead, `T?` (shorthand for `T | nil`) makes absence explicit in the type:
+In many languages, any reference can be null — and you don't know until it explodes at runtime. Basalt has `nil`, but it can never hide. A `string` is always a string. If a value might be absent, the type says so: `T?` (shorthand for `T | nil`) forces you to check before you use it:
 
 ```basalt
 fn find_user(id: i64) -> string? {

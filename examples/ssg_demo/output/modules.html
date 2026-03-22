@@ -357,7 +357,9 @@
     stdout.<span class="fn">println</span>(geometry.<span class="fn">distance</span>(a, b) <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 5</span>
 }</code></pre>
 <p>All access is qualified: <code>geometry.Point</code>, <code>geometry.distance</code>. There is no unqualified import — you always know where a name comes from by reading the call site.</p>
-<p>&lt;div class="callout callout-note"&gt;&lt;strong&gt;Why qualified access?&lt;/strong&gt; When two modules export the same name, qualified access makes collisions impossible. You never have to guess which &lt;code&gt;parse&lt;/code&gt; or &lt;code&gt;Error&lt;/code&gt; you are looking at. The tradeoff is verbosity — but the code tells the truth about its dependencies at every use site. &lt;/div&gt;</p>
+<div class="callout callout-note"><strong>Why qualified access?</strong>
+When two modules export the same name, qualified access makes collisions impossible. You never have to guess which <code>parse</code> or <code>Error</code> you are looking at. The tradeoff is verbosity — but the code tells the truth about its dependencies at every use site.
+</div>
 <h2>Import aliases</h2>
 <p>When a module path is long, give it a shorter name:</p>
 <pre><code><span class="kw">import</span> <span class="st">"lib/validators"</span> <span class="kw">as</span> val

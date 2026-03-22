@@ -365,9 +365,14 @@
     <span class="cm">// Output: Attempt 1: complete</span>
 }</code></pre>
 <p>The <code>mut</code> keyword serves as documentation. When you see <code>let mut</code> in code, you know this value will change — scan for where.</p>
-<p>&lt;div class="callout callout-warn"&gt;&lt;strong&gt;Gotcha: collections need mut too&lt;/strong&gt; Mutating methods like &lt;code&gt;push&lt;/code&gt;, &lt;code&gt;sort&lt;/code&gt;, and &lt;code&gt;remove&lt;/code&gt; require the variable to be &lt;code&gt;mut&lt;/code&gt;. An immutable binding to an array means you cannot modify that array at all — not just that you can't reassign the variable.</p>
-<p>&lt;pre&gt;&lt;code&gt;let items = [1, 2, 3] items.push(4)  // Error: Cannot call mutating method on immutable variable&lt;/code&gt;&lt;/pre&gt;</p>
-<p>Write &lt;code&gt;let mut items = [1, 2, 3]&lt;/code&gt; instead. &lt;/div&gt;</p>
+<div class="callout callout-warn"><strong>Gotcha: collections need mut too</strong>
+Mutating methods like <code>push</code>, <code>sort</code>, and <code>remove</code> require the variable to be <code>mut</code>. An immutable binding to an array means you cannot modify that array at all — not just that you can't reassign the variable.
+
+<pre><code>let items = [1, 2, 3]
+items.push(4)  // Error: Cannot call mutating method on immutable variable</code></pre>
+
+Write <code>let mut items = [1, 2, 3]</code> instead.
+</div>
 <h2>Type inference</h2>
 <p>Basalt infers types from the value you assign. You don't need to write them — but you can:</p>
 <pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {

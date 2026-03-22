@@ -406,7 +406,9 @@
     <span class="cm">// Output: Found: Charlie</span>
 }</code></pre>
 <h2>Closures as strategy</h2>
-<p>&lt;div class="callout callout-tip"&gt;&lt;strong&gt;Try this&lt;/strong&gt; Closures let you swap behavior without building a class hierarchy. Pass different closures to the same function to get different behavior — the strategy pattern without the ceremony. &lt;/div&gt;</p>
+<div class="callout callout-tip"><strong>Try this</strong>
+Closures let you swap behavior without building a class hierarchy. Pass different closures to the same function to get different behavior — the strategy pattern without the ceremony.
+</div>
 <pre><code><span class="kw">fn</span> <span class="fn">apply_discount</span>(prices<span class="op">:</span> [<span class="ty">f64</span>], strategy<span class="op">:</span> <span class="kw">fn</span>(<span class="ty">f64</span>) <span class="op">-&gt;</span> <span class="ty">f64</span>) <span class="op">-&gt;</span> [<span class="ty">f64</span>] {
     <span class="kw">return</span> prices.<span class="fn">map</span>(strategy)
 }

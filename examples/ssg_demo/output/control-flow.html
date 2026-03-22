@@ -455,7 +455,9 @@
     stdout.<span class="fn">println</span>(<span class="st">"Loaded \(content.length as string) bytes"</span>)
 }</code></pre>
 <p>Compare this to nested <code>if</code> or <code>match</code> — <code>guard let</code> keeps the happy path at the top indentation level. You'll see it everywhere once you start writing real Basalt. It's especially powerful with <a href="error-handling.html">Error Handling</a>.</p>
-<p>&lt;div class="callout callout-tip"&gt;&lt;strong&gt;Try this&lt;/strong&gt; Write a function that takes an array of strings and returns the first one that parses as an integer, using &lt;code&gt;guard let&lt;/code&gt; inside a &lt;code&gt;for&lt;/code&gt; loop with &lt;code&gt;continue&lt;/code&gt; in the else block. &lt;/div&gt;</p>
+<div class="callout callout-tip"><strong>Try this</strong>
+Write a function that takes an array of strings and returns the first one that parses as an integer, using <code>guard let</code> inside a <code>for</code> loop with <code>continue</code> in the else block.
+</div>
 <h2>What's Next</h2>
 <p><code>if</code> and <code>guard</code> handle simple conditions. When you need to match against multiple patterns at once — especially enum variants and union types — you want something more powerful. Next up: <a href="pattern-matching.html">Pattern Matching</a>.</p>
 
