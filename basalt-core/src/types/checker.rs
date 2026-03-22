@@ -1,6 +1,6 @@
 use super::*;
 use crate::error::{CompileError, CompileErrors};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Levenshtein edit distance between two strings.
 fn edit_distance(a: &str, b: &str) -> usize {
@@ -55,6 +55,10 @@ struct TypeChecker {
     current_fn_return: Option<Type>,
     in_loop: bool,
     current_type_name: Option<String>,
+    /// Variables that are both mutable and captured by a closure in the current
+    /// function. Narrowing these is unsound because any function call could
+    /// invoke the capturing closure and mutate the variable.
+    captured_mut_vars: HashSet<String>,
 }
 
 pub fn check(program: &Program) -> Result<TypedProgram, CompileErrors> {
@@ -76,6 +80,7 @@ impl TypeChecker {
             current_fn_return: None,
             in_loop: false,
             current_type_name: None,
+            captured_mut_vars: HashSet::new(),
         }
     }
 
@@ -848,6 +853,10 @@ impl TypeChecker {
         for (name, ty) in &info.params {
             self.define_var(name, ty.clone(), false);
         }
+
+        // Scan for mutable variables captured by closures (for narrowing safety)
+        let old_captured = std::mem::take(&mut self.captured_mut_vars);
+        self.captured_mut_vars = find_captured_mut_vars(&fdef.body, &self.scopes);
 
         let body = self.check_block(&fdef.body)?;
 
@@ -1643,13 +1652,28 @@ impl TypeChecker {
                 let typed_cond = self.check_expr(cond)?;
 
                 // Check for type narrowing: if x is T
+                // Narrowing is sound when the variable cannot change between the
+                // is-check and the use. A mutable variable captured by a closure
+                // can be mutated through the capture at any call site, invalidating
+                // the narrowing. We refuse to narrow when the then-block contains
+                // both a function call AND a closure that captures the variable.
                 let narrowing = if let ExprKind::Is(inner, IsTarget::Type(ty)) = &cond.kind {
                     if let ExprKind::Ident(name) = &inner.kind {
-                        Some((
-                            name.clone(),
-                            self.resolve_type_expr(ty)
-                                .map_err(|e| e.with_span(expr.span))?,
-                        ))
+                        let is_mutable = self
+                            .lookup_var(name)
+                            .map(|(_, m)| m)
+                            .unwrap_or(false);
+                        let resolved = self
+                            .resolve_type_expr(ty)
+                            .map_err(|e| e.with_span(expr.span))?;
+                        if is_mutable
+                            && block_has_call(then_block)
+                            && block_has_closure_capturing(then_block, name)
+                        {
+                            None
+                        } else {
+                            Some((name.clone(), resolved))
+                        }
                     } else {
                         None
                     }

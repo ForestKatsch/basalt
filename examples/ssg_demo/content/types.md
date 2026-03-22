@@ -164,13 +164,37 @@ fn main(stdout: Stdout) {
 }
 ```
 
-You can name unions with type aliases for readability:
+## Type aliases
+
+`type Name = ExistingType` creates a name for any type expression. This works with every type, not just unions:
 
 ```basalt
+type UserId = i64
+type Config = [string: string]
+type Handler = fn(string) -> string!string
 type JsonValue = bool | f64 | string | nil
+type MaybeInt = i64?
 ```
 
-The compiler requires you to handle every member of the union.
+Aliases are interchangeable with the type they name — they're abbreviations, not new types:
+
+```basalt
+type Scores = [string: i64]
+
+fn highest(scores: Scores) -> i64 {
+    let vals = scores.values()
+    let mut best = 0
+    for v in vals {
+        if v > best { best = v }
+    }
+    return best
+}
+
+fn main(stdout: Stdout) {
+    let s: Scores = {"alice": 90, "bob": 85}
+    stdout.println(highest(s) as string)  // Output: 90
+}
+```
 
 ## What's Next
 
