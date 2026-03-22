@@ -131,6 +131,18 @@ const RUST: LangDef = LangDef {
     string_delimiters: &['"'],
 };
 
+const SHELL: LangDef = LangDef {
+    keywords: &[
+        "if", "then", "else", "fi", "for", "do", "done", "while",
+        "case", "esac", "in", "function", "return", "exit",
+        "echo", "cd", "ls", "rm", "cp", "mv", "mkdir", "cat",
+        "grep", "sed", "awk", "export", "source", "sudo",
+    ],
+    types: &[],
+    line_comment: "#",
+    string_delimiters: &['"', '\''],
+};
+
 fn tokenize(source: &str, lang: &LangDef) -> Vec<Token> {
     let chars: Vec<char> = source.chars().collect();
     let mut tokens = Vec::new();
@@ -314,6 +326,7 @@ fn lang_def(name: &str) -> Option<&'static LangDef> {
         "typescript" | "ts" => Some(&TYPESCRIPT),
         "javascript" | "js" => Some(&TYPESCRIPT),
         "rust" | "rs" => Some(&RUST),
+        "sh" | "bash" | "shell" | "zsh" => Some(&SHELL),
         _ => None,
     }
 }

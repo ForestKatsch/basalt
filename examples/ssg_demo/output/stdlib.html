@@ -255,6 +255,54 @@
             text-align: center;
         }
 
+        /* --- Page navigation (prev/next) --- */
+        .page-nav {
+            display: flex;
+            justify-content: space-between;
+            padding: 2rem 0;
+            margin-top: 2rem;
+            border-top: 1px solid var(--border);
+        }
+        .page-nav a {
+            color: var(--text-soft);
+            text-decoration: none;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            transition: all 0.15s ease;
+            max-width: 45%;
+        }
+        .page-nav a:hover {
+            color: var(--accent-hover);
+            border-color: var(--accent);
+            background: var(--accent-light);
+        }
+        .page-nav .prev::before { content: '\2190\00a0'; }
+        .page-nav .next::after { content: '\00a0\2192'; }
+
+        /* --- Callout boxes --- */
+        .content .callout {
+            padding: 1rem 1.25rem;
+            border-radius: var(--radius);
+            margin: 1.25rem 0;
+            font-size: 0.95em;
+        }
+        .content .callout-tip {
+            background: #f0fdf4;
+            border-left: 4px solid #16a34a;
+        }
+        .content .callout-warn {
+            background: #fffbeb;
+            border-left: 4px solid #d97706;
+        }
+        .content .callout-note {
+            background: #eff6ff;
+            border-left: 4px solid #3b82f6;
+        }
+        .content .callout p { margin: 0.3rem 0; }
+        .content .callout strong { display: block; margin-bottom: 0.25rem; }
+
         /* --- Responsive --- */
         @media (max-width: 640px) {
             body { font-size: 16px; }
@@ -281,7 +329,7 @@
         </div>
     </div>
     <div class="sidebar-nav">
-        <div class="page"><a href="index.html">Home</a> <a href="capabilities.html">Capabilities</a> <a href="closures.html">Closures</a> <a href="control-flow.html">Control Flow</a> <a href="conversions.html">Type Conversions</a> <a href="enums.html">Enums</a> <a href="error-handling.html">Error Handling</a> <a href="functions.html">Functions</a> <a href="modules.html">Modules</a> <a href="pattern-matching.html">Pattern Matching</a> <a href="stdlib.html">Standard Library</a> <a href="structs.html">Structs</a> <a href="types.html">Types</a> <a href="variables.html">Variables</a></div>
+        <div class="page"><a href="index.html">Home</a> <a href="types.html">Types</a> <a href="variables.html">Variables</a> <a href="functions.html">Functions</a> <a href="control-flow.html">Control Flow</a> <a href="pattern-matching.html">Pattern Matching</a> <a href="error-handling.html">Error Handling</a> <a href="structs.html">Structs</a> <a href="enums.html">Enums</a> <a href="closures.html">Closures</a> <a href="modules.html">Modules</a> <a href="stdlib.html">Standard Library</a> <a href="capabilities.html">Capabilities</a> <a href="conversions.html">Type Conversions</a></div>
     </div>
     <div class="page">
         <article class="content">
@@ -311,6 +359,7 @@
 <tr><td><code>s.char_at(i)</code></td><td>Single character by index (negative indexes from end)</td></tr>
 <tr><td><code>s.chars()</code></td><td>Array of single-character strings</td></tr>
 <tr><td><code>s.bytes()</code></td><td>Array of byte values</td></tr>
+</tbody></table>
 <pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
     <span class="kw">let</span> s <span class="op">=</span> <span class="st">"Hello, World!"</span>
     stdout.<span class="fn">println</span>(s.<span class="fn">upper</span>())                  <span class="cm">// Output: HELLO, WORLD!</span>
@@ -323,7 +372,6 @@
     <span class="kw">let</span> parts <span class="op">=</span> <span class="st">"a,b,c"</span>.<span class="fn">split</span>(<span class="st">","</span>)
     stdout.<span class="fn">println</span>(parts.<span class="fn">join</span>(<span class="st">" | "</span>))          <span class="cm">// Output: a | b | c</span>
 }</code></pre>
-</tbody></table>
 <p>String interpolation uses <code>\(expr)</code>:</p>
 <pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
     <span class="kw">let</span> name <span class="op">=</span> <span class="st">"world"</span>
@@ -360,6 +408,7 @@
 <tr><td><code>arr.find(f)</code></td><td>First element matching predicate</td></tr>
 <tr><td><code>arr.any(f)</code></td><td>True if any element matches</td></tr>
 <tr><td><code>arr.all(f)</code></td><td>True if all elements match</td></tr>
+</tbody></table>
 <pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
     <span class="kw">let</span> <span class="kw">mut</span> nums <span class="op">=</span> [<span class="nu">3</span>, <span class="nu">1</span>, <span class="nu">4</span>, <span class="nu">1</span>, <span class="nu">5</span>]
 
@@ -375,7 +424,9 @@
     stdout.<span class="fn">println</span>(nums[<span class="op">-</span><span class="nu">1</span>] <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 1 (last element)</span>
 }</code></pre>
 <h3>Map Methods</h3>
-<tr><td>Method</td><td>Description</td></tr>
+<table>
+<thead><tr><th>Method</th><th>Description</th></tr></thead>
+<tbody>
 <tr><td><code>m.length</code></td><td>Entry count (property)</td></tr>
 <tr><td><code>m[key]</code></td><td>Get value (panics if key missing)</td></tr>
 <tr><td><code>m[key] = val</code></td><td>Set value (requires <code>mut</code>)</td></tr>
@@ -385,6 +436,7 @@
 <tr><td><code>m.values()</code></td><td>Array of values (insertion order)</td></tr>
 <tr><td><code>m.remove(key)</code></td><td>Remove entry (requires <code>mut</code>)</td></tr>
 <tr><td><code>m.clone()</code></td><td>Deep copy</td></tr>
+</tbody></table>
 <pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
     <span class="kw">let</span> <span class="kw">mut</span> m <span class="op">=</span> {<span class="st">"name"</span><span class="op">:</span> <span class="st">"Alice"</span>, <span class="st">"city"</span><span class="op">:</span> <span class="st">"NYC"</span>}
 
@@ -404,7 +456,6 @@
         stdout.<span class="fn">println</span>(<span class="st">"\(key): \(value)"</span>)
     }
 }</code></pre>
-</tbody></table>
 <p>Empty maps need a type annotation:</p>
 <pre><code><span class="kw">let</span> <span class="kw">mut</span> scores<span class="op">:</span> [<span class="ty">string</span><span class="op">:</span> <span class="ty">i64</span>] <span class="op">=</span> {}
 scores[<span class="st">"alice"</span>] <span class="op">=</span> <span class="nu">100</span></code></pre>
@@ -432,6 +483,10 @@ scores[<span class="st">"alice"</span>] <span class="op">=</span> <span class="n
 </tbody></table>
 
         </article>
+        <nav class="page-nav">
+            <a href="modules.html" class="prev">Modules</a>
+            <a href="capabilities.html" class="next">Capabilities</a>
+        </nav>
         <footer class="footer">
             Built with a static site generator written in Basalt
         </footer>

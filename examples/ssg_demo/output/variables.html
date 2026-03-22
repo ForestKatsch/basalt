@@ -255,6 +255,54 @@
             text-align: center;
         }
 
+        /* --- Page navigation (prev/next) --- */
+        .page-nav {
+            display: flex;
+            justify-content: space-between;
+            padding: 2rem 0;
+            margin-top: 2rem;
+            border-top: 1px solid var(--border);
+        }
+        .page-nav a {
+            color: var(--text-soft);
+            text-decoration: none;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            transition: all 0.15s ease;
+            max-width: 45%;
+        }
+        .page-nav a:hover {
+            color: var(--accent-hover);
+            border-color: var(--accent);
+            background: var(--accent-light);
+        }
+        .page-nav .prev::before { content: '\2190\00a0'; }
+        .page-nav .next::after { content: '\00a0\2192'; }
+
+        /* --- Callout boxes --- */
+        .content .callout {
+            padding: 1rem 1.25rem;
+            border-radius: var(--radius);
+            margin: 1.25rem 0;
+            font-size: 0.95em;
+        }
+        .content .callout-tip {
+            background: #f0fdf4;
+            border-left: 4px solid #16a34a;
+        }
+        .content .callout-warn {
+            background: #fffbeb;
+            border-left: 4px solid #d97706;
+        }
+        .content .callout-note {
+            background: #eff6ff;
+            border-left: 4px solid #3b82f6;
+        }
+        .content .callout p { margin: 0.3rem 0; }
+        .content .callout strong { display: block; margin-bottom: 0.25rem; }
+
         /* --- Responsive --- */
         @media (max-width: 640px) {
             body { font-size: 16px; }
@@ -281,7 +329,7 @@
         </div>
     </div>
     <div class="sidebar-nav">
-        <div class="page"><a href="index.html">Home</a> <a href="capabilities.html">Capabilities</a> <a href="closures.html">Closures</a> <a href="control-flow.html">Control Flow</a> <a href="conversions.html">Type Conversions</a> <a href="enums.html">Enums</a> <a href="error-handling.html">Error Handling</a> <a href="functions.html">Functions</a> <a href="modules.html">Modules</a> <a href="pattern-matching.html">Pattern Matching</a> <a href="stdlib.html">Standard Library</a> <a href="structs.html">Structs</a> <a href="types.html">Types</a> <a href="variables.html">Variables</a></div>
+        <div class="page"><a href="index.html">Home</a> <a href="types.html">Types</a> <a href="variables.html">Variables</a> <a href="functions.html">Functions</a> <a href="control-flow.html">Control Flow</a> <a href="pattern-matching.html">Pattern Matching</a> <a href="error-handling.html">Error Handling</a> <a href="structs.html">Structs</a> <a href="enums.html">Enums</a> <a href="closures.html">Closures</a> <a href="modules.html">Modules</a> <a href="stdlib.html">Standard Library</a> <a href="capabilities.html">Capabilities</a> <a href="conversions.html">Type Conversions</a></div>
     </div>
     <div class="page">
         <article class="content">
@@ -316,6 +364,10 @@
 }</code></pre>
 
         </article>
+        <nav class="page-nav">
+            <a href="types.html" class="prev">Types</a>
+            <a href="functions.html" class="next">Functions</a>
+        </nav>
         <footer class="footer">
             Built with a static site generator written in Basalt
         </footer>

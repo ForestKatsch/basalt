@@ -143,6 +143,10 @@ fn md_to_html(md: string, highlight: Highlight) -> string {
                 in_code_block = false
             } else {
                 // Flush any open structures before opening code block
+                if in_table {
+                    html = html + "</tbody></table>\n"
+                    in_table = false
+                }
                 if para_lines.length > 0 {
                     html = html + "<p>" + inline_md(para_lines.join(" ")) + "</p>\n"
                     para_lines = []
@@ -179,6 +183,10 @@ fn md_to_html(md: string, highlight: Highlight) -> string {
 
         // Blank line: flush paragraph, close list/blockquote
         if line.trim().length == 0 {
+            if in_table {
+                html = html + "</tbody></table>\n"
+                in_table = false
+            }
             if para_lines.length > 0 {
                 html = html + "<p>" + inline_md(para_lines.join(" ")) + "</p>\n"
                 para_lines = []
@@ -196,6 +204,10 @@ fn md_to_html(md: string, highlight: Highlight) -> string {
 
         // Horizontal rule: --- on its own
         if line.trim() == "---" {
+            if in_table {
+                html = html + "</tbody></table>\n"
+                in_table = false
+            }
             if para_lines.length > 0 {
                 html = html + "<p>" + inline_md(para_lines.join(" ")) + "</p>\n"
                 para_lines = []
@@ -210,6 +222,10 @@ fn md_to_html(md: string, highlight: Highlight) -> string {
                 html = html + "<p>" + inline_md(para_lines.join(" ")) + "</p>\n"
                 para_lines = []
             }
+            if in_table {
+                html = html + "</tbody></table>\n"
+                in_table = false
+            }
             if in_list {
                 html = html + "</ul>\n"
                 in_list = false
@@ -222,6 +238,10 @@ fn md_to_html(md: string, highlight: Highlight) -> string {
                 html = html + "<p>" + inline_md(para_lines.join(" ")) + "</p>\n"
                 para_lines = []
             }
+            if in_table {
+                html = html + "</tbody></table>\n"
+                in_table = false
+            }
             if in_list {
                 html = html + "</ul>\n"
                 in_list = false
@@ -233,6 +253,10 @@ fn md_to_html(md: string, highlight: Highlight) -> string {
             if para_lines.length > 0 {
                 html = html + "<p>" + inline_md(para_lines.join(" ")) + "</p>\n"
                 para_lines = []
+            }
+            if in_table {
+                html = html + "</tbody></table>\n"
+                in_table = false
             }
             if in_list {
                 html = html + "</ul>\n"
@@ -247,6 +271,10 @@ fn md_to_html(md: string, highlight: Highlight) -> string {
             if para_lines.length > 0 {
                 html = html + "<p>" + inline_md(para_lines.join(" ")) + "</p>\n"
                 para_lines = []
+            }
+            if in_table {
+                html = html + "</tbody></table>\n"
+                in_table = false
             }
             if in_blockquote {
                 html = html + "</blockquote>\n"
@@ -265,6 +293,10 @@ fn md_to_html(md: string, highlight: Highlight) -> string {
             if para_lines.length > 0 {
                 html = html + "<p>" + inline_md(para_lines.join(" ")) + "</p>\n"
                 para_lines = []
+            }
+            if in_table {
+                html = html + "</tbody></table>\n"
+                in_table = false
             }
             if in_list {
                 html = html + "</ul>\n"
@@ -510,38 +542,7 @@ fn main(stdout: Stdout, fs: Fs, highlight: Highlight) {
         bodies.push(body_html)
     }
 
-    // Build navigation from non-draft pages
-    let mut nav_html = "<a href=\"index.html\">Home</a>"
-    for idx in 0..stems.length {
-        if stems[idx] != "index" {
-            nav_html = nav_html + " <a href=\"" + stems[idx] + ".html\">" + titles[idx] + "</a>"
-        }
-    }
-
-    // Generate each content page (skip index — handled separately below)
-    let mut page_count = 0
-    for idx in 0..stems.length {
-        if stems[idx] == "index" { continue }
-        let mut vars: [string: string] = {}
-        vars["title"] = titles[idx]
-        vars["date"] = dates[idx]
-        vars["description"] = descriptions[idx]
-        vars["body"] = bodies[idx]
-        vars["nav"] = nav_html
-
-        let page_html = apply_template(page_template, vars)
-        let out_path = fs.join("output", stems[idx] + ".html")
-        let write_result = fs.write_file(out_path, page_html)
-        match write_result {
-            !err => stdout.println("  Error writing \(out_path): \(err)")
-            _ => {
-                stdout.println("  Generated \(out_path)")
-                page_count = page_count + 1
-            }
-        }
-    }
-
-    // Generate index page with listing sorted by date (ascending for docs order)
+    // Sort pages by date (ascending for docs order)
     // Build date-sorted indices using simple insertion sort (small N)
     let mut sorted_indices: [i64] = []
     for idx in 0..stems.length {
@@ -563,6 +564,66 @@ fn main(stdout: Stdout, fs: Fs, highlight: Highlight) {
         }
     }
 
+    // Build navigation in chapter order from sorted indices
+    let mut nav_parts: [string] = []
+    nav_parts.push("<a href=\"index.html\">Home</a>")
+    for si in sorted_indices {
+        if stems[si] != "index" {
+            nav_parts.push("<a href=\"" + stems[si] + ".html\">" + escape_html(titles[si]) + "</a>")
+        }
+    }
+    let nav_html = nav_parts.join(" ")
+
+    // Build a list of non-index sorted indices for prev/next navigation
+    let mut content_order: [i64] = []
+    for si in sorted_indices {
+        if stems[si] != "index" {
+            content_order.push(si)
+        }
+    }
+
+    // Generate each content page (skip index — handled separately below)
+    let mut page_count = 0
+    for idx in 0..stems.length {
+        if stems[idx] == "index" { continue }
+        let mut vars: [string: string] = {}
+        vars["title"] = titles[idx]
+        vars["date"] = dates[idx]
+        vars["description"] = descriptions[idx]
+        vars["body"] = bodies[idx]
+        vars["nav"] = nav_html
+
+        // Compute prev/next from content_order
+        let mut prev_html = ""
+        let mut next_html = ""
+        for ci in 0..content_order.length {
+            if content_order[ci] == idx {
+                if ci > 0 {
+                    let pi = content_order[ci - 1]
+                    prev_html = "<a href=\"" + stems[pi] + ".html\" class=\"prev\">" + escape_html(titles[pi]) + "</a>"
+                }
+                if ci + 1 < content_order.length {
+                    let ni = content_order[ci + 1]
+                    next_html = "<a href=\"" + stems[ni] + ".html\" class=\"next\">" + escape_html(titles[ni]) + "</a>"
+                }
+                break
+            }
+        }
+        vars["prev"] = prev_html
+        vars["next"] = next_html
+
+        let page_html = apply_template(page_template, vars)
+        let out_path = fs.join("output", stems[idx] + ".html")
+        let write_result = fs.write_file(out_path, page_html)
+        match write_result {
+            !err => stdout.println("  Error writing \(out_path): \(err)")
+            _ => {
+                stdout.println("  Generated \(out_path)")
+                page_count = page_count + 1
+            }
+        }
+    }
+
     // Build the page listing HTML
     let mut listing_html = "<ul class=\"chapters\">\n"
     let mut chapter_num = 1
@@ -570,12 +631,14 @@ fn main(stdout: Stdout, fs: Fs, highlight: Highlight) {
         // Skip the index page itself from the listing
         if stems[si] == "index" { continue }
         listing_html = listing_html + "<li>\n"
-        listing_html = listing_html + "  <span class=\"num\">" + (chapter_num as string) + "</span>\n"
-        listing_html = listing_html + "  <div class=\"chapter-info\">\n"
-        listing_html = listing_html + "    <a href=\"" + stems[si] + ".html\">" + escape_html(titles[si]) + "</a>\n"
-        listing_html = listing_html + "    <div class=\"date\">" + escape_html(dates[si]) + "</div>\n"
-        listing_html = listing_html + "    <div class=\"desc\">" + escape_html(descriptions[si]) + "</div>\n"
-        listing_html = listing_html + "  </div>\n"
+        listing_html = listing_html + "  <a href=\"" + stems[si] + ".html\" class=\"chapter-link\">\n"
+        listing_html = listing_html + "    <span class=\"num\">" + (chapter_num as string) + "</span>\n"
+        listing_html = listing_html + "    <div class=\"chapter-info\">\n"
+        listing_html = listing_html + "      <span class=\"chapter-title\">" + escape_html(titles[si]) + "</span>\n"
+        listing_html = listing_html + "      <div class=\"date\">" + escape_html(dates[si]) + "</div>\n"
+        listing_html = listing_html + "      <div class=\"desc\">" + escape_html(descriptions[si]) + "</div>\n"
+        listing_html = listing_html + "    </div>\n"
+        listing_html = listing_html + "  </a>\n"
         listing_html = listing_html + "</li>\n"
         chapter_num = chapter_num + 1
     }

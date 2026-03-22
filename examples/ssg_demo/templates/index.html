@@ -180,6 +180,43 @@
             font-style: italic;
         }
         .content strong { color: var(--text); font-weight: 600; }
+        .content em { color: var(--text-soft); }
+        .content h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-soft);
+            margin-top: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        .content hr {
+            border: none;
+            border-top: 2px solid var(--border-light);
+            margin: 2.5rem 0;
+        }
+        .content ol { margin: 0.85rem 0; padding-left: 1.5rem; }
+        .content table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1.25rem 0;
+            font-size: 0.92em;
+            border-radius: var(--radius);
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+        .content th {
+            background: var(--bg-warm);
+            font-weight: 600;
+            color: var(--text);
+            text-align: left;
+            padding: 0.6rem 0.9rem;
+            border-bottom: 2px solid var(--border);
+        }
+        .content td {
+            padding: 0.55rem 0.9rem;
+            border-bottom: 1px solid var(--border-light);
+        }
+        .content tr:last-child td { border-bottom: none; }
+        .content tr:hover td { background: var(--bg-warm); }
 
         /* --- Chapter list --- */
         .chapters {
@@ -189,15 +226,29 @@
             gap: 0;
         }
         .chapters li {
+            display: block;
+            border-radius: var(--radius);
+        }
+        .chapters a.chapter-link {
             display: flex;
             align-items: baseline;
             gap: 1rem;
+            text-decoration: none;
+            color: inherit;
             padding: 1rem 1.25rem;
             border-radius: var(--radius);
             transition: background 0.15s ease;
         }
-        .chapters li:hover {
+        .chapters a.chapter-link:hover {
             background: var(--bg-warm);
+        }
+        .chapters .chapter-title {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+        .chapters a.chapter-link:hover .chapter-title {
+            color: var(--accent-hover);
         }
         .chapters .num {
             font-family: 'JetBrains Mono', monospace;
@@ -207,13 +258,6 @@
             min-width: 1.5rem;
         }
         .chapters .chapter-info { flex: 1; }
-        .chapters a {
-            font-size: 1.05rem;
-            font-weight: 600;
-            color: var(--text);
-            text-decoration: none;
-        }
-        .chapters a:hover { color: var(--accent-hover); }
         .chapters .desc {
             color: var(--text-faint);
             font-size: 0.88rem;
@@ -234,7 +278,7 @@
             .page { padding: 0 1.25rem; }
             .hero h1 { font-size: 2rem; }
             .hero-code { font-size: 0.82em; padding: 1rem 1.25rem; }
-            .chapters li { padding: 0.75rem; }
+            .chapters a.chapter-link { padding: 0.75rem; }
         }
         /* Syntax highlighting */
         .kw { color: #fbbf24; }
@@ -261,8 +305,8 @@
             <h1>Learn Basalt</h1>
             <p class="lead">A statically typed language with no null, no exceptions, and no surprises. This guide will take you from hello world to building real programs.</p>
             <div class="hero-code">
-<span style="color:#fbbf24">fn</span> main(stdout: <span style="color:#a7d28b">Stdout</span>) {<br>
-&nbsp;&nbsp;&nbsp;&nbsp;stdout.println(<span style="color:#a7d28b">"Hello, Basalt!"</span>)<br>
+<span style="color:#fbbf24">fn</span> <span style="color:#7dd3fc">main</span>(stdout: <span style="color:#a7d28b">Stdout</span>) {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;stdout.<span style="color:#7dd3fc">println</span>(<span style="color:#a7d28b">"Hello! You're running Basalt."</span>)<br>
 }
             </div>
         </div>

@@ -180,6 +180,43 @@
             font-style: italic;
         }
         .content strong { color: var(--text); font-weight: 600; }
+        .content em { color: var(--text-soft); }
+        .content h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-soft);
+            margin-top: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        .content hr {
+            border: none;
+            border-top: 2px solid var(--border-light);
+            margin: 2.5rem 0;
+        }
+        .content ol { margin: 0.85rem 0; padding-left: 1.5rem; }
+        .content table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1.25rem 0;
+            font-size: 0.92em;
+            border-radius: var(--radius);
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+        .content th {
+            background: var(--bg-warm);
+            font-weight: 600;
+            color: var(--text);
+            text-align: left;
+            padding: 0.6rem 0.9rem;
+            border-bottom: 2px solid var(--border);
+        }
+        .content td {
+            padding: 0.55rem 0.9rem;
+            border-bottom: 1px solid var(--border-light);
+        }
+        .content tr:last-child td { border-bottom: none; }
+        .content tr:hover td { background: var(--bg-warm); }
 
         /* --- Chapter list --- */
         .chapters {
@@ -189,15 +226,29 @@
             gap: 0;
         }
         .chapters li {
+            display: block;
+            border-radius: var(--radius);
+        }
+        .chapters a.chapter-link {
             display: flex;
             align-items: baseline;
             gap: 1rem;
+            text-decoration: none;
+            color: inherit;
             padding: 1rem 1.25rem;
             border-radius: var(--radius);
             transition: background 0.15s ease;
         }
-        .chapters li:hover {
+        .chapters a.chapter-link:hover {
             background: var(--bg-warm);
+        }
+        .chapters .chapter-title {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+        .chapters a.chapter-link:hover .chapter-title {
+            color: var(--accent-hover);
         }
         .chapters .num {
             font-family: 'JetBrains Mono', monospace;
@@ -207,13 +258,6 @@
             min-width: 1.5rem;
         }
         .chapters .chapter-info { flex: 1; }
-        .chapters a {
-            font-size: 1.05rem;
-            font-weight: 600;
-            color: var(--text);
-            text-decoration: none;
-        }
-        .chapters a:hover { color: var(--accent-hover); }
         .chapters .desc {
             color: var(--text-faint);
             font-size: 0.88rem;
@@ -234,7 +278,7 @@
             .page { padding: 0 1.25rem; }
             .hero h1 { font-size: 2rem; }
             .hero-code { font-size: 0.82em; padding: 1rem 1.25rem; }
-            .chapters li { padding: 0.75rem; }
+            .chapters a.chapter-link { padding: 0.75rem; }
         }
         /* Syntax highlighting */
         .kw { color: #fbbf24; }
@@ -254,15 +298,15 @@
         </div>
     </div>
     <div class="sidebar-nav">
-        <div class="page"><a href="index.html">Home</a> <a href="capabilities.html">Capabilities</a> <a href="closures.html">Closures</a> <a href="control-flow.html">Control Flow</a> <a href="conversions.html">Type Conversions</a> <a href="enums.html">Enums</a> <a href="error-handling.html">Error Handling</a> <a href="functions.html">Functions</a> <a href="modules.html">Modules</a> <a href="pattern-matching.html">Pattern Matching</a> <a href="stdlib.html">Standard Library</a> <a href="structs.html">Structs</a> <a href="types.html">Types</a> <a href="variables.html">Variables</a></div>
+        <div class="page"><a href="index.html">Home</a> <a href="types.html">Types</a> <a href="variables.html">Variables</a> <a href="functions.html">Functions</a> <a href="control-flow.html">Control Flow</a> <a href="pattern-matching.html">Pattern Matching</a> <a href="error-handling.html">Error Handling</a> <a href="structs.html">Structs</a> <a href="enums.html">Enums</a> <a href="closures.html">Closures</a> <a href="modules.html">Modules</a> <a href="stdlib.html">Standard Library</a> <a href="capabilities.html">Capabilities</a> <a href="conversions.html">Type Conversions</a></div>
     </div>
     <div class="page">
         <div class="hero">
             <h1>Learn Basalt</h1>
             <p class="lead">A statically typed language with no null, no exceptions, and no surprises. This guide will take you from hello world to building real programs.</p>
             <div class="hero-code">
-<span style="color:#fbbf24">fn</span> main(stdout: <span style="color:#a7d28b">Stdout</span>) {<br>
-&nbsp;&nbsp;&nbsp;&nbsp;stdout.println(<span style="color:#a7d28b">"Hello, Basalt!"</span>)<br>
+<span style="color:#fbbf24">fn</span> <span style="color:#7dd3fc">main</span>(stdout: <span style="color:#a7d28b">Stdout</span>) {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;stdout.<span style="color:#7dd3fc">println</span>(<span style="color:#a7d28b">"Hello! You're running Basalt."</span>)<br>
 }
             </div>
         </div>
@@ -270,10 +314,10 @@
             <p>This guide walks you through everything Basalt can do, with examples you can run at every step. No prior experience with Basalt is needed — just curiosity.</p>
 <h2>Your first three minutes</h2>
 <p>Install and build:</p>
-<pre><code>cargo build --release</code></pre>
+<pre><code>cargo build <span class="op">-</span><span class="op">-</span>release</code></pre>
 <p>Write this to a file called <code>hello.bas</code>:</p>
-<pre><code>fn main(stdout: Stdout) {
-    stdout.println("Hello! You're running Basalt.")
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    stdout.<span class="fn">println</span>(<span class="st">"Hello! You're running Basalt."</span>)
 }</code></pre>
 <p>Run it:</p>
 <pre><code>basalt run hello.bas</code></pre>
@@ -284,108 +328,134 @@
 <h2>Chapters</h2>
 <ul class="chapters">
 <li>
-  <span class="num">1</span>
-  <div class="chapter-info">
-    <a href="types.html">Types</a>
-    <div class="date">2026-03-02</div>
-    <div class="desc">Basalt's type system</div>
-  </div>
+  <a href="types.html" class="chapter-link">
+    <span class="num">1</span>
+    <div class="chapter-info">
+      <span class="chapter-title">Types</span>
+      <div class="date">2026-03-02</div>
+      <div class="desc">Basalt's type system</div>
+    </div>
+  </a>
 </li>
 <li>
-  <span class="num">2</span>
-  <div class="chapter-info">
-    <a href="variables.html">Variables</a>
-    <div class="date">2026-03-03</div>
-    <div class="desc">Variables, mutability, and type inference</div>
-  </div>
+  <a href="variables.html" class="chapter-link">
+    <span class="num">2</span>
+    <div class="chapter-info">
+      <span class="chapter-title">Variables</span>
+      <div class="date">2026-03-03</div>
+      <div class="desc">Variables, mutability, and type inference</div>
+    </div>
+  </a>
 </li>
 <li>
-  <span class="num">3</span>
-  <div class="chapter-info">
-    <a href="functions.html">Functions</a>
-    <div class="date">2026-03-04</div>
-    <div class="desc">Function declarations and first-class functions</div>
-  </div>
+  <a href="functions.html" class="chapter-link">
+    <span class="num">3</span>
+    <div class="chapter-info">
+      <span class="chapter-title">Functions</span>
+      <div class="date">2026-03-04</div>
+      <div class="desc">Function declarations and first-class functions</div>
+    </div>
+  </a>
 </li>
 <li>
-  <span class="num">4</span>
-  <div class="chapter-info">
-    <a href="control-flow.html">Control Flow</a>
-    <div class="date">2026-03-05</div>
-    <div class="desc">Conditionals, loops, guards, and pattern matching</div>
-  </div>
+  <a href="control-flow.html" class="chapter-link">
+    <span class="num">4</span>
+    <div class="chapter-info">
+      <span class="chapter-title">Control Flow</span>
+      <div class="date">2026-03-05</div>
+      <div class="desc">Conditionals, loops, guards, and pattern matching</div>
+    </div>
+  </a>
 </li>
 <li>
-  <span class="num">5</span>
-  <div class="chapter-info">
-    <a href="pattern-matching.html">Pattern Matching</a>
-    <div class="date">2026-03-06</div>
-    <div class="desc">Exhaustive pattern matching with match expressions</div>
-  </div>
+  <a href="pattern-matching.html" class="chapter-link">
+    <span class="num">5</span>
+    <div class="chapter-info">
+      <span class="chapter-title">Pattern Matching</span>
+      <div class="date">2026-03-06</div>
+      <div class="desc">Exhaustive pattern matching with match expressions</div>
+    </div>
+  </a>
 </li>
 <li>
-  <span class="num">6</span>
-  <div class="chapter-info">
-    <a href="error-handling.html">Error Handling</a>
-    <div class="date">2026-03-07</div>
-    <div class="desc">Result types, error propagation, and recovery</div>
-  </div>
+  <a href="error-handling.html" class="chapter-link">
+    <span class="num">6</span>
+    <div class="chapter-info">
+      <span class="chapter-title">Error Handling</span>
+      <div class="date">2026-03-07</div>
+      <div class="desc">Result types, error propagation, and recovery</div>
+    </div>
+  </a>
 </li>
 <li>
-  <span class="num">7</span>
-  <div class="chapter-info">
-    <a href="structs.html">Structs</a>
-    <div class="date">2026-03-08</div>
-    <div class="desc">Struct types, methods, and reference semantics</div>
-  </div>
+  <a href="structs.html" class="chapter-link">
+    <span class="num">7</span>
+    <div class="chapter-info">
+      <span class="chapter-title">Structs</span>
+      <div class="date">2026-03-08</div>
+      <div class="desc">Struct types, methods, and reference semantics</div>
+    </div>
+  </a>
 </li>
 <li>
-  <span class="num">8</span>
-  <div class="chapter-info">
-    <a href="enums.html">Enums</a>
-    <div class="date">2026-03-09</div>
-    <div class="desc">Enum types with data-carrying variants</div>
-  </div>
+  <a href="enums.html" class="chapter-link">
+    <span class="num">8</span>
+    <div class="chapter-info">
+      <span class="chapter-title">Enums</span>
+      <div class="date">2026-03-09</div>
+      <div class="desc">Enum types with data-carrying variants</div>
+    </div>
+  </a>
 </li>
 <li>
-  <span class="num">9</span>
-  <div class="chapter-info">
-    <a href="closures.html">Closures</a>
-    <div class="date">2026-03-10</div>
-    <div class="desc">Lambda functions and functional array methods</div>
-  </div>
+  <a href="closures.html" class="chapter-link">
+    <span class="num">9</span>
+    <div class="chapter-info">
+      <span class="chapter-title">Closures</span>
+      <div class="date">2026-03-10</div>
+      <div class="desc">Lambda functions and functional array methods</div>
+    </div>
+  </a>
 </li>
 <li>
-  <span class="num">10</span>
-  <div class="chapter-info">
-    <a href="modules.html">Modules</a>
-    <div class="date">2026-03-11</div>
-    <div class="desc">Module system and imports</div>
-  </div>
+  <a href="modules.html" class="chapter-link">
+    <span class="num">10</span>
+    <div class="chapter-info">
+      <span class="chapter-title">Modules</span>
+      <div class="date">2026-03-11</div>
+      <div class="desc">Module system and imports</div>
+    </div>
+  </a>
 </li>
 <li>
-  <span class="num">11</span>
-  <div class="chapter-info">
-    <a href="stdlib.html">Standard Library</a>
-    <div class="date">2026-03-12</div>
-    <div class="desc">Built-in methods and the math module</div>
-  </div>
+  <a href="stdlib.html" class="chapter-link">
+    <span class="num">11</span>
+    <div class="chapter-info">
+      <span class="chapter-title">Standard Library</span>
+      <div class="date">2026-03-12</div>
+      <div class="desc">Built-in methods and the math module</div>
+    </div>
+  </a>
 </li>
 <li>
-  <span class="num">12</span>
-  <div class="chapter-info">
-    <a href="capabilities.html">Capabilities</a>
-    <div class="date">2026-03-13</div>
-    <div class="desc">Capability-based I/O system</div>
-  </div>
+  <a href="capabilities.html" class="chapter-link">
+    <span class="num">12</span>
+    <div class="chapter-info">
+      <span class="chapter-title">Capabilities</span>
+      <div class="date">2026-03-13</div>
+      <div class="desc">Capability-based I/O system</div>
+    </div>
+  </a>
 </li>
 <li>
-  <span class="num">13</span>
-  <div class="chapter-info">
-    <a href="conversions.html">Type Conversions</a>
-    <div class="date">2026-03-14</div>
-    <div class="desc">Type casting with as and as?</div>
-  </div>
+  <a href="conversions.html" class="chapter-link">
+    <span class="num">13</span>
+    <div class="chapter-info">
+      <span class="chapter-title">Type Conversions</span>
+      <div class="date">2026-03-14</div>
+      <div class="desc">Type casting with as and as?</div>
+    </div>
+  </a>
 </li>
 </ul>
 

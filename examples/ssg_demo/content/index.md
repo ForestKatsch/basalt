@@ -8,13 +8,13 @@ This guide walks you through everything Basalt can do, with examples you can run
 
 Install and build:
 
-```
+```sh
 cargo build --release
 ```
 
 Write this to a file called `hello.bas`:
 
-```
+```basalt
 fn main(stdout: Stdout) {
     stdout.println("Hello! You're running Basalt.")
 }
@@ -22,7 +22,7 @@ fn main(stdout: Stdout) {
 
 Run it:
 
-```
+```sh
 basalt run hello.bas
 ```
 
@@ -30,7 +30,7 @@ That's it. You just wrote and ran a Basalt program. The `stdout: Stdout` part is
 
 You can also type-check without running:
 
-```
+```sh
 basalt check hello.bas
 ```
 
