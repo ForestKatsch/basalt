@@ -44,14 +44,14 @@ pub fn compile_file_rich(path: &Path) -> Result<CompileResult, (CompileErrors, S
 
     let tokens = lexer::lex(&source).map_err(|e| {
         (
-            CompileErrors::single(CompileError::bare(&e)),
+            CompileErrors::single(CompileError::from_legacy(&e)),
             source.clone(),
             filename.clone(),
         )
     })?;
     let mut ast = parser::parse(tokens).map_err(|e| {
         (
-            CompileErrors::single(CompileError::bare(&e)),
+            CompileErrors::single(CompileError::from_legacy(&e)),
             source.clone(),
             filename.clone(),
         )

@@ -53,6 +53,25 @@ impl CompileError {
         self
     }
 
+    /// Parse a legacy error string like "[line 13:1] message" into a CompileError
+    /// with a proper span. If the string doesn't match this format, creates a bare error.
+    pub fn from_legacy(s: &str) -> Self {
+        if let Some(rest) = s.strip_prefix("[line ") {
+            if let Some(bracket_end) = rest.find(']') {
+                let coords = &rest[..bracket_end];
+                let msg = rest[bracket_end + 1..].trim().to_string();
+                let parts: Vec<&str> = coords.split(':').collect();
+                if parts.len() == 2 {
+                    if let (Ok(line), Ok(col)) = (parts[0].parse::<u32>(), parts[1].parse::<u32>())
+                    {
+                        return CompileError::new(msg, Span::new(line, col));
+                    }
+                }
+            }
+        }
+        CompileError::bare(s)
+    }
+
     /// Render this error as a human-readable diagnostic.
     ///
     /// `source` is the full source code of the file that produced this error.

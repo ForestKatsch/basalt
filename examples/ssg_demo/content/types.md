@@ -20,16 +20,51 @@ fn main(stdout: Stdout) {
 }
 ```
 
-Integer types come in signed (`i8`, `i16`, `i32`, `i64`) and unsigned (`u8`, `u16`, `u32`, `u64`). All integer literals default to `i64`. When you need a specific width, annotate:
+### Integer types
+
+| Type | Size | Range |
+|------|------|-------|
+| `i8` | 1 byte | -128 to 127 |
+| `i16` | 2 bytes | -32,768 to 32,767 |
+| `i32` | 4 bytes | -2,147,483,648 to 2,147,483,647 |
+| `i64` | 8 bytes | -9.2 x 10^18 to 9.2 x 10^18 |
+| `u8` | 1 byte | 0 to 255 |
+| `u16` | 2 bytes | 0 to 65,535 |
+| `u32` | 4 bytes | 0 to 4,294,967,295 |
+| `u64` | 8 bytes | 0 to 1.8 x 10^19 |
+
+All integer literals default to `i64`. Use a type annotation for other widths:
 
 ```basalt
 fn main(stdout: Stdout) {
     let byte: u8 = 255
     let port: u16 = 8080
     let id: u64 = 0xDEADBEEF
+    let mask: i32 = 0xFF
     stdout.println(byte as string)  // Output: 255
 }
 ```
+
+Integer literals also support hex (`0xFF`) and binary (`0b1010`) notation.
+
+### Checked arithmetic
+
+All integer arithmetic is checked. Overflow panics at runtime instead of silently wrapping:
+
+```basalt
+fn main(stdout: Stdout) {
+    let x: u8 = 255
+    let y = x + (1 as u8)
+    // runtime panic: integer overflow: 255 + 1 exceeds u8 range
+}
+```
+
+Division by zero and out-of-range shift amounts also panic. Use `as?` for safe narrowing conversions (see [Type Conversions](conversions.html)).
+
+### Float
+
+One float type: `f64` (IEEE 754 double precision, 64-bit). There is no `f32`. Float arithmetic follows IEEE 754 — no overflow panics, but division by zero produces `inf`.
+
 
 ## No implicit conversions
 
