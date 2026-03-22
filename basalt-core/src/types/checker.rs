@@ -130,6 +130,27 @@ impl TypeChecker {
         None
     }
 
+    /// Resolve a type expression, checking module-local types first.
+    /// Used when resolving types inside a module definition.
+    fn resolve_type_expr_in_module(
+        &self,
+        ty: &TypeExpr,
+        module_name: &str,
+    ) -> Result<Type, CompileError> {
+        if let TypeExpr::Named(name) = ty {
+            // Try qualified name first (module.Type)
+            let qualified = format!("{}.{}", module_name, name);
+            if self.type_info.structs.contains_key(&qualified) {
+                return Ok(Type::Struct(qualified));
+            }
+            if self.type_info.enums.contains_key(&qualified) {
+                return Ok(Type::Enum(qualified));
+            }
+        }
+        // Fall back to normal resolution
+        self.resolve_type_expr(ty)
+    }
+
     fn resolve_type_expr(&self, ty: &TypeExpr) -> Result<Type, CompileError> {
         match ty {
             TypeExpr::Named(name) => self.resolve_type_name(name),
@@ -448,6 +469,41 @@ impl TypeChecker {
     }
 
     fn register_module_types(&mut self, program: &Program) -> Result<(), CompileError> {
+        // Phase 1: Register all module type NAMES as empty shells so they can
+        // reference each other during field resolution.
+        for (module_name, items) in &program.modules {
+            for item in items {
+                if let Item::TypeDef(td) = item {
+                    let qualified = format!("{}.{}", module_name, td.name);
+                    match &td.kind {
+                        TypeDefKind::Struct(_) => {
+                            self.type_info.structs.insert(
+                                qualified,
+                                StructInfo {
+                                    name: td.name.clone(),
+                                    fields: Vec::new(),
+                                    methods: HashMap::new(),
+                                    parent: td.parent.clone(),
+                                },
+                            );
+                        }
+                        TypeDefKind::Enum(_) => {
+                            self.type_info.enums.insert(
+                                qualified,
+                                EnumInfo {
+                                    name: td.name.clone(),
+                                    variants: Vec::new(),
+                                    methods: HashMap::new(),
+                                },
+                            );
+                        }
+                        TypeDefKind::Alias(_) => {}
+                    }
+                }
+            }
+        }
+
+        // Phase 2: Resolve fields, variants, methods, and functions.
         for (module_name, items) in &program.modules {
             let mut mod_info = ModuleInfo {
                 structs: HashMap::new(),
@@ -463,19 +519,29 @@ impl TypeChecker {
                             let fields: Vec<(String, Type)> = sdef
                                 .fields
                                 .iter()
-                                .map(|f| Ok((f.name.clone(), self.resolve_type_expr(&f.ty)?)))
+                                .map(|f| {
+                                    Ok((
+                                        f.name.clone(),
+                                        self.resolve_type_expr_in_module(&f.ty, module_name)?,
+                                    ))
+                                })
                                 .collect::<Result<_, CompileError>>()?;
                             let mut methods = HashMap::new();
                             for m in &sdef.methods {
                                 let params: Vec<(String, Type)> = m
                                     .params
                                     .iter()
-                                    .map(|p| Ok((p.name.clone(), self.resolve_type_expr(&p.ty)?)))
+                                    .map(|p| {
+                                        Ok((
+                                            p.name.clone(),
+                                            self.resolve_type_expr_in_module(&p.ty, module_name)?,
+                                        ))
+                                    })
                                     .collect::<Result<_, CompileError>>()?;
                                 let ret = m
                                     .return_type
                                     .as_ref()
-                                    .map(|t| self.resolve_type_expr(t))
+                                    .map(|t| self.resolve_type_expr_in_module(t, module_name))
                                     .transpose()?
                                     .unwrap_or(Type::Nil);
                                 methods.insert(
@@ -506,7 +572,7 @@ impl TypeChecker {
                                     let fields: Result<Vec<Type>, CompileError> = v
                                         .fields
                                         .iter()
-                                        .map(|t| self.resolve_type_expr(t))
+                                        .map(|t| self.resolve_type_expr_in_module(t, module_name))
                                         .collect();
                                     Ok(VariantInfo {
                                         name: v.name.clone(),
@@ -524,7 +590,7 @@ impl TypeChecker {
                             );
                         }
                         TypeDefKind::Alias(ty) => {
-                            let resolved = self.resolve_type_expr(ty)?;
+                            let resolved = self.resolve_type_expr_in_module(ty, module_name)?;
                             mod_info.aliases.insert(td.name.clone(), resolved);
                         }
                     },
@@ -532,12 +598,17 @@ impl TypeChecker {
                         let params: Vec<(String, Type)> = fdef
                             .params
                             .iter()
-                            .map(|p| Ok((p.name.clone(), self.resolve_type_expr(&p.ty)?)))
+                            .map(|p| {
+                                Ok((
+                                    p.name.clone(),
+                                    self.resolve_type_expr_in_module(&p.ty, module_name)?,
+                                ))
+                            })
                             .collect::<Result<_, CompileError>>()?;
                         let ret = fdef
                             .return_type
                             .as_ref()
-                            .map(|t| self.resolve_type_expr(t))
+                            .map(|t| self.resolve_type_expr_in_module(t, module_name))
                             .transpose()?
                             .unwrap_or(Type::Nil);
                         mod_info.functions.insert(
