@@ -2,7 +2,7 @@ title: Types
 date: 2026-03-02
 description: Every value has a type. Every type tells the truth.
 
-Most bugs in dynamic languages come from a value being something you didn't expect — a string where you wanted a number, `null` where you wanted a record, `undefined` where you wanted anything at all. Basalt's type system eliminates these bugs at compile time. If your program type-checks, every value is exactly what the type says it is.
+Every value in Basalt has a type known at compile time. The compiler rejects programs where types don't match — before the code runs.
 
 ## Primitives
 

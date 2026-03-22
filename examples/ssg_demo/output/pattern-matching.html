@@ -335,7 +335,7 @@
         <article class="content">
             <h1>Pattern Matching</h1>
             <p class="subtitle">The compiler checks every case. Forget one, it tells you.</p>
-            <p>Pattern matching in Basalt isn't syntactic sugar — it's a safety mechanism. The <code>match</code> expression checks a value against patterns, and the compiler <strong>guarantees you've handled every possibility</strong>. If you add a variant to an enum and forget to update a <code>match</code>, the compiler stops you before the code ships.</p>
+            <p><code>match</code> checks a value against patterns. The compiler verifies every possibility is handled.</p>
 <h2>Matching literals</h2>
 <p>At its simplest, <code>match</code> replaces chains of <code>if</code>/<code>else if</code>:</p>
 <pre><code><span class="kw">fn</span> <span class="fn">describe_status</span>(code<span class="op">:</span> <span class="ty">i64</span>) <span class="op">-&gt;</span> <span class="ty">string</span> {
@@ -430,9 +430,7 @@ Imagine you add a <code>Binary(bytes)</code> variant to <code>HttpBody</code> si
     <span class="cm">// Output: Result: 3.3333333333333335</span>
 }</code></pre>
 <p>Both branches must be present — you can't ignore the error case. For lighter-weight error handling, see the <code>?</code> operator and <code>guard let</code> in <a href="error-handling.html">Error Handling</a>.</p>
-<div class="callout callout-tip"><strong>Try this</strong>
-Define a <code>type Shape { Circle(f64), Rect(f64, f64), Triangle(f64, f64, f64) }</code> and write an <code>area</code> function using <code>match</code>. Then add a <code>Point</code> variant with no data and see what the compiler tells you.
-</div>
+<p>To practice, define a <code>type Shape { Circle(f64) \n Rect(f64, f64) \n Triangle(f64, f64, f64) }</code> and write an <code>area</code> function using <code>match</code>. Then add a <code>Point</code> variant with no data — the compiler will flag every <code>match</code> that doesn't handle it.</p>
 <h2>What's Next</h2>
 <p>Pattern matching forces you to handle every case — including errors. But what's the best way to structure error handling across a whole program? Next up: <a href="error-handling.html">Error Handling</a>.</p>
 

@@ -335,7 +335,7 @@
         <article class="content">
             <h1>Functions</h1>
             <p class="subtitle">Everything is explicit. Parameters, return types, return statements.</p>
-            <p>Functions in Basalt have no hidden behavior. Every parameter has a type. Every non-void function declares its return type. Every value is returned explicitly. Reading a function signature tells you exactly what goes in and what comes out.</p>
+            <p>All parameters require type annotations. Return type is required for non-void functions. Return is always explicit.</p>
 <h2>Declaring functions</h2>
 <pre><code><span class="kw">fn</span> <span class="fn">celsius_to_fahrenheit</span>(c<span class="op">:</span> <span class="ty">f64</span>) <span class="op">-&gt;</span> <span class="ty">f64</span> {
     <span class="kw">return</span> c <span class="op">*</span> <span class="nu">1.8</span> <span class="op">+</span> <span class="nu">32.0</span>
@@ -403,9 +403,15 @@ In languages with implicit return, adding a logging line at the end of a functio
     stdout.<span class="fn">println</span>(<span class="fn">apply</span>(negate, <span class="nu">3</span>) <span class="kw">as</span> <span class="ty">string</span>)    <span class="cm">// Output: -3</span>
 }</code></pre>
 <p>The type <code>fn(i64) -&gt; i64</code> describes any function that takes one <code>i64</code> and returns an <code>i64</code>. This enables higher-order patterns — mapping, filtering, and composing operations — without any special syntax. We'll see this in action with <a href="closures.html">Closures</a>.</p>
-<div class="callout callout-tip"><strong>Try this</strong>
-Write a function <code>fn clamp(val: i64, lo: i64, hi: i64) -> i64</code> that returns <code>val</code> if it's between <code>lo</code> and <code>hi</code>, otherwise the nearest bound. You'll need <code>if</code> expressions — which brings us to the next chapter.
-</div>
+<h2>Forward references</h2>
+<p>Functions can call other functions defined later in the same file. All function signatures are registered before any bodies are checked:</p>
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    stdout.<span class="fn">println</span>(<span class="fn">greet</span>(<span class="st">"world"</span>))  <span class="cm">// OK — greet is defined below</span>
+}
+
+<span class="kw">fn</span> <span class="fn">greet</span>(name<span class="op">:</span> <span class="ty">string</span>) <span class="op">-&gt;</span> <span class="ty">string</span> {
+    <span class="kw">return</span> <span class="st">"Hello, "</span> <span class="op">+</span> name <span class="op">+</span> <span class="st">"!"</span>
+}</code></pre>
 <h2>What's Next</h2>
 <p>Functions describe <em>what</em> to compute. Control flow describes <em>when</em> and <em>how</em>. Next up: <a href="control-flow.html">Control Flow</a>.</p>
 

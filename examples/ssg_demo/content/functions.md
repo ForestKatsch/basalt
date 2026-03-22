@@ -2,7 +2,7 @@ title: Functions
 date: 2026-03-04
 description: Everything is explicit. Parameters, return types, return statements.
 
-Functions in Basalt have no hidden behavior. Every parameter has a type. Every non-void function declares its return type. Every value is returned explicitly. Reading a function signature tells you exactly what goes in and what comes out.
+All parameters require type annotations. Return type is required for non-void functions. Return is always explicit.
 
 ## Declaring functions
 
@@ -100,9 +100,19 @@ fn main(stdout: Stdout) {
 
 The type `fn(i64) -> i64` describes any function that takes one `i64` and returns an `i64`. This enables higher-order patterns — mapping, filtering, and composing operations — without any special syntax. We'll see this in action with [Closures](closures.html).
 
-<div class="callout callout-tip"><strong>Try this</strong>
-Write a function <code>fn clamp(val: i64, lo: i64, hi: i64) -> i64</code> that returns <code>val</code> if it's between <code>lo</code> and <code>hi</code>, otherwise the nearest bound. You'll need <code>if</code> expressions — which brings us to the next chapter.
-</div>
+## Forward references
+
+Functions can call other functions defined later in the same file. All function signatures are registered before any bodies are checked:
+
+```basalt
+fn main(stdout: Stdout) {
+    stdout.println(greet("world"))  // OK — greet is defined below
+}
+
+fn greet(name: string) -> string {
+    return "Hello, " + name + "!"
+}
+```
 
 ## What's Next
 

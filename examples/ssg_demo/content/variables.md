@@ -2,7 +2,7 @@ title: Variables
 date: 2026-03-03
 description: Immutable by default. Mutable when you need it.
 
-Most bugs from mutable state follow the same pattern: something changed a value you assumed was stable. Basalt addresses this at the language level — variables are immutable by default, and the compiler enforces it.
+Variables are immutable by default. Declare with `let` and the binding cannot be reassigned.
 
 ## Immutable by default
 
@@ -93,6 +93,35 @@ fn main(stdout: Stdout) {
 Each `let` creates a new binding. The old value is untouched — if anything else referenced it, they still see the original. Shadowing is useful for transforming a value through a pipeline without inventing new names for each step.
 
 This is different from mutation. With `let mut`, you change what a name points to. With shadowing, you create an entirely new binding that happens to reuse the name — and you can even change the type, as the example above shows.
+
+## Scoping
+
+Variables are visible from their declaration to the end of the enclosing block. Inner blocks can see outer variables, but not the reverse:
+
+```basalt
+fn main(stdout: Stdout) {
+    let outer = "visible"
+    if true {
+        let inner = "only here"
+        stdout.println(outer)  // OK — outer is visible
+    }
+    // inner is NOT visible here
+    // stdout.println(inner)  // COMPILE ERROR: undefined variable 'inner'
+}
+```
+
+Loop variables are scoped to the loop body:
+
+```basalt
+fn main(stdout: Stdout) {
+    for i in 0..3 {
+        stdout.println(i as string)
+    }
+    // i is NOT visible here
+}
+```
+
+Function parameters are scoped to the function body. There is no hoisting — a variable must be declared before it's used.
 
 ## What's Next
 

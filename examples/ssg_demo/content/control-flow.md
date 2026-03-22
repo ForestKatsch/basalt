@@ -154,9 +154,36 @@ fn load_config(fs: Fs, stdout: Stdout) {
 
 Compare this to nested `if` or `match` — `guard let` keeps the happy path at the top indentation level. You'll see it everywhere once you start writing real Basalt. It's especially powerful with [Error Handling](error-handling.html).
 
-<div class="callout callout-tip"><strong>Try this</strong>
-Write a function that takes an array of strings and returns the first one that parses as an integer, using <code>guard let</code> inside a <code>for</code> loop with <code>continue</code> in the else block.
-</div>
+### guard let errors
+
+The `else` block must diverge — the compiler enforces this:
+
+```basalt
+fn example(fs: Fs, stdout: Stdout) {
+    guard let data = fs.read_file("f.txt") else {
+        stdout.println("failed")
+        // Error: guard else block must diverge (return, break, continue, or panic)
+    }
+}
+```
+
+`guard let` works with optional types (`T?`) and result types (`T!E`). It unwraps the success/present value:
+
+```basalt
+fn find_first_positive(nums: [i64]) -> i64? {
+    return nums.find(fn(n: i64) -> bool { return n > 0 })
+}
+
+fn main(stdout: Stdout) {
+    let nums = [-3, -1, 0, 5, 2]
+    guard let pos = find_first_positive(nums) else {
+        stdout.println("no positive numbers")
+        return
+    }
+    stdout.println("first positive: " + (pos as string))
+    // Output: first positive: 5
+}
+```
 
 ## What's Next
 

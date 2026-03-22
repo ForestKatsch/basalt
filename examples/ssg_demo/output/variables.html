@@ -335,7 +335,7 @@
         <article class="content">
             <h1>Variables</h1>
             <p class="subtitle">Immutable by default. Mutable when you need it.</p>
-            <p>Most bugs from mutable state follow the same pattern: something changed a value you assumed was stable. Basalt addresses this at the language level — variables are immutable by default, and the compiler enforces it.</p>
+            <p>Variables are immutable by default. Declare with <code>let</code> and the binding cannot be reassigned.</p>
 <h2>Immutable by default</h2>
 <pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
     <span class="kw">let</span> name <span class="op">=</span> <span class="st">"config.json"</span>
@@ -398,6 +398,25 @@ Write <code>let mut items = [1, 2, 3]</code> instead.
 }</code></pre>
 <p>Each <code>let</code> creates a new binding. The old value is untouched — if anything else referenced it, they still see the original. Shadowing is useful for transforming a value through a pipeline without inventing new names for each step.</p>
 <p>This is different from mutation. With <code>let mut</code>, you change what a name points to. With shadowing, you create an entirely new binding that happens to reuse the name — and you can even change the type, as the example above shows.</p>
+<h2>Scoping</h2>
+<p>Variables are visible from their declaration to the end of the enclosing block. Inner blocks can see outer variables, but not the reverse:</p>
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> outer <span class="op">=</span> <span class="st">"visible"</span>
+    <span class="kw">if</span> <span class="kw">true</span> {
+        <span class="kw">let</span> inner <span class="op">=</span> <span class="st">"only here"</span>
+        stdout.<span class="fn">println</span>(outer)  <span class="cm">// OK — outer is visible</span>
+    }
+    <span class="cm">// inner is NOT visible here</span>
+    <span class="cm">// stdout.println(inner)  // COMPILE ERROR: undefined variable 'inner'</span>
+}</code></pre>
+<p>Loop variables are scoped to the loop body:</p>
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">for</span> i <span class="kw">in</span> <span class="nu">0..3</span> {
+        stdout.<span class="fn">println</span>(i <span class="kw">as</span> <span class="ty">string</span>)
+    }
+    <span class="cm">// i is NOT visible here</span>
+}</code></pre>
+<p>Function parameters are scoped to the function body. There is no hoisting — a variable must be declared before it's used.</p>
 <h2>What's Next</h2>
 <p>Variables hold values. Functions transform them. Next up: <a href="functions.html">Functions</a>.</p>
 

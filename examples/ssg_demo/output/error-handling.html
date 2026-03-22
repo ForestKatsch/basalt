@@ -335,8 +335,7 @@
         <article class="content">
             <h1>Error Handling</h1>
             <p class="subtitle">No exceptions. No surprises. Errors are values you can see in the type.</p>
-            <p>In most languages, any function can throw an exception. You don't know which ones until one crashes your program at 3 AM. You can't see it in the type signature. You can't grep for it reliably. You just have to <em>know</em> — or wrap everything in <code>try/catch</code> and hope.</p>
-<p>Basalt takes a different approach: <strong>errors are values</strong>. If a function can fail, its return type says so. The compiler ensures you handle every error before you can use the result.</p>
+            <p>If a function can fail, its return type says so. <code>T!E</code> holds either a success value of type <code>T</code> or an error of type <code>E</code>. The compiler ensures every result is handled.</p>
 <h2>Result types</h2>
 <p><code>T!E</code> is a type that holds either a success value of type <code>T</code> or an error of type <code>E</code>:</p>
 <pre><code><span class="kw">fn</span> <span class="fn">parse_temperature</span>(s<span class="op">:</span> <span class="ty">string</span>) <span class="op">-&gt;</span> <span class="ty">f64</span><span class="op">!</span><span class="ty">string</span> {
@@ -421,6 +420,46 @@
     }
 }</code></pre>
 <p>Each possible failure — file not found, not a number, out of range — is explicit. The caller sees a single <code>i64!string</code> and decides how to handle failure. No exception hierarchy to memorize. No hidden control flow.</p>
+<h2>Custom error types</h2>
+<p>The error type in <code>T!E</code> can be any type — not just <code>string</code>. For real applications, define an enum:</p>
+<pre><code><span class="kw">type</span> <span class="ty">ConfigError</span> {
+    <span class="ty">FileNotFound</span>(<span class="ty">string</span>)
+    <span class="ty">ParseFailed</span>(<span class="ty">string</span>)
+    <span class="ty">MissingField</span>(<span class="ty">string</span>)
+}
+
+<span class="kw">fn</span> <span class="fn">load_config</span>(fs<span class="op">:</span> <span class="ty">Fs</span>) <span class="op">-&gt;</span> [<span class="ty">string</span><span class="op">:</span> <span class="ty">string</span>]<span class="op">!</span><span class="ty">ConfigError</span> {
+    <span class="kw">guard</span> <span class="kw">let</span> raw <span class="op">=</span> fs.<span class="fn">read_file</span>(<span class="st">"config.txt"</span>) <span class="kw">else</span> {
+        <span class="kw">return</span> <span class="op">!</span>(<span class="ty">ConfigError</span>.<span class="ty">FileNotFound</span>(<span class="st">"config.txt"</span>))
+    }
+    <span class="kw">let</span> <span class="kw">mut</span> config<span class="op">:</span> [<span class="ty">string</span><span class="op">:</span> <span class="ty">string</span>] <span class="op">=</span> {}
+    <span class="kw">let</span> lines <span class="op">=</span> raw.<span class="fn">split</span>(<span class="st">"\n"</span>)
+    <span class="kw">for</span> line <span class="kw">in</span> lines {
+        <span class="kw">let</span> sep <span class="op">=</span> line.<span class="fn">index_of</span>(<span class="st">"="</span>)
+        <span class="kw">if</span> sep <span class="op">&lt;</span> <span class="nu">0</span> { <span class="kw">continue</span> }
+        <span class="kw">let</span> key <span class="op">=</span> line.<span class="fn">slice</span>(<span class="nu">0</span>, sep).<span class="fn">trim</span>()
+        <span class="kw">let</span> value <span class="op">=</span> line.<span class="fn">slice</span>(sep <span class="op">+</span> <span class="nu">1</span>, line.length).<span class="fn">trim</span>()
+        config[key] <span class="op">=</span> value
+    }
+    <span class="kw">if</span> <span class="op">!</span>config.<span class="fn">contains_key</span>(<span class="st">"name"</span>) {
+        <span class="kw">return</span> <span class="op">!</span>(<span class="ty">ConfigError</span>.<span class="ty">MissingField</span>(<span class="st">"name"</span>))
+    }
+    <span class="kw">return</span> config
+}
+
+<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>, fs<span class="op">:</span> <span class="ty">Fs</span>) {
+    <span class="kw">match</span> <span class="fn">load_config</span>(fs) {
+        <span class="op">!</span>err <span class="op">=&gt;</span> {
+            <span class="kw">match</span> err {
+                <span class="ty">ConfigError</span>.<span class="ty">FileNotFound</span>(path) <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(<span class="st">"File not found: "</span> <span class="op">+</span> path)
+                <span class="ty">ConfigError</span>.<span class="ty">ParseFailed</span>(msg) <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(<span class="st">"Parse error: "</span> <span class="op">+</span> msg)
+                <span class="ty">ConfigError</span>.<span class="ty">MissingField</span>(name) <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(<span class="st">"Missing: "</span> <span class="op">+</span> name)
+            }
+        }
+        config <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(<span class="st">"Loaded config: "</span> <span class="op">+</span> config[<span class="st">"name"</span>])
+    }
+}</code></pre>
+<p>Using an enum for errors gives you exhaustive handling — the compiler ensures you handle <code>FileNotFound</code>, <code>ParseFailed</code>, AND <code>MissingField</code>. If you add a new error variant later, every <code>match</code> that handles the error type tells you about the missing case.</p>
 <h2>What happens if you ignore a result?</h2>
 <p>You can't. If a function returns <code>T!E</code> and you don't handle the error, the compiler tells you:</p>
 <blockquote>
@@ -429,9 +468,6 @@
 <p>This is the core guarantee: errors cannot be silently swallowed. Every result is either used, propagated, or explicitly handled.</p>
 <div class="callout callout-warn"><strong>panic is not error handling</strong>
 <code>panic("message")</code> terminates the program immediately with a stack trace. It cannot be caught. Use it for programming errors — violated invariants, impossible states, bugs. Use result types for expected failures — bad input, missing files, network timeouts. If a user can cause it, it's not a panic.
-</div>
-<div class="callout callout-tip"><strong>Try this</strong>
-Write a function <code>fn parse_pair(s: string) -> (i64, i64)!string</code> that takes a string like <code>"3,7"</code>, splits on <code>,</code>, and parses both halves. Use <code>?</code> to propagate parse errors. What error message does the user see for <code>"3,abc"</code>?
 </div>
 <h2>What's Next</h2>
 <p>Errors are values, and now you know how to create, propagate, and handle them. Next, let's define our own data types. Next up: <a href="structs.html">Structs</a>.</p>

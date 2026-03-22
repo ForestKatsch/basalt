@@ -2,7 +2,7 @@ title: Pattern Matching
 date: 2026-03-06
 description: The compiler checks every case. Forget one, it tells you.
 
-Pattern matching in Basalt isn't syntactic sugar — it's a safety mechanism. The `match` expression checks a value against patterns, and the compiler **guarantees you've handled every possibility**. If you add a variant to an enum and forget to update a `match`, the compiler stops you before the code ships.
+`match` checks a value against patterns. The compiler verifies every possibility is handled.
 
 ## Matching literals
 
@@ -127,9 +127,7 @@ fn main(stdout: Stdout) {
 
 Both branches must be present — you can't ignore the error case. For lighter-weight error handling, see the `?` operator and `guard let` in [Error Handling](error-handling.html).
 
-<div class="callout callout-tip"><strong>Try this</strong>
-Define a <code>type Shape { Circle(f64), Rect(f64, f64), Triangle(f64, f64, f64) }</code> and write an <code>area</code> function using <code>match</code>. Then add a <code>Point</code> variant with no data and see what the compiler tells you.
-</div>
+To practice, define a `type Shape { Circle(f64) \n Rect(f64, f64) \n Triangle(f64, f64, f64) }` and write an `area` function using `match`. Then add a `Point` variant with no data — the compiler will flag every `match` that doesn't handle it.
 
 ## What's Next
 

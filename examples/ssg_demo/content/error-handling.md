@@ -2,9 +2,7 @@ title: Error Handling
 date: 2026-03-07
 description: No exceptions. No surprises. Errors are values you can see in the type.
 
-In most languages, any function can throw an exception. You don't know which ones until one crashes your program at 3 AM. You can't see it in the type signature. You can't grep for it reliably. You just have to *know* — or wrap everything in `try/catch` and hope.
-
-Basalt takes a different approach: **errors are values**. If a function can fail, its return type says so. The compiler ensures you handle every error before you can use the result.
+If a function can fail, its return type says so. `T!E` holds either a success value of type `T` or an error of type `E`. The compiler ensures every result is handled.
 
 ## Result types
 
@@ -124,6 +122,52 @@ fn main(stdout: Stdout, fs: Fs) {
 
 Each possible failure — file not found, not a number, out of range — is explicit. The caller sees a single `i64!string` and decides how to handle failure. No exception hierarchy to memorize. No hidden control flow.
 
+## Custom error types
+
+The error type in `T!E` can be any type — not just `string`. For real applications, define an enum:
+
+```basalt
+type ConfigError {
+    FileNotFound(string)
+    ParseFailed(string)
+    MissingField(string)
+}
+
+fn load_config(fs: Fs) -> [string: string]!ConfigError {
+    guard let raw = fs.read_file("config.txt") else {
+        return !(ConfigError.FileNotFound("config.txt"))
+    }
+    let mut config: [string: string] = {}
+    let lines = raw.split("\n")
+    for line in lines {
+        let sep = line.index_of("=")
+        if sep < 0 { continue }
+        let key = line.slice(0, sep).trim()
+        let value = line.slice(sep + 1, line.length).trim()
+        config[key] = value
+    }
+    if !config.contains_key("name") {
+        return !(ConfigError.MissingField("name"))
+    }
+    return config
+}
+
+fn main(stdout: Stdout, fs: Fs) {
+    match load_config(fs) {
+        !err => {
+            match err {
+                ConfigError.FileNotFound(path) => stdout.println("File not found: " + path)
+                ConfigError.ParseFailed(msg) => stdout.println("Parse error: " + msg)
+                ConfigError.MissingField(name) => stdout.println("Missing: " + name)
+            }
+        }
+        config => stdout.println("Loaded config: " + config["name"])
+    }
+}
+```
+
+Using an enum for errors gives you exhaustive handling — the compiler ensures you handle `FileNotFound`, `ParseFailed`, AND `MissingField`. If you add a new error variant later, every `match` that handles the error type tells you about the missing case.
+
 ## What happens if you ignore a result?
 
 You can't. If a function returns `T!E` and you don't handle the error, the compiler tells you:
@@ -136,9 +180,6 @@ This is the core guarantee: errors cannot be silently swallowed. Every result is
 <code>panic("message")</code> terminates the program immediately with a stack trace. It cannot be caught. Use it for programming errors — violated invariants, impossible states, bugs. Use result types for expected failures — bad input, missing files, network timeouts. If a user can cause it, it's not a panic.
 </div>
 
-<div class="callout callout-tip"><strong>Try this</strong>
-Write a function <code>fn parse_pair(s: string) -> (i64, i64)!string</code> that takes a string like <code>"3,7"</code>, splits on <code>,</code>, and parses both halves. Use <code>?</code> to propagate parse errors. What error message does the user see for <code>"3,abc"</code>?
-</div>
 
 ## What's Next
 

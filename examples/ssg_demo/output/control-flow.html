@@ -455,9 +455,28 @@
     stdout.<span class="fn">println</span>(<span class="st">"Loaded \(content.length as string) bytes"</span>)
 }</code></pre>
 <p>Compare this to nested <code>if</code> or <code>match</code> — <code>guard let</code> keeps the happy path at the top indentation level. You'll see it everywhere once you start writing real Basalt. It's especially powerful with <a href="error-handling.html">Error Handling</a>.</p>
-<div class="callout callout-tip"><strong>Try this</strong>
-Write a function that takes an array of strings and returns the first one that parses as an integer, using <code>guard let</code> inside a <code>for</code> loop with <code>continue</code> in the else block.
-</div>
+<h3>guard let errors</h3>
+<p>The <code>else</code> block must diverge — the compiler enforces this:</p>
+<pre><code><span class="kw">fn</span> <span class="fn">example</span>(fs<span class="op">:</span> <span class="ty">Fs</span>, stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">guard</span> <span class="kw">let</span> data <span class="op">=</span> fs.<span class="fn">read_file</span>(<span class="st">"f.txt"</span>) <span class="kw">else</span> {
+        stdout.<span class="fn">println</span>(<span class="st">"failed"</span>)
+        <span class="cm">// Error: guard else block must diverge (return, break, continue, or panic)</span>
+    }
+}</code></pre>
+<p><code>guard let</code> works with optional types (<code>T?</code>) and result types (<code>T!E</code>). It unwraps the success/present value:</p>
+<pre><code><span class="kw">fn</span> <span class="fn">find_first_positive</span>(nums<span class="op">:</span> [<span class="ty">i64</span>]) <span class="op">-&gt;</span> <span class="ty">i64</span><span class="op">?</span> {
+    <span class="kw">return</span> nums.<span class="fn">find</span>(<span class="kw">fn</span>(n<span class="op">:</span> <span class="ty">i64</span>) <span class="op">-&gt;</span> <span class="ty">bool</span> { <span class="kw">return</span> n <span class="op">&gt;</span> <span class="nu">0</span> })
+}
+
+<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> nums <span class="op">=</span> [<span class="op">-</span><span class="nu">3</span>, <span class="op">-</span><span class="nu">1</span>, <span class="nu">0</span>, <span class="nu">5</span>, <span class="nu">2</span>]
+    <span class="kw">guard</span> <span class="kw">let</span> pos <span class="op">=</span> <span class="fn">find_first_positive</span>(nums) <span class="kw">else</span> {
+        stdout.<span class="fn">println</span>(<span class="st">"no positive numbers"</span>)
+        <span class="kw">return</span>
+    }
+    stdout.<span class="fn">println</span>(<span class="st">"first positive: "</span> <span class="op">+</span> (pos <span class="kw">as</span> <span class="ty">string</span>))
+    <span class="cm">// Output: first positive: 5</span>
+}</code></pre>
 <h2>What's Next</h2>
 <p><code>if</code> and <code>guard</code> handle simple conditions. When you need to match against multiple patterns at once — especially enum variants and union types — you want something more powerful. Next up: <a href="pattern-matching.html">Pattern Matching</a>.</p>
 

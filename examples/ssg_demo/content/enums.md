@@ -135,6 +135,39 @@ fn main(stdout: Stdout) {
 }
 ```
 
+## Methods on enums
+
+Like structs, enums can have methods:
+
+```basalt
+type Color {
+    Red
+    Green
+    Blue
+
+    fn name(self: Self) -> string {
+        match self {
+            Color.Red => return "red"
+            Color.Green => return "green"
+            Color.Blue => return "blue"
+        }
+        return ""
+    }
+
+    fn is_primary(self: Self) -> bool {
+        return true
+    }
+}
+
+fn main(stdout: Stdout) {
+    let c = Color.Blue
+    stdout.println(c.name())       // Output: blue
+    stdout.println(c.is_primary() as string)  // Output: true
+}
+```
+
+Methods on enums work the same as struct methods — `self: Self` for instance methods, no `self` for static methods.
+
 <div class="callout callout-note"><strong>Enums vs. type unions</strong>
 Basalt also has union types like <code>string | i64</code> for ad-hoc combinations. Enums are different — they define a <em>named, closed</em> set of possibilities with meaningful variant names. Use unions when combining existing types; use enums when defining a domain concept.
 </div>

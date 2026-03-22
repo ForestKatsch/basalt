@@ -438,6 +438,33 @@
     stdout.<span class="fn">println</span>(<span class="fn">describe_state</span>(next))
     <span class="cm">// Output: connected to api.example.com:443</span>
 }</code></pre>
+<h2>Methods on enums</h2>
+<p>Like structs, enums can have methods:</p>
+<pre><code><span class="kw">type</span> <span class="ty">Color</span> {
+    <span class="ty">Red</span>
+    <span class="ty">Green</span>
+    <span class="ty">Blue</span>
+
+    <span class="kw">fn</span> <span class="fn">name</span>(self<span class="op">:</span> <span class="ty">Self</span>) <span class="op">-&gt;</span> <span class="ty">string</span> {
+        <span class="kw">match</span> self {
+            <span class="ty">Color</span>.<span class="ty">Red</span> <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"red"</span>
+            <span class="ty">Color</span>.<span class="ty">Green</span> <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"green"</span>
+            <span class="ty">Color</span>.<span class="ty">Blue</span> <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"blue"</span>
+        }
+        <span class="kw">return</span> <span class="st">""</span>
+    }
+
+    <span class="kw">fn</span> <span class="fn">is_primary</span>(self<span class="op">:</span> <span class="ty">Self</span>) <span class="op">-&gt;</span> <span class="ty">bool</span> {
+        <span class="kw">return</span> <span class="kw">true</span>
+    }
+}
+
+<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> c <span class="op">=</span> <span class="ty">Color</span>.<span class="ty">Blue</span>
+    stdout.<span class="fn">println</span>(c.<span class="fn">name</span>())       <span class="cm">// Output: blue</span>
+    stdout.<span class="fn">println</span>(c.<span class="fn">is_primary</span>() <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: true</span>
+}</code></pre>
+<p>Methods on enums work the same as struct methods — <code>self: Self</code> for instance methods, no <code>self</code> for static methods.</p>
 <div class="callout callout-note"><strong>Enums vs. type unions</strong>
 Basalt also has union types like <code>string | i64</code> for ad-hoc combinations. Enums are different — they define a <em>named, closed</em> set of possibilities with meaningful variant names. Use unions when combining existing types; use enums when defining a domain concept.
 </div>
