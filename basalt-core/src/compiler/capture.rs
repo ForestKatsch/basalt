@@ -133,6 +133,12 @@ fn collect_free_in_stmt(stmt: &TypedStmt, defined: &mut std::collections::HashSe
             collect_free_in_expr(&decl.value, defined, free);
             defined.insert(decl.name.clone());
         }
+        TypedStmt::LetTuple(bindings, value) => {
+            collect_free_in_expr(value, defined, free);
+            for (name, _) in bindings {
+                defined.insert(name.clone());
+            }
+        }
         TypedStmt::Assign(target, value) => {
             match target.as_ref() {
                 TypedAssignTarget::Variable(name, _) => {

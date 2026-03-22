@@ -43,6 +43,7 @@ pub struct Block {
 #[derive(Debug, Clone)]
 pub enum Stmt {
     Let(LetDecl),
+    LetTuple(Vec<String>, Expr), // let (a, b, c) = expr
     Assign(AssignTarget, Expr),
     Return(Option<Expr>),
     ReturnError(Expr),

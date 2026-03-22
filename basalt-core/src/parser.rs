@@ -465,6 +465,25 @@ impl Parser {
     fn parse_stmt(&mut self) -> Result<Stmt, String> {
         match self.peek().clone() {
             Token::Let => {
+                // Check for tuple destructuring: let (a, b) = expr
+                if self.is_tuple_destructure_ahead() {
+                    self.advance(); // consume 'let'
+                    self.expect(&Token::LParen)?;
+                    let mut names = Vec::new();
+                    loop {
+                        names.push(self.expect_ident()?);
+                        if *self.peek() == Token::Comma {
+                            self.advance();
+                        } else {
+                            break;
+                        }
+                    }
+                    self.expect(&Token::RParen)?;
+                    self.expect(&Token::Eq)?;
+                    let value = self.parse_expr()?;
+                    self.expect_newline_or_eof()?;
+                    return Ok(Stmt::LetTuple(names, value));
+                }
                 let decl = self.parse_let_decl()?;
                 self.expect_newline_or_eof()?;
                 Ok(Stmt::Let(decl))
@@ -1003,9 +1022,9 @@ impl Parser {
                                 // module.Type { ... } - struct construction
                                 self.advance();
                                 self.skip_newlines();
-                                let fields = self.parse_struct_fields()?;
+                                let (fields, spread) = self.parse_struct_fields()?;
                                 self.expect(&Token::RBrace)?;
-                                return Ok(Expr::StructLit(type_name, Some(name), fields, None));
+                                return Ok(Expr::StructLit(type_name, Some(name), fields, spread));
                             }
                             Token::Dot => {
                                 // module.Type.Variant or module.Type.method
@@ -1086,9 +1105,9 @@ impl Parser {
                         if self.is_struct_lit_ahead() {
                             self.advance(); // consume {
                             self.skip_newlines();
-                            let fields = self.parse_struct_fields()?;
+                            let (fields, spread) = self.parse_struct_fields()?;
                             self.expect(&Token::RBrace)?;
-                            Ok(Expr::StructLit(name, None, fields, None))
+                            Ok(Expr::StructLit(name, None, fields, spread))
                         } else {
                             Ok(Expr::TypeIdent(name))
                         }
@@ -1197,6 +1216,30 @@ impl Parser {
         }
     }
 
+    /// Check for `let (ident, ident, ...) = ` pattern
+    fn is_tuple_destructure_ahead(&self) -> bool {
+        // let ( ident , ident ) =
+        // pos: Let  (  ...
+        if !matches!(self.peek(), Token::Let) {
+            return false;
+        }
+        if !matches!(self.peek_ahead(1), Token::LParen) {
+            return false;
+        }
+        // Scan for ) = pattern
+        let mut i = 2;
+        loop {
+            match self.tokens.get(self.pos + i) {
+                Some(Token::Ident(_)) => i += 1,
+                Some(Token::Comma) => i += 1,
+                Some(Token::RParen) => {
+                    return matches!(self.tokens.get(self.pos + i + 1), Some(Token::Eq));
+                }
+                _ => return false,
+            }
+        }
+    }
+
     fn is_struct_lit_ahead(&self) -> bool {
         // Look past { to see if we have ident: pattern (struct lit)
         // or something else (block)
@@ -1212,6 +1255,10 @@ impl Parser {
         // Check for empty braces — this IS a struct literal when preceded by TypeIdent
         if let Some(Token::RBrace) = self.tokens.get(self.pos + offset) {
             return true; // empty struct: TypeName { }
+        }
+        // Check for ..expr (functional update)
+        if let Some(Token::DotDot) = self.tokens.get(self.pos + offset) {
+            return true;
         }
         // Check for ident:
         if let Some(Token::Ident(_)) = self.tokens.get(self.pos + offset) {
@@ -1250,15 +1297,24 @@ impl Parser {
         }
     }
 
-    fn parse_struct_fields(&mut self) -> Result<Vec<(String, Expr)>, String> {
+    fn parse_struct_fields(&mut self) -> Result<(Vec<(String, Expr)>, Option<Box<Expr>>), String> {
         let mut fields = Vec::new();
+        let mut spread = None;
         self.skip_newlines();
         if *self.peek() == Token::RBrace {
-            return Ok(fields);
+            return Ok((fields, None));
         }
         loop {
             self.skip_newlines();
             if *self.peek() == Token::RBrace {
+                break;
+            }
+            // Check for ..expr (spread/functional update)
+            if *self.peek() == Token::DotDot {
+                self.advance();
+                spread = Some(Box::new(self.parse_expr()?));
+                self.skip_newlines();
+                // Spread must be last
                 break;
             }
             let name = self.expect_ident()?;
@@ -1271,7 +1327,7 @@ impl Parser {
                 self.skip_newlines();
             }
         }
-        Ok(fields)
+        Ok((fields, spread))
     }
 
     fn parse_if_expr(&mut self) -> Result<Expr, String> {

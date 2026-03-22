@@ -177,6 +177,7 @@ pub struct TypedBlock {
 #[derive(Debug, Clone)]
 pub enum TypedStmt {
     Let(TypedLetDecl),
+    LetTuple(Vec<(String, Type)>, TypedExpr), // let (a, b) = expr
     Assign(Box<TypedAssignTarget>, Box<TypedExpr>),
     Return(Option<TypedExpr>),
     ReturnError(TypedExpr),

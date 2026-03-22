@@ -310,6 +310,14 @@ impl Compiler {
                 }
                 Ok(None)
             }
+            TypedStmt::LetTuple(bindings, value) => {
+                let tuple_reg = self.compile_expr(fc, value)?;
+                for (i, (name, ty)) in bindings.iter().enumerate() {
+                    let local_reg = fc.declare_local(name, ty);
+                    fc.emit(Op::GetField(local_reg, tuple_reg, i as u16));
+                }
+                Ok(None)
+            }
             TypedStmt::Assign(target, value) => {
                 let value_reg = self.compile_expr(fc, value)?;
                 match &**target {

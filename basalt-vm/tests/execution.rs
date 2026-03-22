@@ -2114,3 +2114,90 @@ fn main(stdout: Stdout) {
         &["0", "1", "2"],
     );
 }
+
+// ==================== Functional Update Syntax ====================
+
+#[test]
+fn test_struct_spread() {
+    run_expect_output(
+        r#"
+type Config { width: i64, height: i64, title: string }
+fn main(stdout: Stdout) {
+    let c = Config { width: 800, height: 600, title: "app" }
+    let c2 = Config { title: "new title", ..c }
+    stdout.println(c2.width as string)
+    stdout.println(c2.title)
+}
+"#,
+        &["800", "new title"],
+    );
+}
+
+#[test]
+fn test_struct_spread_full_copy() {
+    run_expect_output(
+        r#"
+type Point { x: f64, y: f64 }
+fn main(stdout: Stdout) {
+    let p = Point { x: 1.0, y: 2.0 }
+    let q = Point { ..p }
+    stdout.println(q.x as string)
+    stdout.println(q.y as string)
+}
+"#,
+        &["1.0", "2.0"],
+    );
+}
+
+// ==================== Tuple Destructuring ====================
+
+#[test]
+fn test_tuple_destructure() {
+    run_expect_output(
+        r#"
+fn main(stdout: Stdout) {
+    let (a, b, c) = (10, "hello", true)
+    stdout.println(a as string)
+    stdout.println(b)
+    stdout.println(c as string)
+}
+"#,
+        &["10", "hello", "true"],
+    );
+}
+
+#[test]
+fn test_tuple_destructure_function_return() {
+    run_expect_output(
+        r#"
+fn divmod(a: i64, b: i64) -> (i64, i64) {
+    return (a / b, a % b)
+}
+fn main(stdout: Stdout) {
+    let (quot, rem) = divmod(17, 5)
+    stdout.println(quot as string)
+    stdout.println(rem as string)
+}
+"#,
+        &["3", "2"],
+    );
+}
+
+// ==================== Underscore Number Literals ====================
+
+#[test]
+fn test_underscore_number_literals() {
+    run_expect_output(
+        r#"
+fn main(stdout: Stdout) {
+    let million = 1_000_000
+    let hex = 0xFF_FF
+    let bin = 0b1010_0101
+    stdout.println(million as string)
+    stdout.println(hex as string)
+    stdout.println(bin as string)
+}
+"#,
+        &["1000000", "65535", "165"],
+    );
+}

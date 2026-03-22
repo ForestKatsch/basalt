@@ -743,6 +743,31 @@ impl TypeChecker {
                 let typed = self.check_let_decl(decl)?;
                 Ok(TypedStmt::Let(typed))
             }
+            Stmt::LetTuple(names, value) => {
+                let typed_value = self.check_expr(value)?;
+                match &typed_value.ty {
+                    Type::Tuple(types) => {
+                        if names.len() != types.len() {
+                            return Err(format!(
+                                "tuple destructure: expected {} elements, got {}",
+                                names.len(),
+                                types.len()
+                            ));
+                        }
+                        let mut bindings = Vec::new();
+                        for (i, name) in names.iter().enumerate() {
+                            let ty = types[i].clone();
+                            self.define_var(name, ty.clone(), false);
+                            bindings.push((name.clone(), ty));
+                        }
+                        Ok(TypedStmt::LetTuple(bindings, typed_value))
+                    }
+                    _ => Err(format!(
+                        "cannot destructure non-tuple type {}",
+                        typed_value.ty.display_name()
+                    )),
+                }
+            }
             Stmt::Assign(target, value) => {
                 let typed_value = self.check_expr(value)?;
                 let typed_target = match target {
@@ -1123,7 +1148,7 @@ impl TypeChecker {
                     ty: Type::Tuple(types),
                 })
             }
-            Expr::StructLit(type_name, module, fields, _spread) => {
+            Expr::StructLit(type_name, module, fields, spread) => {
                 let full_name = if let Some(m) = module {
                     format!("{}.{}", m, type_name)
                 } else {
@@ -1168,6 +1193,34 @@ impl TypeChecker {
                         ));
                     }
                     typed_fields.push((name.clone(), typed));
+                }
+
+                // Handle spread (functional update): fill missing fields from spread expr
+                if let Some(spread_expr) = spread {
+                    let typed_spread = self.check_expr(spread_expr)?;
+                    if typed_spread.ty != Type::Struct(full_name.clone()) {
+                        return Err(format!(
+                            "spread type mismatch: expected {}, got {}",
+                            full_name,
+                            typed_spread.ty.display_name()
+                        ));
+                    }
+                    // Fill in any unprovided fields from the spread
+                    for (i, (name, _)) in info.fields.iter().enumerate() {
+                        if !provided.contains(name) {
+                            provided.insert(name.clone());
+                            typed_fields.push((
+                                name.clone(),
+                                TypedExpr {
+                                    kind: TypedExprKind::FieldAccess(
+                                        Box::new(typed_spread.clone()),
+                                        name.clone(),
+                                    ),
+                                    ty: info.fields[i].1.clone(),
+                                },
+                            ));
+                        }
+                    }
                 }
 
                 // Check all fields are provided
