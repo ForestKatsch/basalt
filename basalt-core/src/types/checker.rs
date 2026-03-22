@@ -267,6 +267,7 @@ impl TypeChecker {
         // First pass: register all type definitions and function signatures
         self.register_types(program)?;
         self.register_module_types(program)?;
+        self.register_std_math();
         self.register_functions(program)?;
 
         // Register global functions in scope
@@ -466,6 +467,88 @@ impl TypeChecker {
             self.type_info.modules.insert(module_name.clone(), mod_info);
         }
         Ok(())
+    }
+
+    /// Register the built-in math standard library module.
+    fn register_std_math(&mut self) {
+        // Only register if not already provided by an explicit module
+        if self.type_info.modules.contains_key("math") {
+            return;
+        }
+        let mut functions = HashMap::new();
+        let float_ty = Type::F64;
+
+        // Helper: one-arg float -> float
+        let one_arg = |name: &str| -> (String, FuncInfo) {
+            (name.to_string(), FuncInfo {
+                name: name.to_string(),
+                params: vec![("x".to_string(), Type::F64)],
+                return_type: float_ty.clone(),
+                is_method: false,
+            })
+        };
+
+        // Helper: zero-arg -> float (constants)
+        let zero_arg = |name: &str| -> (String, FuncInfo) {
+            (name.to_string(), FuncInfo {
+                name: name.to_string(),
+                params: vec![],
+                return_type: float_ty.clone(),
+                is_method: false,
+            })
+        };
+
+        // Helper: two-arg (float, float) -> float
+        let two_arg = |name: &str| -> (String, FuncInfo) {
+            (name.to_string(), FuncInfo {
+                name: name.to_string(),
+                params: vec![("a".to_string(), Type::F64), ("b".to_string(), Type::F64)],
+                return_type: float_ty.clone(),
+                is_method: false,
+            })
+        };
+
+        // Existing functions
+        functions.insert(one_arg("sqrt").0, one_arg("sqrt").1);
+        functions.insert(one_arg("abs").0, one_arg("abs").1);
+        functions.insert(one_arg("floor").0, one_arg("floor").1);
+        functions.insert(one_arg("ceil").0, one_arg("ceil").1);
+        functions.insert(one_arg("round").0, one_arg("round").1);
+        functions.insert(two_arg("min").0, two_arg("min").1);
+        functions.insert(two_arg("max").0, two_arg("max").1);
+
+        // Trigonometry
+        for name in ["sin", "cos", "tan", "asin", "acos", "atan"] {
+            let (k, v) = one_arg(name);
+            functions.insert(k, v);
+        }
+        {
+            let (k, v) = two_arg("atan2");
+            functions.insert(k, v);
+        }
+
+        // Logarithms & exponentials
+        for name in ["log", "log2", "log10", "exp"] {
+            let (k, v) = one_arg(name);
+            functions.insert(k, v);
+        }
+        {
+            let (k, v) = two_arg("pow");
+            functions.insert(k, v);
+        }
+
+        // Constants (zero-arg functions)
+        for name in ["pi", "e", "tau", "inf"] {
+            let (k, v) = zero_arg(name);
+            functions.insert(k, v);
+        }
+
+        self.type_info.modules.insert("math".to_string(), ModuleInfo {
+            structs: HashMap::new(),
+            enums: HashMap::new(),
+            aliases: HashMap::new(),
+            functions,
+        });
     }
 
     /// Phase 1a: Register just the type name as an empty shell.
@@ -1781,6 +1864,13 @@ impl TypeChecker {
         // If obj is a TypeIdent, this is a static method call: Type.method(args)
         if let ExprKind::TypeIdent(type_name) = &obj.kind {
             return self.check_static_method_call(type_name, method, args);
+        }
+
+        // If obj is an Ident that resolves to a module, treat as static method call
+        if let ExprKind::Ident(name) = &obj.kind {
+            if self.type_info.modules.contains_key(name.as_str()) {
+                return self.check_static_method_call(name, method, args);
+            }
         }
 
         // Check mutability for mutating methods

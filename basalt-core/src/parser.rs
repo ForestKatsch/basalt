@@ -1325,6 +1325,7 @@ impl Parser {
         }
     }
 
+    #[allow(clippy::type_complexity)]
     fn parse_struct_fields(&mut self) -> Result<(Vec<(String, Expr)>, Option<Box<Expr>>), String> {
         let mut fields = Vec::new();
         let mut spread = None;

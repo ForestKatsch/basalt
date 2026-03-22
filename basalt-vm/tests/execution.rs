@@ -45,6 +45,22 @@ fn run_expect_compile_error(source: &str) {
     );
 }
 
+fn run_expect_compile_error_containing(source: &str, expected_msg: &str) {
+    let result = basalt_core::compile(source);
+    match result {
+        Ok(_) => panic!("Expected compile error but compilation succeeded"),
+        Err(e) => {
+            let msg = e.to_string();
+            assert!(
+                msg.contains(expected_msg),
+                "Expected error containing '{}', got: {}",
+                expected_msg,
+                msg
+            );
+        }
+    }
+}
+
 // ==================== Basic Output ====================
 
 #[test]
@@ -2273,5 +2289,186 @@ fn test_if_else_different_types_union() {
         }
         "#,
         &["42"],
+    );
+}
+
+#[test]
+fn test_math_trig() {
+    run_expect_output(
+        r#"
+        import "std/math"
+        fn main(stdout: Stdout) {
+            stdout.println((math.sin(0.0) as string))
+            stdout.println((math.cos(0.0) as string))
+        }
+        "#,
+        &["0.0", "1.0"],
+    );
+}
+
+#[test]
+fn test_math_log() {
+    run_expect_output(
+        r#"
+        import "std/math"
+        fn main(stdout: Stdout) {
+            stdout.println((math.log(math.e()) as string))
+        }
+        "#,
+        &["1.0"],
+    );
+}
+
+#[test]
+fn test_math_constants() {
+    run_expect_output(
+        r#"
+        import "std/math"
+        fn main(stdout: Stdout) {
+            let pi = math.pi()
+            let close_enough = pi > 3.14 && pi < 3.15
+            stdout.println(close_enough as string)
+        }
+        "#,
+        &["true"],
+    );
+}
+
+#[test]
+fn test_math_pow_atan2() {
+    run_expect_output(
+        r#"
+        import "std/math"
+        fn main(stdout: Stdout) {
+            stdout.println((math.pow(2.0, 10.0) as string))
+            let a = math.atan2(1.0, 1.0)
+            let close = a > 0.78 && a < 0.79
+            stdout.println(close as string)
+        }
+        "#,
+        &["1024.0", "true"],
+    );
+}
+
+
+// ==================== Type Checker Error Tests ====================
+
+#[test]
+fn test_error_type_mismatch_arithmetic() {
+    run_expect_compile_error_containing(
+        "fn main(stdout: Stdout) { let x = 1 + 2.0 }",
+        "cannot add i64 and f64",
+    );
+}
+
+#[test]
+fn test_error_type_mismatch_let() {
+    run_expect_compile_error_containing(
+        r#"fn main(stdout: Stdout) { let x: i64 = "hello" }"#,
+        "type mismatch",
+    );
+}
+
+#[test]
+fn test_error_undefined_function() {
+    run_expect_compile_error_containing(
+        "fn main(stdout: Stdout) { foo() }",
+        "undefined",
+    );
+}
+
+#[test]
+fn test_error_too_many_args() {
+    run_expect_compile_error_containing(
+        "fn add(a: i64, b: i64) -> i64 { return a + b }\nfn main(stdout: Stdout) { add(1, 2, 3) }",
+        "expects 2 arguments, got 3",
+    );
+}
+
+#[test]
+fn test_error_too_few_args() {
+    run_expect_compile_error_containing(
+        "fn add(a: i64, b: i64) -> i64 { return a + b }\nfn main(stdout: Stdout) { add(1) }",
+        "expects 2 arguments, got 1",
+    );
+}
+
+#[test]
+fn test_error_assign_to_immutable() {
+    run_expect_compile_error_containing(
+        "fn main(stdout: Stdout) { let x = 5\nx = 10 }",
+        "cannot assign to immutable variable",
+    );
+}
+
+#[test]
+fn test_error_return_type_mismatch() {
+    run_expect_compile_error_containing(
+        "fn foo() -> i64 { return \"hello\" }\nfn main(stdout: Stdout) { foo() }",
+        "return type mismatch",
+    );
+}
+
+#[test]
+fn test_error_unknown_field() {
+    run_expect_compile_error_containing(
+        "type Point { x: f64, y: f64 }\nfn main(stdout: Stdout) { let p = Point { x: 1.0, y: 2.0 }\nlet z = p.z }",
+        "unknown field",
+    );
+}
+
+#[test]
+fn test_error_unknown_method() {
+    run_expect_compile_error_containing(
+        "fn main(stdout: Stdout) { let s = \"hello\"\ns.nonexistent() }",
+        "unknown string method",
+    );
+}
+
+#[test]
+fn test_error_non_exhaustive_match() {
+    run_expect_compile_error_containing(
+        "type Color { Red\nGreen\nBlue }\nfn f(c: Color) -> string { match c { Color.Red => return \"r\" } }\nfn main(stdout: Stdout) { f(Color.Red) }",
+        "non-exhaustive match",
+    );
+}
+
+#[test]
+fn test_error_if_condition_not_bool() {
+    run_expect_compile_error_containing(
+        "fn main(stdout: Stdout) { if 42 { } }",
+        "if condition must be bool",
+    );
+}
+
+#[test]
+fn test_error_while_condition_not_bool() {
+    run_expect_compile_error_containing(
+        "fn main(stdout: Stdout) { while 1 { } }",
+        "while condition must be bool",
+    );
+}
+
+#[test]
+fn test_error_cannot_iterate() {
+    run_expect_compile_error_containing(
+        "fn main(stdout: Stdout) { for x in 42 { } }",
+        "cannot iterate over",
+    );
+}
+
+#[test]
+fn test_error_break_outside_loop() {
+    run_expect_compile_error_containing(
+        "fn main(stdout: Stdout) { break }",
+        "break outside of loop",
+    );
+}
+
+#[test]
+fn test_error_missing_struct_field() {
+    run_expect_compile_error_containing(
+        "type Point { x: f64, y: f64 }\nfn main(stdout: Stdout) { let p = Point { x: 1.0 } }",
+        "missing field",
     );
 }

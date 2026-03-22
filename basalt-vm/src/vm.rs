@@ -1184,6 +1184,34 @@ impl VM {
                 );
                 Ok(Value::float(a.max(b)))
             }
+            "sin" => Ok(Value::float(args.first().map(|a| a.as_float()).unwrap_or(0.0).sin())),
+            "cos" => Ok(Value::float(args.first().map(|a| a.as_float()).unwrap_or(0.0).cos())),
+            "tan" => Ok(Value::float(args.first().map(|a| a.as_float()).unwrap_or(0.0).tan())),
+            "asin" => Ok(Value::float(args.first().map(|a| a.as_float()).unwrap_or(0.0).asin())),
+            "acos" => Ok(Value::float(args.first().map(|a| a.as_float()).unwrap_or(0.0).acos())),
+            "atan" => Ok(Value::float(args.first().map(|a| a.as_float()).unwrap_or(0.0).atan())),
+            "atan2" => {
+                let (y, x) = (
+                    args.first().map(|v| v.as_float()).unwrap_or(0.0),
+                    args.get(1).map(|v| v.as_float()).unwrap_or(0.0),
+                );
+                Ok(Value::float(y.atan2(x)))
+            }
+            "log" => Ok(Value::float(args.first().map(|a| a.as_float()).unwrap_or(0.0).ln())),
+            "log2" => Ok(Value::float(args.first().map(|a| a.as_float()).unwrap_or(0.0).log2())),
+            "log10" => Ok(Value::float(args.first().map(|a| a.as_float()).unwrap_or(0.0).log10())),
+            "exp" => Ok(Value::float(args.first().map(|a| a.as_float()).unwrap_or(0.0).exp())),
+            "pow" => {
+                let (base, exp) = (
+                    args.first().map(|v| v.as_float()).unwrap_or(0.0),
+                    args.get(1).map(|v| v.as_float()).unwrap_or(0.0),
+                );
+                Ok(Value::float(base.powf(exp)))
+            }
+            "pi" => Ok(Value::float(std::f64::consts::PI)),
+            "e" => Ok(Value::float(std::f64::consts::E)),
+            "tau" => Ok(Value::float(std::f64::consts::TAU)),
+            "inf" => Ok(Value::float(f64::INFINITY)),
             _ => Err(format!("unknown math function '{}'", name)),
         }
     }

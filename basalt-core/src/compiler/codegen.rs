@@ -24,6 +24,7 @@ struct FnCompiler {
     registers: u16,
     locals: HashMap<String, u16>, // name -> register
     local_types: HashMap<String, Type>,
+    #[allow(clippy::type_complexity)]
     scope_stack: Vec<Vec<(String, Option<u16>, Option<Type>)>>, // (name, prev_reg, prev_type)
     loop_breaks: Vec<Vec<usize>>,    // jump indices to patch on break
     loop_continues: Vec<Vec<usize>>, // jump indices to patch on continue
@@ -203,7 +204,7 @@ impl Compiler {
         let functions = std::mem::take(&mut self.functions);
         let mut method_lookup: HashMap<String, Vec<usize>> = HashMap::new();
         for (i, f) in functions.iter().enumerate() {
-            method_lookup.entry(f.name.clone()).or_insert_with(Vec::new).push(i);
+            method_lookup.entry(f.name.clone()).or_default().push(i);
         }
 
         Ok(Program {
