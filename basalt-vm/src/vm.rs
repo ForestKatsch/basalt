@@ -2159,36 +2159,77 @@ fn extract_closure(val: &Value) -> Result<(usize, Vec<Value>), String> {
     Err("expected closure argument".to_string())
 }
 
-/// Resolve a path relative to a root directory, preventing escape via ..
+/// Resolve a user-provided path within the sandbox root.
+///
+/// Defense in depth:
+/// 1. Lexical normalization rejects `..` escape attempts before any I/O.
+/// 2. The path is joined to the root, then the result is canonicalized
+///    (resolving symlinks) and verified to still be under root.
+/// 3. For non-existent paths (writes), the parent directory is canonicalized
+///    instead, and the final component is appended.
+///
+/// TOCTOU note: there is an inherent race between canonicalize() and the
+/// subsequent file operation — a symlink could be created in between. Full
+/// protection requires OS-level sandboxing (e.g., openat/cap-std). The
+/// lexical check + canonicalization catches non-adversarial escapes. For
+/// adversarial environments, Basalt programs should run in an OS sandbox.
 fn resolve_sandboxed_path(root: &Path, user_path: &str) -> Result<PathBuf, String> {
-    // Reject obvious escape attempts before any I/O
+    // Step 1: Lexical rejection — catches .., even if canonicalize would too.
+    // This blocks attempts before we touch the filesystem at all.
     let normalized = normalize_path_components(user_path);
-    if normalized.starts_with("..") || normalized.contains("/../") || normalized.ends_with("/..") {
+    if normalized.starts_with("..")
+        || normalized.contains("/../")
+        || normalized.ends_with("/..")
+        || normalized == "." && user_path.contains("..")
+    {
         return Err(format!("path '{}' escapes sandbox root", user_path));
     }
 
     let joined = root.join(user_path);
-    // Canonicalize to resolve symlinks and verify containment
+
+    // Step 2: Canonicalize root once. If root itself can't be canonicalized
+    // (e.g., it doesn't exist), reject — we can't verify containment.
+    let root_canonical = root
+        .canonicalize()
+        .map_err(|e| format!("sandbox root error: {}", e))?;
+
+    // Step 3: Canonicalize the target path.
     let resolved = if joined.exists() {
         joined
             .canonicalize()
             .map_err(|e| format!("path error: {}", e))?
     } else {
-        // For non-existent paths, canonicalize parent + filename
-        let parent = joined.parent().unwrap_or(root);
-        let parent_canonical = if parent.exists() {
-            parent
-                .canonicalize()
-                .map_err(|e| format!("path error: {}", e))?
-        } else {
-            parent.to_path_buf()
-        };
-        parent_canonical.join(joined.file_name().unwrap_or_default())
+        // For non-existent paths, canonicalize the deepest existing ancestor.
+        let mut ancestor = joined.as_path();
+        let mut tail_components = Vec::new();
+        loop {
+            if ancestor.exists() {
+                break;
+            }
+            if let Some(file_name) = ancestor.file_name() {
+                tail_components.push(file_name.to_os_string());
+            } else {
+                return Err(format!("path '{}' has no resolvable ancestor", user_path));
+            }
+            ancestor = match ancestor.parent() {
+                Some(p) => p,
+                None => return Err(format!("path '{}' has no resolvable ancestor", user_path)),
+            };
+        }
+        let mut result = ancestor
+            .canonicalize()
+            .map_err(|e| format!("path error: {}", e))?;
+        for component in tail_components.into_iter().rev() {
+            result.push(component);
+        }
+        result
     };
-    let root_canonical = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
+
+    // Step 4: Verify containment.
     if !resolved.starts_with(&root_canonical) {
         return Err(format!("path '{}' escapes sandbox root", user_path));
     }
+
     Ok(resolved)
 }
 

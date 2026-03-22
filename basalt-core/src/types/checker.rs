@@ -876,6 +876,7 @@ impl TypeChecker {
         }
 
         self.current_fn_return = old_return;
+        self.captured_mut_vars = old_captured;
         self.pop_scope();
 
         Ok(TypedFnDef {
@@ -1652,27 +1653,21 @@ impl TypeChecker {
                 let typed_cond = self.check_expr(cond)?;
 
                 // Check for type narrowing: if x is T
-                // Narrowing is sound when the variable cannot change between the
-                // is-check and the use. A mutable variable captured by a closure
-                // can be mutated through the capture at any call site, invalidating
-                // the narrowing. We refuse to narrow when the then-block contains
-                // both a function call AND a closure that captures the variable.
+                // Narrowing is only sound when the variable cannot change between
+                // the is-check and the use. A mutable variable that is captured
+                // by any closure in the current function can be mutated through
+                // the capture at any call site, so narrowing it is unsound.
                 let narrowing = if let ExprKind::Is(inner, IsTarget::Type(ty)) = &cond.kind {
                     if let ExprKind::Ident(name) = &inner.kind {
-                        let is_mutable = self
-                            .lookup_var(name)
-                            .map(|(_, m)| m)
-                            .unwrap_or(false);
-                        let resolved = self
-                            .resolve_type_expr(ty)
-                            .map_err(|e| e.with_span(expr.span))?;
-                        if is_mutable
-                            && block_has_call(then_block)
-                            && block_has_closure_capturing(then_block, name)
-                        {
+                        let is_mutable = self.lookup_var(name).map(|(_, m)| m).unwrap_or(false);
+                        if is_mutable && self.captured_mut_vars.contains(name) {
                             None
                         } else {
-                            Some((name.clone(), resolved))
+                            Some((
+                                name.clone(),
+                                self.resolve_type_expr(ty)
+                                    .map_err(|e| e.with_span(expr.span))?,
+                            ))
                         }
                     } else {
                         None
@@ -3568,4 +3563,291 @@ fn is_mutating_method(name: &str) -> bool {
         name,
         "push" | "pop" | "insert" | "remove" | "sort" | "reverse"
     )
+}
+
+/// Find mutable variables from outer scopes that are referenced inside lambdas
+/// in the given block. These variables are unsafe to narrow because any function
+/// call could invoke the capturing closure and mutate the variable.
+fn find_captured_mut_vars(
+    block: &Block,
+    scopes: &[HashMap<String, (Type, bool)>],
+) -> HashSet<String> {
+    let mut result = HashSet::new();
+    // Collect mutable variable names from current scopes
+    let mut mutable_vars = HashSet::new();
+    for scope in scopes {
+        for (name, (_, is_mut)) in scope {
+            if *is_mut {
+                mutable_vars.insert(name.clone());
+            }
+        }
+    }
+    // Also collect let-mut declarations inside the block itself,
+    // since those aren't in scopes yet at scan time
+    collect_mut_declarations(block, &mut mutable_vars);
+    // Walk the block looking for lambdas that capture those mutable vars
+    for stmt in &block.stmts {
+        find_lambdas_in_stmt(&stmt.kind, &mutable_vars, &mut result);
+    }
+    result
+}
+
+fn collect_mut_declarations(block: &Block, mutable_vars: &mut HashSet<String>) {
+    for stmt in &block.stmts {
+        if let StmtKind::Let(decl) = &stmt.kind {
+            if decl.mutable {
+                mutable_vars.insert(decl.name.clone());
+            }
+        }
+        // Recurse into nested blocks (if, for, while, etc.)
+        if let StmtKind::Expr(e) = &stmt.kind {
+            collect_mut_decls_in_expr(&e.kind, mutable_vars);
+        }
+    }
+}
+
+fn collect_mut_decls_in_expr(expr: &ExprKind, mutable_vars: &mut HashSet<String>) {
+    match expr {
+        ExprKind::If(_, then_block, else_expr) => {
+            collect_mut_declarations(then_block, mutable_vars);
+            if let Some(e) = else_expr {
+                collect_mut_decls_in_expr(&e.kind, mutable_vars);
+            }
+        }
+        ExprKind::For(_, _, _, body)
+        | ExprKind::While(_, body)
+        | ExprKind::Loop(body)
+        | ExprKind::Block(body) => {
+            collect_mut_declarations(body, mutable_vars);
+        }
+        _ => {}
+    }
+}
+
+fn find_lambdas_in_stmt(
+    stmt: &StmtKind,
+    mutable_vars: &HashSet<String>,
+    captured: &mut HashSet<String>,
+) {
+    match stmt {
+        StmtKind::Let(decl) => find_lambdas_in_expr(&decl.value.kind, mutable_vars, captured),
+        StmtKind::LetTuple(_, expr) => find_lambdas_in_expr(&expr.kind, mutable_vars, captured),
+        StmtKind::Assign(_, expr) => find_lambdas_in_expr(&expr.kind, mutable_vars, captured),
+        StmtKind::Return(Some(expr)) => find_lambdas_in_expr(&expr.kind, mutable_vars, captured),
+        StmtKind::ReturnError(expr) => find_lambdas_in_expr(&expr.kind, mutable_vars, captured),
+        StmtKind::Expr(expr) => find_lambdas_in_expr(&expr.kind, mutable_vars, captured),
+        _ => {}
+    }
+}
+
+fn find_lambdas_in_expr(
+    expr: &ExprKind,
+    mutable_vars: &HashSet<String>,
+    captured: &mut HashSet<String>,
+) {
+    match expr {
+        ExprKind::Lambda(params, _, body) => {
+            // This is a lambda. Find which mutable outer variables it references.
+            let param_names: HashSet<String> = params.iter().map(|p| p.name.clone()).collect();
+            collect_idents_in_block(body, mutable_vars, &param_names, captured);
+            // Also recurse into the lambda body for nested lambdas
+            for stmt in &body.stmts {
+                find_lambdas_in_stmt(&stmt.kind, mutable_vars, captured);
+            }
+        }
+        // Recurse into all sub-expressions
+        ExprKind::BinOp(l, _, r) | ExprKind::Range(l, r) | ExprKind::Index(l, r) => {
+            find_lambdas_in_expr(&l.kind, mutable_vars, captured);
+            find_lambdas_in_expr(&r.kind, mutable_vars, captured);
+        }
+        ExprKind::UnaryOp(_, e)
+        | ExprKind::FieldAccess(e, _)
+        | ExprKind::TypeAccess(e, _)
+        | ExprKind::ErrorLit(e)
+        | ExprKind::As(e, _)
+        | ExprKind::AsSafe(e, _)
+        | ExprKind::Is(e, _)
+        | ExprKind::Try(e) => {
+            find_lambdas_in_expr(&e.kind, mutable_vars, captured);
+        }
+        ExprKind::Call(f, args) => {
+            find_lambdas_in_expr(&f.kind, mutable_vars, captured);
+            for a in args {
+                find_lambdas_in_expr(&a.kind, mutable_vars, captured);
+            }
+        }
+        ExprKind::MethodCall(obj, _, args) => {
+            find_lambdas_in_expr(&obj.kind, mutable_vars, captured);
+            for a in args {
+                find_lambdas_in_expr(&a.kind, mutable_vars, captured);
+            }
+        }
+        ExprKind::StaticMethodCall(_, _, args) => {
+            for a in args {
+                find_lambdas_in_expr(&a.kind, mutable_vars, captured);
+            }
+        }
+        ExprKind::ArrayLit(elems) | ExprKind::TupleLit(elems) => {
+            for e in elems {
+                find_lambdas_in_expr(&e.kind, mutable_vars, captured);
+            }
+        }
+        ExprKind::MapLit(entries) => {
+            for (k, v) in entries {
+                find_lambdas_in_expr(&k.kind, mutable_vars, captured);
+                find_lambdas_in_expr(&v.kind, mutable_vars, captured);
+            }
+        }
+        ExprKind::StructLit(_, _, fields, spread) => {
+            for (_, e) in fields {
+                find_lambdas_in_expr(&e.kind, mutable_vars, captured);
+            }
+            if let Some(s) = spread {
+                find_lambdas_in_expr(&s.kind, mutable_vars, captured);
+            }
+        }
+        ExprKind::EnumVariant(_, _, args) | ExprKind::QualifiedEnumVariant(_, _, _, args) => {
+            for a in args {
+                find_lambdas_in_expr(&a.kind, mutable_vars, captured);
+            }
+        }
+        ExprKind::If(c, then_block, else_expr) => {
+            find_lambdas_in_expr(&c.kind, mutable_vars, captured);
+            for s in &then_block.stmts {
+                find_lambdas_in_stmt(&s.kind, mutable_vars, captured);
+            }
+            if let Some(e) = else_expr {
+                find_lambdas_in_expr(&e.kind, mutable_vars, captured);
+            }
+        }
+        ExprKind::Match(scrutinee, arms) => {
+            find_lambdas_in_expr(&scrutinee.kind, mutable_vars, captured);
+            for arm in arms {
+                find_lambdas_in_expr(&arm.body.kind, mutable_vars, captured);
+            }
+        }
+        ExprKind::For(_, _, iter, body) | ExprKind::While(iter, body) => {
+            find_lambdas_in_expr(&iter.kind, mutable_vars, captured);
+            for s in &body.stmts {
+                find_lambdas_in_stmt(&s.kind, mutable_vars, captured);
+            }
+        }
+        ExprKind::Loop(body) | ExprKind::Block(body) => {
+            for s in &body.stmts {
+                find_lambdas_in_stmt(&s.kind, mutable_vars, captured);
+            }
+        }
+        ExprKind::Guard(_, e, body) => {
+            find_lambdas_in_expr(&e.kind, mutable_vars, captured);
+            for s in &body.stmts {
+                find_lambdas_in_stmt(&s.kind, mutable_vars, captured);
+            }
+        }
+        ExprKind::InterpolatedString(parts) => {
+            for part in parts {
+                if let StringPart::Expr(e) = part {
+                    find_lambdas_in_expr(&e.kind, mutable_vars, captured);
+                }
+            }
+        }
+        _ => {} // literals, identifiers, nil, etc.
+    }
+}
+
+/// Walk a block and collect identifiers that are mutable outer variables.
+/// Used to find which outer mut vars a lambda body references.
+fn collect_idents_in_block(
+    block: &Block,
+    mutable_vars: &HashSet<String>,
+    param_names: &HashSet<String>,
+    captured: &mut HashSet<String>,
+) {
+    for stmt in &block.stmts {
+        collect_idents_in_stmt(&stmt.kind, mutable_vars, param_names, captured);
+    }
+}
+
+fn collect_idents_in_stmt(
+    stmt: &StmtKind,
+    mutable_vars: &HashSet<String>,
+    params: &HashSet<String>,
+    captured: &mut HashSet<String>,
+) {
+    match stmt {
+        StmtKind::Let(d) => collect_idents_in_expr(&d.value.kind, mutable_vars, params, captured),
+        StmtKind::LetTuple(_, e) => collect_idents_in_expr(&e.kind, mutable_vars, params, captured),
+        StmtKind::Assign(target, e) => {
+            // Check the assignment target for captured mutable variables
+            if let AssignTarget::Variable(name) = target {
+                if mutable_vars.contains(name) && !params.contains(name) {
+                    captured.insert(name.clone());
+                }
+            }
+            collect_idents_in_expr(&e.kind, mutable_vars, params, captured);
+        }
+        StmtKind::Return(Some(e)) => {
+            collect_idents_in_expr(&e.kind, mutable_vars, params, captured)
+        }
+        StmtKind::ReturnError(e) => collect_idents_in_expr(&e.kind, mutable_vars, params, captured),
+        StmtKind::Expr(e) => collect_idents_in_expr(&e.kind, mutable_vars, params, captured),
+        _ => {}
+    }
+}
+
+fn collect_idents_in_expr(
+    expr: &ExprKind,
+    mutable_vars: &HashSet<String>,
+    params: &HashSet<String>,
+    captured: &mut HashSet<String>,
+) {
+    match expr {
+        ExprKind::Ident(name) => {
+            if mutable_vars.contains(name) && !params.contains(name) {
+                captured.insert(name.clone());
+            }
+        }
+        // Recurse into sub-expressions (same structure as find_lambdas_in_expr)
+        ExprKind::BinOp(l, _, r) | ExprKind::Range(l, r) | ExprKind::Index(l, r) => {
+            collect_idents_in_expr(&l.kind, mutable_vars, params, captured);
+            collect_idents_in_expr(&r.kind, mutable_vars, params, captured);
+        }
+        ExprKind::UnaryOp(_, e)
+        | ExprKind::FieldAccess(e, _)
+        | ExprKind::TypeAccess(e, _)
+        | ExprKind::ErrorLit(e)
+        | ExprKind::As(e, _)
+        | ExprKind::AsSafe(e, _)
+        | ExprKind::Is(e, _)
+        | ExprKind::Try(e) => {
+            collect_idents_in_expr(&e.kind, mutable_vars, params, captured);
+        }
+        ExprKind::Call(f, args) => {
+            collect_idents_in_expr(&f.kind, mutable_vars, params, captured);
+            for a in args {
+                collect_idents_in_expr(&a.kind, mutable_vars, params, captured);
+            }
+        }
+        ExprKind::MethodCall(obj, _, args) => {
+            collect_idents_in_expr(&obj.kind, mutable_vars, params, captured);
+            for a in args {
+                collect_idents_in_expr(&a.kind, mutable_vars, params, captured);
+            }
+        }
+        ExprKind::If(c, then_b, else_e) => {
+            collect_idents_in_expr(&c.kind, mutable_vars, params, captured);
+            for s in &then_b.stmts {
+                collect_idents_in_stmt(&s.kind, mutable_vars, params, captured);
+            }
+            if let Some(e) = else_e {
+                collect_idents_in_expr(&e.kind, mutable_vars, params, captured);
+            }
+        }
+        ExprKind::Block(b) | ExprKind::Loop(b) => {
+            for s in &b.stmts {
+                collect_idents_in_stmt(&s.kind, mutable_vars, params, captured);
+            }
+        }
+        ExprKind::Lambda(_, _, _) => {} // don't recurse into nested lambdas
+        _ => {}
+    }
 }
