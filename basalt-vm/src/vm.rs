@@ -905,16 +905,41 @@ impl VM {
     }
 
     fn format_stack_trace(&self) -> String {
-        let mut trace = String::new();
-        for &(fi, ip) in self.call_stack.iter().rev() {
+        let frames: Vec<(String, u32)> = self.call_stack.iter().rev().map(|&(fi, ip)| {
             let func = &self.program.functions[fi];
             let line = func.line_table.get(ip).copied().unwrap_or(0);
+            (func.name.clone(), line)
+        }).collect();
+
+        let mut trace = String::new();
+
+        let format_frame = |name: &str, line: u32| -> String {
             if line > 0 {
-                trace.push_str(&format!("  at {} (line {})\n", func.name, line));
+                format!("  at {} (line {})\n", name, line)
             } else {
-                trace.push_str(&format!("  at {}\n", func.name));
+                format!("  at {}\n", name)
+            }
+        };
+
+        if frames.len() <= 16 {
+            for (name, line) in &frames {
+                trace.push_str(&format_frame(name, *line));
+            }
+        } else {
+            // Show first 8 frames (most recent)
+            for (name, line) in frames.iter().take(8) {
+                trace.push_str(&format_frame(name, *line));
+            }
+
+            let omitted = frames.len() - 11; // 8 top + 3 bottom
+            trace.push_str(&format!("  ... {} more frames\n", omitted));
+
+            // Show last 3 frames (outermost callers, usually main)
+            for (name, line) in frames.iter().skip(frames.len() - 3) {
+                trace.push_str(&format_frame(name, *line));
             }
         }
+
         trace
     }
 

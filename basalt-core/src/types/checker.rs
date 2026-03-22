@@ -46,6 +46,31 @@ impl TypeChecker {
         }
     }
 
+    /// Remove a type from a union, returning the remaining type.
+    /// If `original` is `A | B | C` and `to_remove` is `A`, returns `B | C`.
+    /// If the result would be empty, returns the original unchanged.
+    fn subtract_type(&self, original: &Type, to_remove: &Type) -> Type {
+        match original {
+            Type::Union(members) => {
+                let remaining: Vec<Type> = members
+                    .iter()
+                    .filter(|m| m != &to_remove)
+                    .cloned()
+                    .collect();
+                match remaining.len() {
+                    0 => original.clone(),
+                    // SAFETY: remaining.len() == 1 per match arm
+                    1 => remaining.into_iter().next().unwrap(),
+                    _ => Type::Union(remaining),
+                }
+            }
+            Type::Optional(inner) if to_remove == &Type::Nil => {
+                *inner.clone()
+            }
+            _ => original.clone(),
+        }
+    }
+
     fn lookup_var(&self, name: &str) -> Option<(Type, bool)> {
         for scope in self.scopes.iter().rev() {
             if let Some(entry) = scope.get(name) {
@@ -112,6 +137,7 @@ impl TypeChecker {
                     }
                 }
                 if deduped.len() == 1 {
+                    // SAFETY: deduped is non-empty, guarded by len==1 check above
                     Ok(deduped.into_iter().next().unwrap())
                 } else {
                     Ok(Type::Union(deduped))
@@ -482,6 +508,7 @@ impl TypeChecker {
                     .iter()
                     .map(|f| Ok((f.name.clone(), self.resolve_type_expr(&f.ty)?)))
                     .collect::<Result<_, CompileError>>()?;
+                // SAFETY: struct name was registered in phase 1a (register_type_names)
                 self.type_info.structs.get_mut(&td.name).unwrap().fields = fields;
                 self.current_type_name = None;
             }
@@ -500,6 +527,7 @@ impl TypeChecker {
                         })
                     })
                     .collect::<Result<_, CompileError>>()?;
+                // SAFETY: enum name was registered in phase 1a (register_type_names)
                 self.type_info.enums.get_mut(&td.name).unwrap().variants = variants;
                 self.current_type_name = None;
             }
@@ -1308,19 +1336,59 @@ impl TypeChecker {
                 }
 
                 let typed_else = if let Some(else_expr) = else_expr {
-                    Some(Box::new(self.check_expr(else_expr)?))
+                    // Apply complementary narrowing in else branch
+                    let else_narrowing = if let Some((name, narrow_ty)) = &narrowing {
+                        let original_ty = self.lookup_var(name).map(|(ty, _)| ty);
+                        if let Some(original) = original_ty {
+                            let complement = self.subtract_type(&original, narrow_ty);
+                            if complement != original {
+                                Some((name.clone(), complement))
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+
+                    if let Some((ref name, ref complement_ty)) = else_narrowing {
+                        self.push_scope();
+                        self.define_var(name, complement_ty.clone(), false);
+                    }
+                    let result = self.check_expr(else_expr)?;
+                    if else_narrowing.is_some() {
+                        self.pop_scope();
+                    }
+                    Some(Box::new(result))
                 } else {
                     None
                 };
 
                 let ty = if let Some(ref else_typed) = typed_else {
-                    // Both branches must be compatible
                     if self.is_assignable(&typed_then.ty, &else_typed.ty) {
                         else_typed.ty.clone()
                     } else if self.is_assignable(&else_typed.ty, &typed_then.ty) {
                         typed_then.ty.clone()
-                    } else {
+                    } else if typed_then.ty == Type::Nil || else_typed.ty == Type::Nil {
                         Type::Nil
+                    } else {
+                        // Different types: compute union
+                        let mut members = Vec::new();
+                        match &typed_then.ty {
+                            Type::Union(m) => members.extend(m.iter().cloned()),
+                            other => members.push(other.clone()),
+                        }
+                        match &else_typed.ty {
+                            Type::Union(m) => members.extend(m.iter().cloned()),
+                            other => {
+                                if !members.contains(other) {
+                                    members.push(other.clone());
+                                }
+                            }
+                        }
+                        Type::Union(members)
                     }
                 } else {
                     Type::Nil
@@ -1350,15 +1418,30 @@ impl TypeChecker {
                     self.pop_scope();
 
                     if let Some(ref rty) = result_ty {
-                        // Types should be compatible
                         if !self.is_assignable(&typed_body.ty, rty)
                             && !self.is_assignable(rty, &typed_body.ty)
                         {
-                            // Allow if both are nil (returns in all arms)
                             if typed_body.ty != Type::Nil && *rty != Type::Nil {
-                                // Try to create a union
+                                // Compute union of all arm types
+                                let mut members = match rty {
+                                    Type::Union(m) => m.clone(),
+                                    other => vec![other.clone()],
+                                };
+                                match &typed_body.ty {
+                                    Type::Union(m) => members.extend(m.iter().cloned()),
+                                    other => {
+                                        if !members.contains(other) {
+                                            members.push(other.clone());
+                                        }
+                                    }
+                                }
+                                result_ty = Some(Type::Union(members));
                             }
+                        } else if self.is_assignable(rty, &typed_body.ty) {
+                            // Widen to the more general type
+                            result_ty = Some(typed_body.ty.clone());
                         }
+                        // If typed_body is assignable to rty, keep rty (it's already general enough)
                     } else {
                         result_ty = Some(typed_body.ty.clone());
                     }
@@ -2249,6 +2332,10 @@ impl TypeChecker {
     }
 
     fn check_conversion(&self, from: &Type, to: &Type, _is_safe: bool) -> Result<(), CompileError> {
+        // Same type (no-op cast, can arise after type narrowing)
+        if from == to {
+            return Ok(());
+        }
         // Integer to integer
         if from.is_integer() && to.is_integer() {
             return Ok(());

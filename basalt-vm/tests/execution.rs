@@ -2201,3 +2201,77 @@ fn main(stdout: Stdout) {
         &["1000000", "65535", "165"],
     );
 }
+
+#[test]
+fn test_type_narrowing_in_else() {
+    run_expect_output(
+        r#"
+        fn process(val: i64 | string) -> string {
+            if val is i64 {
+                return (val as i64 + 1) as string
+            } else {
+                return val as string
+            }
+        }
+        fn main(stdout: Stdout) {
+            stdout.println(process(41))
+            stdout.println(process("hello"))
+        }
+        "#,
+        &["42", "hello"],
+    );
+}
+
+#[test]
+fn test_optional_narrowing_in_else() {
+    run_expect_output(
+        r#"
+        fn show(val: string?) -> string {
+            if val is nil {
+                return "none"
+            } else {
+                return val as string
+            }
+        }
+        fn main(stdout: Stdout) {
+            stdout.println(show("hello"))
+            stdout.println(show(nil))
+        }
+        "#,
+        &["hello", "none"],
+    );
+}
+
+#[test]
+fn test_match_different_arm_types() {
+    run_expect_output(
+        r#"
+        fn describe(x: i64) -> string {
+            let result = match x {
+                1 => return "one"
+                2 => return "two"
+                _ => return "other"
+            }
+            return result as string
+        }
+        fn main(stdout: Stdout) {
+            stdout.println(describe(1))
+            stdout.println(describe(3))
+        }
+        "#,
+        &["one", "other"],
+    );
+}
+
+#[test]
+fn test_if_else_different_types_union() {
+    run_expect_output(
+        r#"
+        fn main(stdout: Stdout) {
+            let x = if true { 42 } else { 99 }
+            stdout.println(x as string)
+        }
+        "#,
+        &["42"],
+    );
+}

@@ -186,6 +186,7 @@ impl Compiler {
         // Now compile all function bodies (forward references work via self.functions)
         let mut entry_point = None;
         for fdef in &fn_defs {
+            // SAFETY: fdef.name was pre-registered in the loop above
             let idx = self.functions.iter().position(|f| f.name == fdef.name).unwrap();
             self.compile_fn_body(idx, fdef)?;
             if fdef.name == "main" {
@@ -264,6 +265,7 @@ impl Compiler {
             // If this param is captured by inner lambdas AND not already a cell,
             // wrap it in a cell immediately
             if fc.captured_vars.contains(name) && !cell_params.contains(name) {
+                // SAFETY: name was just declared via declare_local above
                 let reg = *fc.locals.get(name).unwrap();
                 fc.emit(Op::MakeCell(reg, reg));
             }
@@ -888,6 +890,7 @@ impl Compiler {
                     let func_reg = fc.alloc_reg();
                     fc.emit(Op::LoadInt(func_reg, func_idx as i64));
                     for (cap_name, _) in &captures {
+                        // SAFETY: captures come from type-checker analysis; variables must exist in enclosing scope
                         let src = *fc.locals.get(cap_name).unwrap();
                         let slot = fc.alloc_reg();
                         fc.emit(Op::Move(slot, src));
@@ -1475,6 +1478,7 @@ impl Compiler {
             });
         }
 
+        // SAFETY: parts is non-empty (empty case returns early above), so loop runs at least once
         Ok(result_reg.unwrap())
     }
 
