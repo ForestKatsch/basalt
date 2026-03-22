@@ -143,6 +143,8 @@ pub struct SpannedToken {
 }
 
 pub fn lex(source: &str) -> Result<Vec<SpannedToken>, CompileError> {
+    // Strip leading UTF-8 BOM if present
+    let source = source.strip_prefix('\u{feff}').unwrap_or(source);
     let mut lexer = Lexer::new(source);
     lexer.lex_all()
 }

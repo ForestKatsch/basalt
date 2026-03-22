@@ -493,7 +493,7 @@ impl TypeChecker {
         // Phase 1a: Register all type NAMES (empty shells)
         for item in &program.items {
             if let Item::TypeDef(td) = item {
-                self.register_type_name(td);
+                self.register_type_name(td)?;
             }
         }
         // Phase 1b: Resolve fields and variants (all type names now visible)
@@ -668,6 +668,16 @@ impl TypeChecker {
                 }
             }
 
+            // Sync module struct/enum info back to global type_info for codegen
+            for (name, info) in &mod_info.structs {
+                let qualified = format!("{}.{}", module_name, name);
+                self.type_info.structs.insert(qualified, info.clone());
+            }
+            for (name, info) in &mod_info.enums {
+                let qualified = format!("{}.{}", module_name, name);
+                self.type_info.enums.insert(qualified, info.clone());
+            }
+
             self.type_info.modules.insert(module_name.clone(), mod_info);
         }
         Ok(())
@@ -768,7 +778,19 @@ impl TypeChecker {
     }
 
     /// Phase 1a: Register just the type name as an empty shell.
-    fn register_type_name(&mut self, td: &TypeDef) {
+    fn register_type_name(&mut self, td: &TypeDef) -> Result<(), CompileError> {
+        const RESERVED_TYPE_NAMES: &[&str] = &["Stdout", "Stdin", "Fs", "Env", "Highlight"];
+
+        if RESERVED_TYPE_NAMES.contains(&td.name.as_str()) {
+            return Err(CompileError::new(
+                format!(
+                    "type name '{}' is reserved for a built-in capability",
+                    td.name
+                ),
+                td.span,
+            ));
+        }
+
         match &td.kind {
             TypeDefKind::Struct(_) => {
                 self.type_info
@@ -800,6 +822,7 @@ impl TypeChecker {
                 }
             }
         }
+        Ok(())
     }
 
     /// Phase 1b: Register type fields and variants (all names now visible).

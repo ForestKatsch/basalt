@@ -145,6 +145,18 @@ fn resolve_imports_recursive(
                 .clone()
                 .unwrap_or_else(|| imp.path.rsplit('/').next().unwrap_or(&imp.path).to_string());
 
+            const KEYWORDS: &[&str] = &[
+                "let", "mut", "fn", "return", "if", "else", "match", "for", "in", "while", "loop",
+                "break", "continue", "type", "guard", "import", "as", "true", "false", "nil", "is",
+            ];
+
+            if KEYWORDS.contains(&alias.as_str()) {
+                return Err(format!(
+                    "import '{}' derives alias '{}' which is a keyword; use 'import \"{}\" as <alias>' to provide a non-keyword name",
+                    imp.path, alias, imp.path
+                ));
+            }
+
             for module_item in module_ast.items {
                 imported_items.push((alias.clone(), module_item));
             }

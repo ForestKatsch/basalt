@@ -2884,3 +2884,88 @@ fn test_u64_comparison() {
         &["true", "false"],
     );
 }
+
+// ─── BASALT-001: Module struct fields populated in global type_info ───
+
+#[test]
+fn test_module_struct_fields_accessible() {
+    let dir = tempfile::tempdir().unwrap();
+
+    // Write a module file with a struct
+    let lib_path = dir.path().join("shapes.bas");
+    std::fs::write(
+        &lib_path,
+        r#"
+type Circle {
+    radius: f64
+}
+
+fn area(c: Circle) -> f64 {
+    return c.radius * c.radius * 3.14
+}
+"#,
+    )
+    .unwrap();
+
+    // Write main file that imports and uses the struct
+    let main_path = dir.path().join("main.bas");
+    std::fs::write(
+        &main_path,
+        r#"
+import "shapes"
+
+fn main(stdout: Stdout) {
+    let c = shapes.Circle { radius: 5.0 }
+    stdout.println(c.radius as string)
+    stdout.println(shapes.area(c) as string)
+}
+"#,
+    )
+    .unwrap();
+
+    let program = basalt_core::compile_file(&main_path).unwrap();
+    let mut vm = VM::new(program);
+    vm.run().unwrap();
+    assert_eq!(vm.captured_output, vec!["5.0", "78.5"]);
+}
+
+// ─── BASALT-002: Reserved capability type names rejected ───
+
+#[test]
+fn test_reserved_type_name_stdout() {
+    run_expect_compile_error_containing(
+        r#"
+type Stdout {
+    x: i64
+}
+fn main(stdout: Stdout) { }
+"#,
+        "reserved for a built-in capability",
+    );
+}
+
+#[test]
+fn test_reserved_type_name_fs() {
+    run_expect_compile_error_containing(
+        r#"
+type Fs {
+    path: string
+}
+fn main() { }
+"#,
+        "reserved for a built-in capability",
+    );
+}
+
+// ─── BASALT-008: BOM does not crash lexer ───
+
+#[test]
+fn test_bom_stripped_from_source() {
+    // UTF-8 BOM + valid source
+    let source = "\u{feff}fn main(stdout: Stdout) {\n    stdout.println(\"ok\")\n}";
+    let result = run_and_capture(source);
+    match result {
+        Ok(output) => assert_eq!(output, vec!["ok"]),
+        Err(e) => panic!("BOM source should compile and run, got: {}", e),
+    }
+}
