@@ -333,7 +333,17 @@ impl TypeChecker {
         // First pass: register all type definitions and function signatures
         self.register_types(program)?;
         self.register_module_types(program)?;
-        self.register_std_math();
+        // Only register std/math if the program imports it
+        let has_math_import = program.items.iter().any(|item| {
+            if let Item::Import(imp) = item {
+                imp.path == "std/math"
+            } else {
+                false
+            }
+        });
+        if has_math_import {
+            self.register_std_math();
+        }
         self.register_functions(program)?;
 
         // Register global functions in scope
