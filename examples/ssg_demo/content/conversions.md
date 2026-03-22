@@ -133,6 +133,20 @@ fn main(stdout: Stdout) {
 
 This forces you to decide which width is correct, rather than letting the compiler pick one and hoping for the best.
 
+### Checked division and modulo
+
+Integer division and modulo use checked arithmetic. `i64::MIN / -1` produces a runtime error instead of silently wrapping (two's complement overflow):
+
+```basalt
+fn main(stdout: Stdout) {
+    let min: i64 = -9223372036854775808
+    let result = min / -1
+    // runtime panic: integer overflow: i64::MIN / -1
+}
+```
+
+This also applies to `%` (modulo). Division by zero panics regardless of operand values.
+
 ## Safe range checking
 
 When you need to narrow a value — say, converting a file size from `i64` to `i32` for a legacy system — use `as?` to catch overflow:

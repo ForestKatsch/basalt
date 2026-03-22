@@ -110,11 +110,32 @@ capability architecture.
 
 ## Error Handling
 
-Compilation errors are returned as `CompileError` (or `String` via the
-legacy `compile`/`compile_file` API). Runtime errors are returned as
-`String` from `vm.run()`.
+`lexer::lex()` and `parser::parse()` now return `Result<_, CompileError>` with
+structured span information. Embedders get `CompileError { message, span, notes }`
+directly — no need to parse error strings.
 
-For rich diagnostics with source context:
+```rust
+use basalt_core::CompileError;
+
+match basalt_core::compile(source) {
+    Ok(program) => { /* run it */ }
+    Err(error) => {
+        // Structured access to error details
+        println!("Error: {}", error.message);
+        println!("At: {:?}", error.span);    // byte offset range in source
+        for note in &error.notes {
+            println!("Note: {}", note);
+        }
+
+        // Or render with source context, line numbers, and carets
+        eprintln!("{}", error.render(&source, "program.bas"));
+    }
+}
+```
+
+Runtime errors are returned as `String` from `vm.run()`.
+
+For rich diagnostics with source context (file-based compilation):
 
 ```rust
 use basalt_core::compile_file_rich;

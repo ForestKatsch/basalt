@@ -30,6 +30,10 @@ Strings are immutable, UTF-8 encoded sequences. All methods return new values.
 | `s.chars()` | Array of single-character strings |
 | `s.bytes()` | Array of byte values |
 
+String concatenation (`+`) is limited to 16 MB total length. Exceeding this limit produces a runtime error. `string.repeat(n)` has the same 16 MB limit.
+
+> **Panic:** string exceeds maximum length (16 MB)
+
 ```basalt
 fn main(stdout: Stdout) {
     let path = "/users/alice/documents/report.txt"

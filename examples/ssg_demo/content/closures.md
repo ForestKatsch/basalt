@@ -127,6 +127,28 @@ fn main(stdout: Stdout) {
 
 Functions that accept closures as parameters declare the type as `fn(ArgTypes) -> ReturnType`.
 
+## Type narrowing and closures
+
+A mutable variable captured by a closure cannot be type-narrowed with `is`. The closure could mutate the variable between the type check and its use:
+
+```basalt
+fn main(stdout: Stdout) {
+    let mut val: i64 | string = "hello"
+    let swap = fn() { val = 42 }
+
+    if val is string {
+        // val could have been changed by swap() between the check and here
+        stdout.println(val)  // ERROR
+    }
+}
+```
+
+> **Error:** Cannot narrow `val`: mutable variable is captured by a closure.
+
+Narrowing still works for:
+- Immutable variables (even if captured)
+- Mutable variables not captured by any closure
+
 ## What's Next
 
 You now have functions, closures, structs, and enums. [Modules](modules.html) show how to organize all of this across multiple files.

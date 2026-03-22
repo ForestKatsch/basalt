@@ -176,6 +176,17 @@ You can't. If a function returns `T!E` and you don't handle the error, the compi
 
 Errors cannot be silently swallowed. Every result is either used, propagated, or explicitly handled.
 
+### Ambiguous composite types
+
+`T!E?` and `T?!E` are compile errors — the combination of result and optional types is ambiguous. If you need an optional result, use a type alias with an explicit union:
+
+```basalt
+type MaybeResult = i64!string | nil
+```
+
+> **Error:** Ambiguous type: `T!E?` — use a type alias with a union instead.
+
+
 <div class="callout callout-warn"><strong>panic is not error handling</strong>
 <code>panic("message")</code> terminates the program immediately with a stack trace. It cannot be caught. Use it for programming errors — violated invariants, impossible states, bugs. Use result types for expected failures — bad input, missing files, network timeouts. If a user can cause it, it's not a panic.
 </div>

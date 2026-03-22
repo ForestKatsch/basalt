@@ -113,6 +113,19 @@ Even with `Fs`, you can only reach files in your project directory. A downloaded
 | `env.args()` | `[string]` | Command-line arguments |
 | `env.get(name)` | `string?` | Environment variable |
 
+### Reserved capability names
+
+The names `Stdout`, `Stdin`, `Fs`, `Env`, and `Highlight` are reserved for the capability system. Defining a type with any of these names is a compile error:
+
+```basalt
+type Stdout {   // COMPILE ERROR
+    buffer: string
+}
+```
+
+> **Error:** `Stdout` is a reserved capability name and cannot be redefined.
+
+
 ## Passing capabilities to helpers
 
 Capabilities are regular values. Pass them as function parameters:

@@ -572,6 +572,9 @@ let value: i64? = 42
 type — they are fully interchangeable. This means `(i64 | string)?` is
 equivalent to `i64 | string | nil`.
 
+`T??` (double optional) is a compile error. `T?` already includes `nil`;
+wrapping it again is redundant and always indicates a mistake.
+
 Use `is nil` or `is` narrowing to unwrap optionals:
 
 ```
@@ -599,6 +602,10 @@ distinguishes error values from success values of the same type — e.g.,
 The `?` operator desugars to: if the value `is Error`, return it from the
 enclosing function; otherwise narrow to the success type `T`.
 
+
+`T!E?` and `T?!E` are compile errors — ambiguous composite types. Use a
+type alias with an explicit union if an optional result is needed:
+`type MaybeResult = T!E | nil`.
 See [Error Handling](#9-error-handling).
 
 ### 3.7 Function Types
@@ -793,7 +800,8 @@ represents the absence of a meaningful value.
 5. `Error(E)` is compatible with `T!E` (result — an error value).
 6. An empty array `[]` is compatible with any array type `[T]`.
 7. An empty map `{}` is compatible with any map type `[K: V]`.
-8. A subtype is compatible with its parent type.
+8. Arrays and maps are invariant in their element/value types. `[T]` is assignable to `[T]` only, not `[T | U]`. This prevents type corruption through shared mutable references.
+9. A subtype is compatible with its parent type.
 
 ### 3.12 No Generics
 
@@ -841,6 +849,10 @@ function returns a non-nil value. Without `-> T`, the function returns `nil`.
 Functions require explicit `return` statements. The last expression in a
 function body is NOT implicitly returned (unlike Rust). A function without
 a `return` statement returns `nil`.
+
+Functions with a non-void return type must return on all code paths. The
+compiler verifies this — an empty function body or a conditional return
+without covering all branches is a compile error.
 
 ### 4.3 Type Declarations
 
@@ -1270,6 +1282,21 @@ match fallible_call() {
 
 The success case binds the unwrapped value. The error case uses `!name` to
 bind the error.
+
+### 8.4 Exhaustiveness
+
+The compiler requires match expressions to be exhaustive:
+- **Enum types:** all variants must be covered, or a wildcard/binding pattern must be present.
+- **Union types:** all member types must be covered with `is` patterns, or a wildcard/binding must be present.
+- **Integer, float, and string types:** the compiler cannot enumerate all values. A wildcard (`_`) or binding pattern is required.
+- **Boolean types:** both `true` and `false` must be covered, or a wildcard/binding must be present.
+- **Result types:** both success and error arms must be present.
+
+A missing pattern produces a compile error:
+
+```
+// error: non-exhaustive match on 'i64': add a wildcard (_) or binding pattern
+```
 
 ---
 

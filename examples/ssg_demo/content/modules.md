@@ -27,11 +27,13 @@ import "geometry"
 fn main(stdout: Stdout) {
     let a = geometry.Point { x: 0.0, y: 0.0 }
     let b = geometry.Point { x: 3.0, y: 4.0 }
-    stdout.println(geometry.distance(a, b) as string)  // Output: 5
+    stdout.println(a.x as string)                       // Output: 0
+    stdout.println(b.y as string)                       // Output: 4
+    stdout.println(geometry.distance(a, b) as string)   // Output: 5
 }
 ```
 
-All access is qualified: `geometry.Point`, `geometry.distance`. There is no unqualified import — you always know where a name comes from by reading the call site.
+Module types and functions are accessed through the module name: `geometry.Point` constructs the struct, `a.x` accesses fields directly, and `geometry.distance()` calls the function.
 
 <div class="callout callout-note"><strong>Why qualified access?</strong>
 When two modules export the same name, qualified access makes collisions impossible. You never have to guess which <code>parse</code> or <code>Error</code> you are looking at. The tradeoff is verbosity — but the code tells the truth about its dependencies at every use site.
@@ -51,6 +53,15 @@ fn main(stdout: Stdout) {
 ```
 
 The alias replaces the module name at all use sites. The original long name is not accessible.
+
+If an import path derives an alias that is a reserved keyword, the compiler requires an explicit alias:
+
+```basalt
+import "type"              // COMPILE ERROR: 'type' is a keyword
+import "type" as mytype    // OK
+```
+
+> **Error:** Import alias `type` is a keyword. Use `import "type" as <name>` instead.
 
 ## Standard library imports
 

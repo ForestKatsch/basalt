@@ -55,6 +55,22 @@ fn label(code: i64) -> string {
 
 No ambiguity. The compiler catches it, points at the line, and tells you what's wrong.
 
+### Missing return on all paths
+
+The compiler checks every code path. Conditionally returning is not enough — every branch must return:
+
+```basalt
+fn sign(n: i64) -> string {
+    if n > 0 { return "positive" }
+    if n < 0 { return "negative" }
+    // COMPILE ERROR: not all code paths return a value
+}
+```
+
+> **Error:** Function `sign` declares return type `string` but not all code paths return a value.
+
+This applies equally to lambdas. An empty function body or a body without `return` when a return type is declared is always rejected.
+
 ## Multiple parameters and early return
 
 Functions can return early from any point. This keeps the happy path unindented:

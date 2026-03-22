@@ -76,6 +76,25 @@ fn content_type(body: HttpBody) -> string {
 Imagine you add a <code>Binary(bytes)</code> variant to <code>HttpBody</code> six months from now. Without exhaustiveness checking, every <code>match</code> on <code>HttpBody</code> silently does the wrong thing. With it, the compiler finds every location that needs updating — instantly. This turns a runtime bug into a compile-time checklist.
 </div>
 
+### Exhaustiveness for integers, floats, and strings
+
+Match on integers, floats, and strings requires a wildcard (`_`) or binding pattern. The compiler cannot enumerate all possible values, so it requires a catch-all:
+
+```basalt
+fn classify(n: i64) -> string {
+    match n {
+        0 => return "zero"
+        1 => return "one"
+    }
+    return ""
+}
+```
+
+> **Error:** non-exhaustive match on 'i64': add a wildcard (_) or binding pattern
+
+Add `_ => return "other"` to fix it. The first example on this page already includes a wildcard for exactly this reason.
+
+
 ## Type narrowing with `is`
 
 For union types, `is` patterns narrow the type within each branch:

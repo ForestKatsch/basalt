@@ -108,6 +108,16 @@ fn main(stdout: Stdout) {
 
 Arrays and maps are reference types — assignment shares the same object. Use `.clone()` for an independent copy. Tuples are value types and copy on assignment.
 
+Arrays and maps are **invariant** in their element type. `[i64]` is not assignable to `[i64 | f64]` — this prevents type corruption through shared references. Use `.map()` to convert element types explicitly:
+
+```basalt
+fn main(stdout: Stdout) {
+    let ints = [1, 2, 3]
+    // let mixed: [i64 | f64] = ints   // COMPILE ERROR: [i64] is not assignable to [i64 | f64]
+    let mixed = ints.map(fn(n: i64) -> i64 | f64 { return n })  // explicit conversion
+}
+```
+
 ## Optional types: absence you can see
 
 In many languages, any reference can be null — and you don't know until it explodes at runtime. Basalt has `nil`, but it can never hide. A `string` is always a string. If a value might be absent, the type says so: `T?` (shorthand for `T | nil`) forces you to check before you use it:
@@ -130,6 +140,10 @@ fn main(stdout: Stdout) {
 ```
 
 The compiler forces you to handle `nil` before using the value. No null pointer exceptions. Ever.
+
+`T??` (double optional) is a compile error. `T?` already includes `nil` — wrapping it again is redundant.
+
+> **Error:** Type `string??` is invalid: `T?` already includes nil.
 
 ## Result types
 
