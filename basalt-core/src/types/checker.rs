@@ -2337,6 +2337,22 @@ impl TypeChecker {
         }
     }
 
+    /// Method call on an already-typed object with already-typed args.
+    fn check_method_call_typed(
+        &mut self,
+        typed_obj: TypedExpr,
+        method: &str,
+        typed_args: Vec<TypedExpr>,
+        span: Span,
+    ) -> Result<TypedExpr, CompileError> {
+        let result_ty = self.check_builtin_method(&typed_obj.ty, method, &typed_args, span)?;
+        Ok(TypedExpr {
+            kind: TypedExprKind::MethodCall(Box::new(typed_obj), method.to_string(), typed_args),
+            ty: result_ty,
+            span,
+        })
+    }
+
     fn check_method_call(
         &mut self,
         obj: &Expr,
@@ -2348,9 +2364,11 @@ impl TypeChecker {
             return self.check_static_method_call(type_name, method, args, obj.span);
         }
 
-        // If obj is an Ident that resolves to a module, treat as static method call
+        // If obj is an Ident that resolves to a module AND is not a local variable,
+        // treat as static method call. Local variables shadow module names.
         if let ExprKind::Ident(name) = &obj.kind {
-            if self.type_info.modules.contains_key(name.as_str()) {
+            let is_local = self.lookup_var(name.as_str()).is_some();
+            if !is_local && self.type_info.modules.contains_key(name.as_str()) {
                 return self.check_static_method_call(name, method, args, obj.span);
             }
         }
@@ -2949,6 +2967,17 @@ impl TypeChecker {
         let mut typed_args = Vec::new();
         for arg in args {
             typed_args.push(self.check_expr(arg)?);
+        }
+
+        // If name is a local variable, treat as method call on its value,
+        // not a module/type static call. Local variables shadow modules.
+        if let Some((var_ty, _)) = self.lookup_var(name) {
+            let typed_obj = TypedExpr {
+                kind: TypedExprKind::Ident(name.to_string()),
+                ty: var_ty.clone(),
+                span,
+            };
+            return self.check_method_call_typed(typed_obj, method, typed_args, span);
         }
 
         // Check if name is a module

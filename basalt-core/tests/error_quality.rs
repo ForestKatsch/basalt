@@ -319,3 +319,31 @@ fn struct_length_field_works() {
         "struct with 'length' field should compile",
     );
 }
+
+// --- Local variable shadows module name ---
+
+#[test]
+fn error_local_shadows_module_method_call() {
+    // When a local variable shadows a module name, method calls go to the variable
+    let e = expect_error(
+        "import \"std/math\"\nfn main(stdout: Stdout) {\n    let math: f64 = 1.0\n    stdout.println(math.sqrt(math) as string)\n}",
+    );
+    assert!(
+        e.message.contains("unknown method") && e.message.contains("sqrt"),
+        "should reject sqrt on f64: {}",
+        e.message
+    );
+}
+
+#[test]
+fn error_local_shadows_module_static_call() {
+    // StaticMethodCall path also respects local variable shadowing
+    let e = expect_error(
+        "import \"std/math\"\nfn main(stdout: Stdout) {\n    let math: f64 = 1.0\n    math.sqrt(4.0)\n}",
+    );
+    assert!(
+        e.message.contains("unknown method") || e.message.contains("sqrt"),
+        "should treat math as f64, not module: {}",
+        e.message
+    );
+}
