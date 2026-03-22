@@ -3508,9 +3508,28 @@ impl TypeChecker {
                     ));
                 }
             }
-            // For integers, strings, etc. we can't check exhaustiveness
-            // without a wildcard, but we don't error — they may use guard/return patterns
-            _ => {}
+            // For integers, strings, floats: require a wildcard/binding pattern
+            // since we can't enumerate all possible values.
+            _ => {
+                let has_wildcard = arms.iter().any(|arm| {
+                    matches!(
+                        arm.pattern.kind,
+                        PatternKind::Wildcard | PatternKind::Binding(_)
+                    )
+                });
+                if !has_wildcard && !arms.is_empty() {
+                    return Err(CompileError::new(
+                        format!(
+                            "non-exhaustive match on '{}': add a wildcard (_) or binding pattern to handle all values",
+                            scrutinee_ty.display_name()
+                        ),
+                        span,
+                    ));
+                }
+                if arms.is_empty() {
+                    return Err(CompileError::new("empty match expression", span));
+                }
+            }
         }
         Ok(())
     }

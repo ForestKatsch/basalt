@@ -234,18 +234,26 @@ impl VM {
                     };
                 }
                 Op::DivInt(d, a, b) => {
+                    let va = reg[a as usize].try_as_int()?;
                     let vb = reg[b as usize].try_as_int()?;
                     if vb == 0 {
                         return Err("division by zero".to_string());
                     }
-                    reg[d as usize] = Value::int(reg[a as usize].try_as_int()? / vb);
+                    reg[d as usize] = match va.checked_div(vb) {
+                        Some(r) => Value::int(r),
+                        None => return Err(format!("integer overflow: {} / {}", va, vb)),
+                    };
                 }
                 Op::ModInt(d, a, b) => {
+                    let va = reg[a as usize].try_as_int()?;
                     let vb = reg[b as usize].try_as_int()?;
                     if vb == 0 {
                         return Err("modulo by zero".to_string());
                     }
-                    reg[d as usize] = Value::int(reg[a as usize].try_as_int()? % vb);
+                    reg[d as usize] = match va.checked_rem(vb) {
+                        Some(r) => Value::int(r),
+                        None => return Err(format!("integer overflow: {} % {}", va, vb)),
+                    };
                 }
                 Op::PowInt(d, a, b) => {
                     let base = reg[a as usize].try_as_int()?;
