@@ -1,6 +1,6 @@
 title: Structs
 date: 2026-03-08
-description: Named data with methods. Reference semantics, explicit cloning.
+description: Defining structs, methods, reference semantics, and cloning.
 
 Structs group related data under a name. You define them with the `type` keyword and construct them with field initializers.
 

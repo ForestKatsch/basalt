@@ -1,6 +1,6 @@
 title: Control Flow
 date: 2026-03-05
-description: Conditions are bool. Loops are clear. Guards catch problems early.
+description: if/else, for-in, while, loop/break, guard, and guard let.
 
 Basalt's control flow has one principle: **say what you mean**. Conditions must be booleans — no truthy/falsy surprises. Loops iterate over real collections. Guards push error handling to the top so the happy path reads clean.
 

@@ -1,6 +1,6 @@
 title: Pattern Matching
 date: 2026-03-06
-description: The compiler checks every case. Forget one, it tells you.
+description: match expressions, enum destructuring, exhaustiveness, type narrowing, and result matching.
 
 `match` checks a value against patterns. The compiler verifies every possibility is handled.
 

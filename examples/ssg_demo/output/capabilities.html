@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Capabilities — Basalt</title>
-    <meta name="description" content="Your program only does what you allow it to do.">
+    <meta name="description" content="Stdout, Stdin, Fs, Env — how I/O works and why it is sandboxed.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -251,7 +251,7 @@
     <div class="page">
         <article class="content">
             <h1>Capabilities</h1>
-            <p class="subtitle">Your program only does what you allow it to do.</p>
+            <p class="subtitle">Stdout, Stdin, Fs, Env — how I/O works and why it is sandboxed.</p>
             <p>Most programs have unrestricted access to the outside world. They can read any file, connect to any server, access any environment variable — and you only find out what they actually do by reading every line of code.</p>
 <p>Basalt inverts this. A program declares its capabilities in <code>main</code>'s parameter list, and the runtime provides only what is requested. If you don't ask for file system access, your program physically cannot read or write files.</p>
 <h2>A minimal program</h2>

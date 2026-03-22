@@ -1,6 +1,6 @@
 title: Types
 date: 2026-03-02
-description: Every value has a type. Every type tells the truth.
+description: Integers, floats, strings, arrays, maps, optionals, results, and unions.
 
 Every value in Basalt has a type known at compile time. The compiler rejects programs where types don't match — before the code runs.
 

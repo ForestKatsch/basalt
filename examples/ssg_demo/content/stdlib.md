@@ -1,6 +1,6 @@
 title: Standard Library
 date: 2026-03-12
-description: Strings, arrays, maps, and math — the tools you reach for every day.
+description: Method reference for strings, arrays, maps, and the math module.
 
 Basalt's standard library is intentionally small. String, array, and map methods are built in — no imports needed. The `math` module is the only thing you import.
 

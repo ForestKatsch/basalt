@@ -1,6 +1,6 @@
 title: Error Handling
 date: 2026-03-07
-description: No exceptions. No surprises. Errors are values you can see in the type.
+description: Result types, the ? operator, guard let, custom error enums, and panic.
 
 If a function can fail, its return type says so. `T!E` holds either a success value of type `T` or an error of type `E`. The compiler ensures every result is handled.
 

@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Pattern Matching — Basalt</title>
-    <meta name="description" content="The compiler checks every case. Forget one, it tells you.">
+    <meta name="description" content="match expressions, enum destructuring, exhaustiveness, type narrowing, and result matching.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -251,7 +251,7 @@
     <div class="page">
         <article class="content">
             <h1>Pattern Matching</h1>
-            <p class="subtitle">The compiler checks every case. Forget one, it tells you.</p>
+            <p class="subtitle">match expressions, enum destructuring, exhaustiveness, type narrowing, and result matching.</p>
             <p><code>match</code> checks a value against patterns. The compiler verifies every possibility is handled.</p>
 <h2>Matching literals</h2>
 <p>At its simplest, <code>match</code> replaces chains of <code>if</code>/<code>else if</code>:</p>

@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Error Handling — Basalt</title>
-    <meta name="description" content="No exceptions. No surprises. Errors are values you can see in the type.">
+    <meta name="description" content="Result types, the ? operator, guard let, custom error enums, and panic.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -251,7 +251,7 @@
     <div class="page">
         <article class="content">
             <h1>Error Handling</h1>
-            <p class="subtitle">No exceptions. No surprises. Errors are values you can see in the type.</p>
+            <p class="subtitle">Result types, the ? operator, guard let, custom error enums, and panic.</p>
             <p>If a function can fail, its return type says so. <code>T!E</code> holds either a success value of type <code>T</code> or an error of type <code>E</code>. The compiler ensures every result is handled.</p>
 <h2>Result types</h2>
 <p><code>T!E</code> is a type that holds either a success value of type <code>T</code> or an error of type <code>E</code>:</p>

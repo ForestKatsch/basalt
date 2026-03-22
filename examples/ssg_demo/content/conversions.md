@@ -1,6 +1,6 @@
 title: Type Conversions
 date: 2026-03-14
-description: Explicit casting. The compiler never guesses.
+description: The as and as? operators, conversion rules, and formatting behavior.
 
 In many languages, the compiler silently converts between numeric types. A function expects `f64` and you pass an `i32` — it just works. Until the day it doesn't: an integer silently becomes a float, loses precision, and your financial calculation is wrong by a cent. Or a large integer overflows into a small one and your array index wraps around to somewhere unexpected.
 

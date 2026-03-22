@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Type Conversions — Basalt</title>
-    <meta name="description" content="Explicit casting. The compiler never guesses.">
+    <meta name="description" content="The as and as? operators, conversion rules, and formatting behavior.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -251,7 +251,7 @@
     <div class="page">
         <article class="content">
             <h1>Type Conversions</h1>
-            <p class="subtitle">Explicit casting. The compiler never guesses.</p>
+            <p class="subtitle">The as and as? operators, conversion rules, and formatting behavior.</p>
             <p>In many languages, the compiler silently converts between numeric types. A function expects <code>f64</code> and you pass an <code>i32</code> — it just works. Until the day it doesn't: an integer silently becomes a float, loses precision, and your financial calculation is wrong by a cent. Or a large integer overflows into a small one and your array index wraps around to somewhere unexpected.</p>
 <p>Basalt requires every conversion to be explicit. You always see it. You always choose it.</p>
 <h2><code>as</code> — convert or panic</h2>

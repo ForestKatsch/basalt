@@ -1,6 +1,6 @@
 title: Functions
 date: 2026-03-04
-description: Everything is explicit. Parameters, return types, return statements.
+description: Declaring functions, return types, first-class functions, and forward references.
 
 All parameters require type annotations. Return type is required for non-void functions. Return is always explicit.
 

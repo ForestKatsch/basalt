@@ -1,6 +1,6 @@
 title: Variables
 date: 2026-03-03
-description: Immutable by default. Mutable when you need it.
+description: let, let mut, type inference, shadowing, and block scoping.
 
 Variables are immutable by default. Declare with `let` and the binding cannot be reassigned.
 

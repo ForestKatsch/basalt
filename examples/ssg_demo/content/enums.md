@@ -1,6 +1,6 @@
 title: Enums
 date: 2026-03-09
-description: A closed set of possibilities. The compiler ensures you handle each one.
+description: Simple variants, data-carrying variants, methods, and modeling with enums.
 
 An enum defines a type that can be exactly one of several variants. Unlike structs, which always have the same fields, an enum value is one possibility from a fixed set.
 

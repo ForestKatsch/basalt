@@ -1,6 +1,6 @@
 title: Modules
 date: 2026-03-11
-description: Each file is a module. All access is qualified. No ambiguity.
+description: Importing files, qualified access, aliases, and the standard library.
 
 In Basalt, every `.bas` file is a module. There is no module declaration syntax — the filename is the module name. You import a module, then access its contents through the module name.
 

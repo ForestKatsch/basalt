@@ -1,6 +1,6 @@
 title: Closures
 date: 2026-03-10
-description: Functions that carry their context.
+description: Lambda syntax, capture by reference, and functional array methods.
 
 A closure is a function defined inline that can capture variables from its surrounding scope. You write them with the `fn` keyword, just like regular functions, but without a name.
 

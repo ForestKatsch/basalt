@@ -1,6 +1,6 @@
 title: Capabilities
 date: 2026-03-13
-description: Your program only does what you allow it to do.
+description: Stdout, Stdin, Fs, Env — how I/O works and why it is sandboxed.
 
 Most programs have unrestricted access to the outside world. They can read any file, connect to any server, access any environment variable — and you only find out what they actually do by reading every line of code.
 

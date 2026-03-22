@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Control Flow — Basalt</title>
-    <meta name="description" content="Conditions are bool. Loops are clear. Guards catch problems early.">
+    <meta name="description" content="if/else, for-in, while, loop/break, guard, and guard let.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -251,7 +251,7 @@
     <div class="page">
         <article class="content">
             <h1>Control Flow</h1>
-            <p class="subtitle">Conditions are bool. Loops are clear. Guards catch problems early.</p>
+            <p class="subtitle">if/else, for-in, while, loop/break, guard, and guard let.</p>
             <p>Basalt's control flow has one principle: <strong>say what you mean</strong>. Conditions must be booleans — no truthy/falsy surprises. Loops iterate over real collections. Guards push error handling to the top so the happy path reads clean.</p>
 <h2>No truthiness</h2>
 <p>In JavaScript, <code>if (0)</code>, <code>if ("")</code>, and <code>if (null)</code> are all falsy. This leads to bugs where empty strings and zero are accidentally treated as "missing." Basalt rejects this entirely:</p>
