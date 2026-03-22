@@ -135,7 +135,7 @@ You can name unions with type aliases for readability:
 type JsonValue = bool | f64 | string | nil
 ```
 
-The compiler ensures you handle every member of the union — you can't accidentally forget the `nil` case.
+The compiler requires you to handle every member of the union.
 
 ## What's Next
 

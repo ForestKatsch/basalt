@@ -39,7 +39,7 @@ This is capture by reference, not by copy. The closure and the enclosing scope s
 
 ## Array methods
 
-The real power of closures shows up with array methods: `map`, `filter`, `find`, `any`, and `all`. These take a closure and apply it to each element.
+Closures are used heavily with array methods: `map`, `filter`, `find`, `any`, and `all`. These take a closure and apply it to each element.
 
 ```basalt
 fn main(stdout: Stdout) {

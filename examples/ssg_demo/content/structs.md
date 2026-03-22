@@ -67,7 +67,7 @@ Static methods like `origin()` are called on the type name. Instance methods lik
 
 ## Reference semantics
 
-This is the most important thing to understand about structs in Basalt: **assignment does not copy.** When you assign a struct to a new variable, both variables refer to the same object.
+Structs are reference types. Assignment shares the object, not copies it:
 
 ```basalt
 fn main(stdout: Stdout) {
@@ -79,15 +79,14 @@ fn main(stdout: Stdout) {
 }
 ```
 
-If you expected `point.x` to still be `1.0`, you are not alone. This is the most common surprise for new Basalt developers.
 
-<div class="callout callout-warn"><strong>Structs are reference types</strong>
-Assignment shares the object, not copies it. Mutating through one variable is visible through every other variable that refers to the same struct. This applies to function arguments too — if you pass a struct to a function, the function can see mutations you make later.
+<div class="callout callout-warn"><strong>Reference semantics apply everywhere</strong>
+Mutating through one variable is visible through every other variable that refers to the same struct. This applies to function arguments too — if you pass a struct to a function, the function can see mutations you make later.
 </div>
 
 ## Cloning for independence
 
-When you need a truly separate copy, call `clone()`:
+For an independent copy, call `clone()`:
 
 ```basalt
 fn main(stdout: Stdout) {

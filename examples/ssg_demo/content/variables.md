@@ -26,11 +26,11 @@ fn main(stdout: Stdout) {
 
 > **Error:** Cannot assign to immutable variable `name`. Declare with `let mut` to allow reassignment.
 
-This isn't a suggestion — it's a compile error. Your program won't build until you make your intent explicit.
+The compiler rejects the program.
 
 ## Mutable when you need it
 
-When you genuinely need a value to change, say so with `let mut`:
+Use `let mut` when the value needs to change:
 
 ```basalt
 fn main(stdout: Stdout) {
@@ -48,7 +48,7 @@ fn main(stdout: Stdout) {
 The `mut` keyword serves as documentation. When you see `let mut` in code, you know this value will change — scan for where.
 
 <div class="callout callout-warn"><strong>Gotcha: collections need mut too</strong>
-Mutating methods like <code>push</code>, <code>sort</code>, and <code>remove</code> require the variable to be <code>mut</code>. An immutable binding to an array means you cannot modify that array at all — not just that you can't reassign the variable.
+Mutating methods like <code>push</code>, <code>sort</code>, and <code>remove</code> require the variable to be <code>mut</code>.
 
 <pre><code>let items = [1, 2, 3]
 items.push(4)  // Error: Cannot call mutating method on immutable variable</code></pre>

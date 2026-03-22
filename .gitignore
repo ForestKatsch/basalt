@@ -1,1 +1,12 @@
 /target
+
+# Generated SSG output — built by CI, not tracked
+examples/ssg_demo/output/
+
+# Tree-sitter generated files — regenerate with `tree-sitter generate`
+tree-sitter-basalt/src/parser.c
+tree-sitter-basalt/src/grammar.json
+tree-sitter-basalt/src/node-types.json
+tree-sitter-basalt/src/tree_sitter/
+tree-sitter-basalt/node_modules/
+tree-sitter-basalt/build/

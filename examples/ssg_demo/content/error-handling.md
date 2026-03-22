@@ -92,7 +92,7 @@ fn main(stdout: Stdout, fs: Fs) {
 }
 ```
 
-The variable `content` is available in the **enclosing scope**, not just inside a block. The `else` branch must diverge — `return`, `break`, or `panic`.
+The variable `content` is available in the enclosing scope. The `else` branch must diverge — `return`, `break`, or `panic`.
 
 ## A real example: read, parse, validate
 
@@ -124,7 +124,7 @@ Each possible failure — file not found, not a number, out of range — is expl
 
 ## Custom error types
 
-The error type in `T!E` can be any type — not just `string`. For real applications, define an enum:
+The error type in `T!E` can be any type — not just `string`. Define an enum for structured errors:
 
 ```basalt
 type ConfigError {
@@ -174,7 +174,7 @@ You can't. If a function returns `T!E` and you don't handle the error, the compi
 
 > **Error:** Result type `i64!string` must be handled. Use `match`, `?`, or `guard let`.
 
-This is the core guarantee: errors cannot be silently swallowed. Every result is either used, propagated, or explicitly handled.
+Errors cannot be silently swallowed. Every result is either used, propagated, or explicitly handled.
 
 <div class="callout callout-warn"><strong>panic is not error handling</strong>
 <code>panic("message")</code> terminates the program immediately with a stack trace. It cannot be caught. Use it for programming errors — violated invariants, impossible states, bugs. Use result types for expected failures — bad input, missing files, network timeouts. If a user can cause it, it's not a panic.

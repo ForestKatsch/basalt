@@ -38,7 +38,7 @@ That's it. You just wrote and ran a Basalt program.
 
 The `stdout: Stdout` parameter is how I/O works in Basalt. Programs receive capabilities as parameters — `Stdout` for printing, `Fs` for file access, `Env` for environment variables. If a capability isn't in the parameter list, the program can't use it.
 
-This means you can read any Basalt function signature and know exactly what side effects it can perform. A function that takes no capability parameters is pure — it can't touch the outside world. We'll explore this fully in [Capabilities](capabilities.html).
+You can read any function signature and know what side effects it performs. A function that takes no capability parameters is pure — it can't touch the outside world. We'll explore this fully in [Capabilities](capabilities.html).
 
 ## Type-check without running
 

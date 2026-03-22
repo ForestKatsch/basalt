@@ -30,7 +30,7 @@ The `_` wildcard catches everything not explicitly listed. Without it, the compi
 
 ## Matching enum variants
 
-This is where `match` truly shines. Define an enum with associated data, then destructure it:
+Define an enum with associated data, then destructure it:
 
 ```basalt
 type HttpBody {
