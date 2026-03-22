@@ -595,13 +595,15 @@ impl TypeChecker {
                                     .map(|t| self.resolve_type_expr_in_module(t, module_name))
                                     .transpose()?
                                     .unwrap_or(Type::Nil);
+                                let is_method =
+                                    params.first().map(|(n, _)| n == "self").unwrap_or(false);
                                 methods.insert(
                                     m.name.clone(),
                                     FuncInfo {
                                         name: m.name.clone(),
                                         params,
                                         return_type: ret,
-                                        is_method: true,
+                                        is_method,
                                     },
                                 );
                             }
@@ -2384,6 +2386,41 @@ impl TypeChecker {
         })
     }
 
+    /// Validate an instance method call on a user-defined type.
+    /// Rejects static methods called via instance syntax, checks arg count.
+    /// Returns the method's return type on success.
+    fn validate_instance_method(
+        &self,
+        method_info: &FuncInfo,
+        method_name: &str,
+        type_name: &str,
+        args: &[TypedExpr],
+        span: Span,
+    ) -> Result<Type, CompileError> {
+        if !method_info.is_method {
+            return Err(CompileError::new(
+                format!(
+                    "'{}' is a static method on '{}'; call it as {}.{}()",
+                    method_name, type_name, type_name, method_name
+                ),
+                span,
+            ));
+        }
+        let expected_args = &method_info.params[1..]; // skip self
+        if expected_args.len() != args.len() {
+            return Err(CompileError::new(
+                format!(
+                    "method '{}' expects {} arguments, got {}",
+                    method_name,
+                    expected_args.len(),
+                    args.len()
+                ),
+                span,
+            ));
+        }
+        Ok(method_info.return_type.clone())
+    }
+
     fn check_builtin_method(
         &self,
         obj_ty: &Type,
@@ -2399,24 +2436,13 @@ impl TypeChecker {
                 // Check user-defined methods
                 if let Some(info) = self.type_info.structs.get(name) {
                     if let Some(method_info) = info.methods.get(method) {
-                        // Check args (skip self parameter)
-                        let expected_args = if method_info.is_method {
-                            &method_info.params[1..] // skip self
-                        } else {
-                            &method_info.params[..]
-                        };
-                        if expected_args.len() != args.len() {
-                            return Err(CompileError::new(
-                                format!(
-                                    "method '{}' expects {} arguments, got {}",
-                                    method,
-                                    expected_args.len(),
-                                    args.len()
-                                ),
-                                span,
-                            ));
-                        }
-                        return Ok(method_info.return_type.clone());
+                        return self.validate_instance_method(
+                            method_info,
+                            method,
+                            name,
+                            args,
+                            span,
+                        );
                     }
                     // Check for .clone()
                     if method == "clone" && args.is_empty() {
@@ -2430,7 +2456,13 @@ impl TypeChecker {
                         .get(name.split('.').next_back().unwrap_or(name))
                     {
                         if let Some(method_info) = info.methods.get(method) {
-                            return Ok(method_info.return_type.clone());
+                            return self.validate_instance_method(
+                                method_info,
+                                method,
+                                name,
+                                args,
+                                span,
+                            );
                         }
                         if method == "clone" && args.is_empty() {
                             return Ok(obj_ty.clone());
@@ -2464,7 +2496,13 @@ impl TypeChecker {
             Type::Enum(name) => {
                 if let Some(info) = self.type_info.enums.get(name) {
                     if let Some(method_info) = info.methods.get(method) {
-                        return Ok(method_info.return_type.clone());
+                        return self.validate_instance_method(
+                            method_info,
+                            method,
+                            name,
+                            args,
+                            span,
+                        );
                     }
                 }
                 let method_names: Vec<&str> = self
