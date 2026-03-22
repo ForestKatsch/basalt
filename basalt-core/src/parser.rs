@@ -1005,7 +1005,7 @@ impl Parser {
                                 self.skip_newlines();
                                 let fields = self.parse_struct_fields()?;
                                 self.expect(&Token::RBrace)?;
-                                return Ok(Expr::StructLit(type_name, Some(name), fields));
+                                return Ok(Expr::StructLit(type_name, Some(name), fields, None));
                             }
                             Token::Dot => {
                                 // module.Type.Variant or module.Type.method
@@ -1088,7 +1088,7 @@ impl Parser {
                             self.skip_newlines();
                             let fields = self.parse_struct_fields()?;
                             self.expect(&Token::RBrace)?;
-                            Ok(Expr::StructLit(name, None, fields))
+                            Ok(Expr::StructLit(name, None, fields, None))
                         } else {
                             Ok(Expr::TypeIdent(name))
                         }

@@ -471,7 +471,7 @@ impl Lexer {
                 self.advance(); // x
                 let hex_start = self.pos;
                 while let Some(ch) = self.peek() {
-                    if ch.is_ascii_hexdigit() {
+                    if ch.is_ascii_hexdigit() || ch == '_' {
                         self.advance();
                     } else {
                         break;
@@ -483,7 +483,8 @@ impl Lexer {
                         self.line, self.col
                     ));
                 }
-                let hex_str: String = self.chars[hex_start..self.pos].iter().collect();
+                let hex_str: String = self.chars[hex_start..self.pos].iter()
+                    .filter(|c| **c != '_').collect();
                 let val = i64::from_str_radix(&hex_str, 16)
                     .map_err(|e| format!("invalid hex literal: {}", e))?;
                 return Ok(Token::IntLit(val));
@@ -493,7 +494,7 @@ impl Lexer {
                 self.advance(); // b
                 let bin_start = self.pos;
                 while let Some(ch) = self.peek() {
-                    if ch == '0' || ch == '1' {
+                    if ch == '0' || ch == '1' || ch == '_' {
                         self.advance();
                     } else {
                         break;
@@ -505,16 +506,17 @@ impl Lexer {
                         self.line, self.col
                     ));
                 }
-                let bin_str: String = self.chars[bin_start..self.pos].iter().collect();
+                let bin_str: String = self.chars[bin_start..self.pos].iter()
+                    .filter(|c| **c != '_').collect();
                 let val = i64::from_str_radix(&bin_str, 2)
                     .map_err(|e| format!("invalid binary literal: {}", e))?;
                 return Ok(Token::IntLit(val));
             }
         }
 
-        // Decimal digits
+        // Decimal digits (with optional _ separators)
         while let Some(ch) = self.peek() {
-            if ch.is_ascii_digit() {
+            if ch.is_ascii_digit() || ch == '_' {
                 self.advance();
             } else {
                 break;
@@ -528,7 +530,7 @@ impl Lexer {
                 if ch.is_ascii_digit() {
                     self.advance(); // consume '.'
                     while let Some(ch) = self.peek() {
-                        if ch.is_ascii_digit() {
+                        if ch.is_ascii_digit() || ch == '_' {
                             self.advance();
                         } else {
                             break;
@@ -552,7 +554,7 @@ impl Lexer {
                 self.advance();
             }
             while let Some(ch) = self.peek() {
-                if ch.is_ascii_digit() {
+                if ch.is_ascii_digit() || ch == '_' {
                     self.advance();
                 } else {
                     break;
@@ -563,7 +565,8 @@ impl Lexer {
             false
         };
 
-        let num_str: String = self.chars[start..self.pos].iter().collect();
+        let num_str: String = self.chars[start..self.pos].iter()
+            .filter(|c| **c != '_').collect();
 
         if is_float || has_exp {
             let val: f64 = num_str

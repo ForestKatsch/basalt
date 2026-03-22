@@ -97,7 +97,7 @@ pub enum Expr {
     TupleLit(Vec<Expr>),
 
     // Struct construction
-    StructLit(String, Option<String>, Vec<(String, Expr)>), // TypeName, optional module, fields
+    StructLit(String, Option<String>, Vec<(String, Expr)>, Option<Box<Expr>>), // TypeName, optional module, fields, spread
 
     // Enum variant construction
     EnumVariant(String, String, Vec<Expr>), // TypeName, Variant, args
