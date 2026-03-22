@@ -56,6 +56,7 @@ pub enum CapabilityData {
     Stdin,
     Fs { root: PathBuf },
     Env { args: Vec<String> },
+    Highlight,
 }
 
 #[derive(Debug, Clone)]

@@ -263,6 +263,14 @@
             .content pre { padding: 1rem; font-size: 0.82em; }
             .sidebar-nav a { font-size: 0.78rem; padding: 0.25rem 0.5rem; }
         }
+        /* Syntax highlighting */
+        .kw { color: #fbbf24; }
+        .ty { color: #a7d28b; }
+        .st { color: #a7d28b; }
+        .nu { color: #f0a8d0; }
+        .cm { color: #7a7060; font-style: italic; }
+        .fn { color: #7dd3fc; }
+        .op { color: #d4a574; }
     </style>
 </head>
 <body>
@@ -281,39 +289,39 @@
             <p class="subtitle">Result types, error propagation, and recovery</p>
             <p>Basalt has no exceptions. Errors are values, carried by result types <code>T!E</code>.</p>
 <h3>Creating and returning errors</h3>
-<pre><code>fn parse_age(s: string) -&gt; i64!string {
-    let n = s as? i64
-    if n is nil {
-        return !("invalid number: " + s)
+<pre><code><span class="kw">fn</span> <span class="fn">parse_age</span>(s<span class="op">:</span> <span class="ty">string</span>) <span class="op">-&gt;</span> <span class="ty">i64</span><span class="op">!</span><span class="ty">string</span> {
+    <span class="kw">let</span> n <span class="op">=</span> s <span class="kw">as</span><span class="op">?</span> <span class="ty">i64</span>
+    <span class="kw">if</span> n <span class="kw">is</span> <span class="kw">nil</span> {
+        <span class="kw">return</span> <span class="op">!</span>(<span class="st">"invalid number: "</span> <span class="op">+</span> s)
     }
-    let age = n as i64
-    if age &lt; 0 {
-        return !("age cannot be negative")
+    <span class="kw">let</span> age <span class="op">=</span> n <span class="kw">as</span> <span class="ty">i64</span>
+    <span class="kw">if</span> age <span class="op">&lt;</span> <span class="nu">0</span> {
+        <span class="kw">return</span> <span class="op">!</span>(<span class="st">"age cannot be negative"</span>)
     }
-    return age
+    <span class="kw">return</span> age
 }</code></pre>
 <h3>Propagating with ?</h3>
 <p>The <code>?</code> operator propagates errors automatically. If the result is an error, it returns from the enclosing function. If successful, it unwraps the value.</p>
-<pre><code>fn load_and_parse(fs: Fs) -&gt; i64!string {
-    let content = fs.read_file("age.txt")?  // propagates read error
-    let age = parse_age(content.trim())?     // propagates parse error
-    return age
+<pre><code><span class="kw">fn</span> <span class="fn">load_and_parse</span>(fs<span class="op">:</span> <span class="ty">Fs</span>) <span class="op">-&gt;</span> <span class="ty">i64</span><span class="op">!</span><span class="ty">string</span> {
+    <span class="kw">let</span> content <span class="op">=</span> fs.<span class="fn">read_file</span>(<span class="st">"age.txt"</span>)<span class="op">?</span>  <span class="cm">// propagates read error</span>
+    <span class="kw">let</span> age <span class="op">=</span> <span class="fn">parse_age</span>(content.<span class="fn">trim</span>())<span class="op">?</span>     <span class="cm">// propagates parse error</span>
+    <span class="kw">return</span> age
 }</code></pre>
 <p>The enclosing function must return a compatible result type.</p>
 <h3>guard let for unwrapping</h3>
 <p>When you want to unwrap and diverge on failure without <code>match</code>:</p>
-<pre><code>fn process(fs: Fs, stdout: Stdout) {
-    guard let data = fs.read_file("input.txt") else {
-        stdout.println("Cannot read input")
-        return
+<pre><code><span class="kw">fn</span> <span class="fn">process</span>(fs<span class="op">:</span> <span class="ty">Fs</span>, stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">guard</span> <span class="kw">let</span> data <span class="op">=</span> fs.<span class="fn">read_file</span>(<span class="st">"input.txt"</span>) <span class="kw">else</span> {
+        stdout.<span class="fn">println</span>(<span class="st">"Cannot read input"</span>)
+        <span class="kw">return</span>
     }
-    // data is `string` here
-    stdout.println("Read " + (data.length as string) + " chars")
+    <span class="cm">// data is `string` here</span>
+    stdout.<span class="fn">println</span>(<span class="st">"Read "</span> <span class="op">+</span> (data.length <span class="kw">as</span> <span class="ty">string</span>) <span class="op">+</span> <span class="st">" chars"</span>)
 }</code></pre>
 <h3>panic for unrecoverable errors</h3>
-<pre><code>fn main(stdout: Stdout) {
-    panic("something went terribly wrong")
-    // Terminates with message and stack trace. Cannot be caught.
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="fn">panic</span>(<span class="st">"something went terribly wrong"</span>)
+    <span class="cm">// Terminates with message and stack trace. Cannot be caught.</span>
 }</code></pre>
 <p>Use <code>panic</code> for programming errors. Use result types for expected failures.</p>
 

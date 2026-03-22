@@ -263,6 +263,14 @@
             .content pre { padding: 1rem; font-size: 0.82em; }
             .sidebar-nav a { font-size: 0.78rem; padding: 0.25rem 0.5rem; }
         }
+        /* Syntax highlighting */
+        .kw { color: #fbbf24; }
+        .ty { color: #a7d28b; }
+        .st { color: #a7d28b; }
+        .nu { color: #f0a8d0; }
+        .cm { color: #7a7060; font-style: italic; }
+        .fn { color: #7dd3fc; }
+        .op { color: #d4a574; }
     </style>
 </head>
 <body>
@@ -280,79 +288,148 @@
             <h1>Standard Library</h1>
             <p class="subtitle">Built-in methods and the math module</p>
             <h3>String Methods</h3>
-<p>| Method | Description | |---|---| | <code>s.length</code> | Character count (property, not a method) | | <code>s.split(sep)</code> | Split by delimiter, returns <code>[string]</code> | | <code>s.trim()</code> | Strip whitespace from both ends | | <code>s.trim_start()</code> | Strip leading whitespace | | <code>s.trim_end()</code> | Strip trailing whitespace | | <code>s.replace(from, to)</code> | Replace all occurrences | | <code>s.find(needle)</code> | Index of first match, returns <code>i64?</code> | | <code>s.index_of(sub)</code> | Index of first occurrence | | <code>s.last_index_of(sub)</code> | Index of last occurrence | | <code>s.substring(start, len)</code> | Extract by char index and length | | <code>s.slice(start, end)</code> | Extract by start/end index | | <code>s.starts_with(prefix)</code> | Prefix test | | <code>s.ends_with(suffix)</code> | Suffix test | | <code>s.contains(sub)</code> | Substring test | | <code>s.upper()</code> | Uppercase | | <code>s.lower()</code> | Lowercase | | <code>s.repeat(n)</code> | Repeat N times | | <code>s.char_at(i)</code> | Single character by index (negative indexes from end) | | <code>s.chars()</code> | Array of single-character strings | | <code>s.bytes()</code> | Array of byte values |</p>
-<pre><code>fn main(stdout: Stdout) {
-    let s = "Hello, World!"
-    stdout.println(s.upper())                  // Output: HELLO, WORLD!
-    stdout.println(s.replace("World", "Basalt"))  // Output: Hello, Basalt!
-    stdout.println(s.substring(0, 5))          // Output: Hello
-    stdout.println(s.contains("World") as string)  // Output: true
-    stdout.println("  spaces  ".trim())        // Output: spaces
-    stdout.println("abc".repeat(3))            // Output: abcabcabc
+<table>
+<thead><tr><th>Method</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>s.length</code></td><td>Character count (property, not a method)</td></tr>
+<tr><td><code>s.split(sep)</code></td><td>Split by delimiter, returns <code>[string]</code></td></tr>
+<tr><td><code>s.trim()</code></td><td>Strip whitespace from both ends</td></tr>
+<tr><td><code>s.trim_start()</code></td><td>Strip leading whitespace</td></tr>
+<tr><td><code>s.trim_end()</code></td><td>Strip trailing whitespace</td></tr>
+<tr><td><code>s.replace(from, to)</code></td><td>Replace all occurrences</td></tr>
+<tr><td><code>s.find(needle)</code></td><td>Index of first match, returns <code>i64?</code></td></tr>
+<tr><td><code>s.index_of(sub)</code></td><td>Index of first occurrence</td></tr>
+<tr><td><code>s.last_index_of(sub)</code></td><td>Index of last occurrence</td></tr>
+<tr><td><code>s.substring(start, len)</code></td><td>Extract by char index and length</td></tr>
+<tr><td><code>s.slice(start, end)</code></td><td>Extract by start/end index</td></tr>
+<tr><td><code>s.starts_with(prefix)</code></td><td>Prefix test</td></tr>
+<tr><td><code>s.ends_with(suffix)</code></td><td>Suffix test</td></tr>
+<tr><td><code>s.contains(sub)</code></td><td>Substring test</td></tr>
+<tr><td><code>s.upper()</code></td><td>Uppercase</td></tr>
+<tr><td><code>s.lower()</code></td><td>Lowercase</td></tr>
+<tr><td><code>s.repeat(n)</code></td><td>Repeat N times</td></tr>
+<tr><td><code>s.char_at(i)</code></td><td>Single character by index (negative indexes from end)</td></tr>
+<tr><td><code>s.chars()</code></td><td>Array of single-character strings</td></tr>
+<tr><td><code>s.bytes()</code></td><td>Array of byte values</td></tr>
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> s <span class="op">=</span> <span class="st">"Hello, World!"</span>
+    stdout.<span class="fn">println</span>(s.<span class="fn">upper</span>())                  <span class="cm">// Output: HELLO, WORLD!</span>
+    stdout.<span class="fn">println</span>(s.<span class="fn">replace</span>(<span class="st">"World"</span>, <span class="st">"Basalt"</span>))  <span class="cm">// Output: Hello, Basalt!</span>
+    stdout.<span class="fn">println</span>(s.<span class="fn">substring</span>(<span class="nu">0</span>, <span class="nu">5</span>))          <span class="cm">// Output: Hello</span>
+    stdout.<span class="fn">println</span>(s.<span class="fn">contains</span>(<span class="st">"World"</span>) <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: true</span>
+    stdout.<span class="fn">println</span>(<span class="st">"  spaces  "</span>.<span class="fn">trim</span>())        <span class="cm">// Output: spaces</span>
+    stdout.<span class="fn">println</span>(<span class="st">"abc"</span>.<span class="fn">repeat</span>(<span class="nu">3</span>))            <span class="cm">// Output: abcabcabc</span>
 
-    let parts = "a,b,c".split(",")
-    stdout.println(parts.join(" | "))          // Output: a | b | c
+    <span class="kw">let</span> parts <span class="op">=</span> <span class="st">"a,b,c"</span>.<span class="fn">split</span>(<span class="st">","</span>)
+    stdout.<span class="fn">println</span>(parts.<span class="fn">join</span>(<span class="st">" | "</span>))          <span class="cm">// Output: a | b | c</span>
 }</code></pre>
+</tbody></table>
 <p>String interpolation uses <code>\(expr)</code>:</p>
-<pre><code>fn main(stdout: Stdout) {
-    let name = "world"
-    let n = 42
-    stdout.println("Hello, \(name)!")         // Output: Hello, world!
-    stdout.println("The answer is \(n)")      // Output: The answer is 42
-    stdout.println("2 + 2 = \(2 + 2)")       // Output: 2 + 2 = 4
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> name <span class="op">=</span> <span class="st">"world"</span>
+    <span class="kw">let</span> n <span class="op">=</span> <span class="nu">42</span>
+    stdout.<span class="fn">println</span>(<span class="st">"Hello, \(name)!"</span>)         <span class="cm">// Output: Hello, world!</span>
+    stdout.<span class="fn">println</span>(<span class="st">"The answer is \(n)"</span>)      <span class="cm">// Output: The answer is 42</span>
+    stdout.<span class="fn">println</span>(<span class="st">"2 + 2 = \(2 + 2)"</span>)       <span class="cm">// Output: 2 + 2 = 4</span>
 }</code></pre>
 <p>Multiline strings use <code>\\</code> prefix per line:</p>
-<pre><code>fn main(stdout: Stdout) {
-    let json =
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> json <span class="op">=</span>
         \\{
-        \\    "name": "basalt",
-        \\    "version": 1
+        \\    <span class="st">"name"</span><span class="op">:</span> <span class="st">"basalt"</span>,
+        \\    <span class="st">"version"</span><span class="op">:</span> <span class="nu">1</span>
         \\}
-    stdout.println(json)
+    stdout.<span class="fn">println</span>(json)
 }</code></pre>
 <h3>Array Methods</h3>
-<p>| Method | Description | |---|---| | <code>arr.length</code> | Element count (property) | | <code>arr.push(val)</code> | Append element (requires <code>mut</code>) | | <code>arr.pop()</code> | Remove and return last element (requires <code>mut</code>) | | <code>arr.insert(i, val)</code> | Insert at index (requires <code>mut</code>) | | <code>arr.remove(i)</code> | Remove at index (requires <code>mut</code>) | | <code>arr.sort()</code> | Sort in place (requires <code>mut</code>, <code>i64</code> or <code>string</code> only) | | <code>arr.reverse()</code> | Reverse in place (requires <code>mut</code>) | | <code>arr.join(sep)</code> | Join elements with separator | | <code>arr.contains(val)</code> | Element membership test | | <code>arr.clone()</code> | Deep copy | | <code>arr.map(f)</code> | Transform each element | | <code>arr.filter(f)</code> | Keep elements matching predicate | | <code>arr.find(f)</code> | First element matching predicate | | <code>arr.any(f)</code> | True if any element matches | | <code>arr.all(f)</code> | True if all elements match |</p>
-<pre><code>fn main(stdout: Stdout) {
-    let mut nums = [3, 1, 4, 1, 5]
+<table>
+<thead><tr><th>Method</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>arr.length</code></td><td>Element count (property)</td></tr>
+<tr><td><code>arr.push(val)</code></td><td>Append element (requires <code>mut</code>)</td></tr>
+<tr><td><code>arr.pop()</code></td><td>Remove and return last element (requires <code>mut</code>)</td></tr>
+<tr><td><code>arr.insert(i, val)</code></td><td>Insert at index (requires <code>mut</code>)</td></tr>
+<tr><td><code>arr.remove(i)</code></td><td>Remove at index (requires <code>mut</code>)</td></tr>
+<tr><td><code>arr.sort()</code></td><td>Sort in place (requires <code>mut</code>, <code>i64</code> or <code>string</code> only)</td></tr>
+<tr><td><code>arr.reverse()</code></td><td>Reverse in place (requires <code>mut</code>)</td></tr>
+<tr><td><code>arr.join(sep)</code></td><td>Join elements with separator</td></tr>
+<tr><td><code>arr.contains(val)</code></td><td>Element membership test</td></tr>
+<tr><td><code>arr.clone()</code></td><td>Deep copy</td></tr>
+<tr><td><code>arr.map(f)</code></td><td>Transform each element</td></tr>
+<tr><td><code>arr.filter(f)</code></td><td>Keep elements matching predicate</td></tr>
+<tr><td><code>arr.find(f)</code></td><td>First element matching predicate</td></tr>
+<tr><td><code>arr.any(f)</code></td><td>True if any element matches</td></tr>
+<tr><td><code>arr.all(f)</code></td><td>True if all elements match</td></tr>
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> <span class="kw">mut</span> nums <span class="op">=</span> [<span class="nu">3</span>, <span class="nu">1</span>, <span class="nu">4</span>, <span class="nu">1</span>, <span class="nu">5</span>]
 
-    nums.sort()
-    stdout.println(nums.join(", "))  // Output: 1, 1, 3, 4, 5
+    nums.<span class="fn">sort</span>()
+    stdout.<span class="fn">println</span>(nums.<span class="fn">join</span>(<span class="st">", "</span>))  <span class="cm">// Output: 1, 1, 3, 4, 5</span>
 
-    nums.reverse()
-    stdout.println(nums.join(", "))  // Output: 5, 4, 3, 1, 1
+    nums.<span class="fn">reverse</span>()
+    stdout.<span class="fn">println</span>(nums.<span class="fn">join</span>(<span class="st">", "</span>))  <span class="cm">// Output: 5, 4, 3, 1, 1</span>
 
-    stdout.println(nums.contains(3) as string)  // Output: true
+    stdout.<span class="fn">println</span>(nums.<span class="fn">contains</span>(<span class="nu">3</span>) <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: true</span>
 
-    // Negative indexing
-    stdout.println(nums[-1] as string)  // Output: 1 (last element)
+    <span class="cm">// Negative indexing</span>
+    stdout.<span class="fn">println</span>(nums[<span class="op">-</span><span class="nu">1</span>] <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 1 (last element)</span>
 }</code></pre>
 <h3>Map Methods</h3>
-<p>| Method | Description | |---|---| | <code>m.length</code> | Entry count (property) | | <code>m[key]</code> | Get value (panics if key missing) | | <code>m[key] = val</code> | Set value (requires <code>mut</code>) | | <code>m.get(key)</code> | Safe lookup, returns <code>V?</code> (nil if missing) | | <code>m.contains_key(key)</code> | Key membership test | | <code>m.keys()</code> | Array of keys (insertion order) | | <code>m.values()</code> | Array of values (insertion order) | | <code>m.remove(key)</code> | Remove entry (requires <code>mut</code>) | | <code>m.clone()</code> | Deep copy |</p>
-<pre><code>fn main(stdout: Stdout) {
-    let mut m = {"name": "Alice", "city": "NYC"}
+<tr><td>Method</td><td>Description</td></tr>
+<tr><td><code>m.length</code></td><td>Entry count (property)</td></tr>
+<tr><td><code>m[key]</code></td><td>Get value (panics if key missing)</td></tr>
+<tr><td><code>m[key] = val</code></td><td>Set value (requires <code>mut</code>)</td></tr>
+<tr><td><code>m.get(key)</code></td><td>Safe lookup, returns <code>V?</code> (nil if missing)</td></tr>
+<tr><td><code>m.contains_key(key)</code></td><td>Key membership test</td></tr>
+<tr><td><code>m.keys()</code></td><td>Array of keys (insertion order)</td></tr>
+<tr><td><code>m.values()</code></td><td>Array of values (insertion order)</td></tr>
+<tr><td><code>m.remove(key)</code></td><td>Remove entry (requires <code>mut</code>)</td></tr>
+<tr><td><code>m.clone()</code></td><td>Deep copy</td></tr>
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> <span class="kw">mut</span> m <span class="op">=</span> {<span class="st">"name"</span><span class="op">:</span> <span class="st">"Alice"</span>, <span class="st">"city"</span><span class="op">:</span> <span class="st">"NYC"</span>}
 
-    stdout.println(m["name"])  // Output: Alice
+    stdout.<span class="fn">println</span>(m[<span class="st">"name"</span>])  <span class="cm">// Output: Alice</span>
 
-    // Safe lookup (does not panic)
-    let age = m.get("age")
-    if age is nil {
-        stdout.println("no age set")  // Output: no age set
+    <span class="cm">// Safe lookup (does not panic)</span>
+    <span class="kw">let</span> age <span class="op">=</span> m.<span class="fn">get</span>(<span class="st">"age"</span>)
+    <span class="kw">if</span> age <span class="kw">is</span> <span class="kw">nil</span> {
+        stdout.<span class="fn">println</span>(<span class="st">"no age set"</span>)  <span class="cm">// Output: no age set</span>
     }
 
-    m["age"] = "30"
-    stdout.println(m.keys().join(", "))  // Output: name, city, age
+    m[<span class="st">"age"</span>] <span class="op">=</span> <span class="st">"30"</span>
+    stdout.<span class="fn">println</span>(m.<span class="fn">keys</span>().<span class="fn">join</span>(<span class="st">", "</span>))  <span class="cm">// Output: name, city, age</span>
 
-    // Iterate
-    for key, value in m {
-        stdout.println("\(key): \(value)")
+    <span class="cm">// Iterate</span>
+    <span class="kw">for</span> key, value <span class="kw">in</span> m {
+        stdout.<span class="fn">println</span>(<span class="st">"\(key): \(value)"</span>)
     }
 }</code></pre>
+</tbody></table>
 <p>Empty maps need a type annotation:</p>
-<pre><code>let mut scores: [string: i64] = {}
-scores["alice"] = 100</code></pre>
+<pre><code><span class="kw">let</span> <span class="kw">mut</span> scores<span class="op">:</span> [<span class="ty">string</span><span class="op">:</span> <span class="ty">i64</span>] <span class="op">=</span> {}
+scores[<span class="st">"alice"</span>] <span class="op">=</span> <span class="nu">100</span></code></pre>
 <h3>Math Module</h3>
-<pre><code>import "std/math"</code></pre>
-<p>| Function | Description | |---|---| | <code>math.sqrt(x)</code> | Square root | | <code>math.abs(x)</code> | Absolute value | | <code>math.floor(x)</code> | Floor | | <code>math.ceil(x)</code> | Ceiling | | <code>math.round(x)</code> | Round | | <code>math.min(a, b)</code> | Minimum | | <code>math.max(a, b)</code> | Maximum | | <code>math.pow(base, exp)</code> | Power | | <code>math.log(x)</code> | Natural log | | <code>math.log2(x)</code> | Base-2 log | | <code>math.log10(x)</code> | Base-10 log | | <code>math.exp(x)</code> | e^x | | <code>math.sin(x)</code>, <code>math.cos(x)</code>, <code>math.tan(x)</code> | Trigonometric | | <code>math.asin(x)</code>, <code>math.acos(x)</code>, <code>math.atan(x)</code> | Inverse trig | | <code>math.atan2(y, x)</code> | Two-argument arctangent | | <code>math.pi</code>, <code>math.e</code>, <code>math.tau</code>, <code>math.inf</code> | Constants |</p>
+<pre><code><span class="kw">import</span> <span class="st">"std/math"</span></code></pre>
+<table>
+<thead><tr><th>Function</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>math.sqrt(x)</code></td><td>Square root</td></tr>
+<tr><td><code>math.abs(x)</code></td><td>Absolute value</td></tr>
+<tr><td><code>math.floor(x)</code></td><td>Floor</td></tr>
+<tr><td><code>math.ceil(x)</code></td><td>Ceiling</td></tr>
+<tr><td><code>math.round(x)</code></td><td>Round</td></tr>
+<tr><td><code>math.min(a, b)</code></td><td>Minimum</td></tr>
+<tr><td><code>math.max(a, b)</code></td><td>Maximum</td></tr>
+<tr><td><code>math.pow(base, exp)</code></td><td>Power</td></tr>
+<tr><td><code>math.log(x)</code></td><td>Natural log</td></tr>
+<tr><td><code>math.log2(x)</code></td><td>Base-2 log</td></tr>
+<tr><td><code>math.log10(x)</code></td><td>Base-10 log</td></tr>
+<tr><td><code>math.exp(x)</code></td><td>e^x</td></tr>
+<tr><td><code>math.sin(x)</code>, <code>math.cos(x)</code>, <code>math.tan(x)</code></td><td>Trigonometric</td></tr>
+<tr><td><code>math.asin(x)</code>, <code>math.acos(x)</code>, <code>math.atan(x)</code></td><td>Inverse trig</td></tr>
+<tr><td><code>math.atan2(y, x)</code></td><td>Two-argument arctangent</td></tr>
+<tr><td><code>math.pi</code>, <code>math.e</code>, <code>math.tau</code>, <code>math.inf</code></td><td>Constants</td></tr>
+</tbody></table>
 
         </article>
         <footer class="footer">

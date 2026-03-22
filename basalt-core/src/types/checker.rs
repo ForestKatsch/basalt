@@ -226,6 +226,7 @@ impl TypeChecker {
             "Stdin" => Ok(Type::Capability("Stdin".to_string())),
             "Fs" => Ok(Type::Capability("Fs".to_string())),
             "Env" => Ok(Type::Capability("Env".to_string())),
+            "Highlight" => Ok(Type::Capability("Highlight".to_string())),
             _ => {
                 if let Some(alias) = self.type_info.aliases.get(name) {
                     return Ok(alias.clone());
@@ -2692,6 +2693,21 @@ impl TypeChecker {
                 }
                 _ => Err(CompileError::new(
                     format!("unknown method '{}' on Env", method),
+                    span,
+                )),
+            },
+            "Highlight" => match method {
+                "code" | "inline" => {
+                    if args.len() != 2 {
+                        return Err(CompileError::new(
+                            format!("{} takes 2 arguments", method),
+                            span,
+                        ));
+                    }
+                    Ok(Type::String)
+                }
+                _ => Err(CompileError::new(
+                    format!("unknown method '{}' on Highlight", method),
                     span,
                 )),
             },

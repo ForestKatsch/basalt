@@ -263,6 +263,14 @@
             .content pre { padding: 1rem; font-size: 0.82em; }
             .sidebar-nav a { font-size: 0.78rem; padding: 0.25rem 0.5rem; }
         }
+        /* Syntax highlighting */
+        .kw { color: #fbbf24; }
+        .ty { color: #a7d28b; }
+        .st { color: #a7d28b; }
+        .nu { color: #f0a8d0; }
+        .cm { color: #7a7060; font-style: italic; }
+        .fn { color: #7dd3fc; }
+        .op { color: #d4a574; }
     </style>
 </head>
 <body>
@@ -281,83 +289,102 @@
             <p class="subtitle">Capability-based I/O system</p>
             <p>IO in Basalt works through capability objects passed to <code>main</code>. A program can only perform IO that it explicitly requests.</p>
 <h3>Stdout</h3>
-<pre><code>fn main(stdout: Stdout) {
-    stdout.println("line with newline")
-    stdout.print("no newline")
-    stdout.flush()
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    stdout.<span class="fn">println</span>(<span class="st">"line with newline"</span>)
+    stdout.<span class="fn">print</span>(<span class="st">"no newline"</span>)
+    stdout.<span class="fn">flush</span>()
 }</code></pre>
 <h3>Stdin</h3>
-<pre><code>fn main(stdout: Stdout, stdin: Stdin) {
-    stdout.print("What is your name? ")
-    stdout.flush()
-    let name = stdin.read_line()
-    stdout.println("Hello, \(name)!")
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>, stdin<span class="op">:</span> <span class="ty">Stdin</span>) {
+    stdout.<span class="fn">print</span>(<span class="st">"What is your name? "</span>)
+    stdout.<span class="fn">flush</span>()
+    <span class="kw">let</span> name <span class="op">=</span> stdin.<span class="fn">read_line</span>()
+    stdout.<span class="fn">println</span>(<span class="st">"Hello, \(name)!"</span>)
 }</code></pre>
-<p>| Method | Description | |---|---| | <code>stdin.read_line()</code> | Read one line (strips newline) | | <code>stdin.read_key()</code> | Read single character (raw mode) |</p>
+<table>
+<thead><tr><th>Method</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>stdin.read_line()</code></td><td>Read one line (strips newline)</td></tr>
+<tr><td><code>stdin.read_key()</code></td><td>Read single character (raw mode)</td></tr>
 <h3>Fs (File System)</h3>
+</tbody></table>
 <p>The <code>Fs</code> capability is sandboxed to the directory containing the source file.</p>
-<pre><code>fn main(stdout: Stdout, fs: Fs) {
-    // Write a file
-    let write_result = fs.write_file("output.txt", "Hello from Basalt!")
-    match write_result {
-        !err =&gt; stdout.println("Write failed: " + err)
-        _ =&gt; stdout.println("Wrote output.txt")
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>, fs<span class="op">:</span> <span class="ty">Fs</span>) {
+    <span class="cm">// Write a file</span>
+    <span class="kw">let</span> write_result <span class="op">=</span> fs.<span class="fn">write_file</span>(<span class="st">"output.txt"</span>, <span class="st">"Hello from Basalt!"</span>)
+    <span class="kw">match</span> write_result {
+        <span class="op">!</span>err <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(<span class="st">"Write failed: "</span> <span class="op">+</span> err)
+        _ <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(<span class="st">"Wrote output.txt"</span>)
     }
 
-    // Read a file
-    guard let content = fs.read_file("output.txt") else {
-        stdout.println("Read failed")
-        return
+    <span class="cm">// Read a file</span>
+    <span class="kw">guard</span> <span class="kw">let</span> content <span class="op">=</span> fs.<span class="fn">read_file</span>(<span class="st">"output.txt"</span>) <span class="kw">else</span> {
+        stdout.<span class="fn">println</span>(<span class="st">"Read failed"</span>)
+        <span class="kw">return</span>
     }
-    stdout.println(content)
+    stdout.<span class="fn">println</span>(content)
 
-    // Check existence
-    stdout.println(fs.exists("output.txt") as string)  // Output: true
+    <span class="cm">// Check existence</span>
+    stdout.<span class="fn">println</span>(fs.<span class="fn">exists</span>(<span class="st">"output.txt"</span>) <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: true</span>
 
-    // List directory
-    guard let files = fs.read_dir(".") else { return }
-    for file in files {
-        stdout.println(file)
+    <span class="cm">// List directory</span>
+    <span class="kw">guard</span> <span class="kw">let</span> files <span class="op">=</span> fs.<span class="fn">read_dir</span>(<span class="st">"."</span>) <span class="kw">else</span> { <span class="kw">return</span> }
+    <span class="kw">for</span> file <span class="kw">in</span> files {
+        stdout.<span class="fn">println</span>(file)
     }
 
-    // Path utilities
-    let p = fs.join("subdir", "page.html")   // "subdir/page.html"
-    let ext = fs.extension("photo.png")       // "png" (returns string?)
-    let name = fs.stem("photo.png")           // "photo" (returns string?)
+    <span class="cm">// Path utilities</span>
+    <span class="kw">let</span> p <span class="op">=</span> fs.<span class="fn">join</span>(<span class="st">"subdir"</span>, <span class="st">"page.html"</span>)   <span class="cm">// "subdir/page.html"</span>
+    <span class="kw">let</span> ext <span class="op">=</span> fs.<span class="fn">extension</span>(<span class="st">"photo.png"</span>)       <span class="cm">// "png" (returns string?)</span>
+    <span class="kw">let</span> name <span class="op">=</span> fs.<span class="fn">stem</span>(<span class="st">"photo.png"</span>)           <span class="cm">// "photo" (returns string?)</span>
 }</code></pre>
-<p>| Method | Returns | Description | |---|---|---| | <code>fs.read_file(path)</code> | <code>string!string</code> | Read file contents | | <code>fs.write_file(path, data)</code> | <code>nil!string</code> | Write file | | <code>fs.read_dir(path)</code> | <code>[string]!string</code> | List directory entries | | <code>fs.exists(path)</code> | <code>bool</code> | Check if path exists | | <code>fs.is_dir(path)</code> | <code>bool</code> | Check if path is a directory | | <code>fs.mkdir(path)</code> | <code>nil!string</code> | Create directory | | <code>fs.join(a, b)</code> | <code>string</code> | Join path components | | <code>fs.extension(path)</code> | <code>string?</code> | File extension without dot | | <code>fs.stem(path)</code> | <code>string?</code> | Filename without extension |</p>
+<table>
+<thead><tr><th>Method</th><th>Returns</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>fs.read_file(path)</code></td><td><code>string!string</code></td><td>Read file contents</td></tr>
+<tr><td><code>fs.write_file(path, data)</code></td><td><code>nil!string</code></td><td>Write file</td></tr>
+<tr><td><code>fs.read_dir(path)</code></td><td><code>[string]!string</code></td><td>List directory entries</td></tr>
+<tr><td><code>fs.exists(path)</code></td><td><code>bool</code></td><td>Check if path exists</td></tr>
+<tr><td><code>fs.is_dir(path)</code></td><td><code>bool</code></td><td>Check if path is a directory</td></tr>
+<tr><td><code>fs.mkdir(path)</code></td><td><code>nil!string</code></td><td>Create directory</td></tr>
+<tr><td><code>fs.join(a, b)</code></td><td><code>string</code></td><td>Join path components</td></tr>
+<tr><td><code>fs.extension(path)</code></td><td><code>string?</code></td><td>File extension without dot</td></tr>
+<tr><td><code>fs.stem(path)</code></td><td><code>string?</code></td><td>Filename without extension</td></tr>
 <h3>Env</h3>
-<pre><code>fn main(stdout: Stdout, env: Env) {
-    let args = env.args()
-    for arg in args {
-        stdout.println(arg)
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>, env<span class="op">:</span> <span class="ty">Env</span>) {
+    <span class="kw">let</span> args <span class="op">=</span> env.<span class="fn">args</span>()
+    <span class="kw">for</span> arg <span class="kw">in</span> args {
+        stdout.<span class="fn">println</span>(arg)
     }
 
-    let home = env.get("HOME")
-    if home is string {
-        stdout.println("Home: " + home)
+    <span class="kw">let</span> home <span class="op">=</span> env.<span class="fn">get</span>(<span class="st">"HOME"</span>)
+    <span class="kw">if</span> home <span class="kw">is</span> <span class="ty">string</span> {
+        stdout.<span class="fn">println</span>(<span class="st">"Home: "</span> <span class="op">+</span> home)
     }
 }</code></pre>
-<p>| Method | Returns | Description | |---|---|---| | <code>env.args()</code> | <code>[string]</code> | Command-line arguments | | <code>env.get(name)</code> | <code>string?</code> | Environment variable value |</p>
+<tr><td>Method</td><td>Returns</td><td>Description</td></tr>
+<tr><td><code>env.args()</code></td><td><code>[string]</code></td><td>Command-line arguments</td></tr>
+<tr><td><code>env.get(name)</code></td><td><code>string?</code></td><td>Environment variable value</td></tr>
 <h3>How capabilities work</h3>
+</tbody></table>
 <p>Capabilities are passed as parameters to <code>main</code>. You only get what you ask for:</p>
-<pre><code>// This program can print but cannot read files
-fn main(stdout: Stdout) {
-    stdout.println("I have no file access")
+<pre><code><span class="cm">// This program can print but cannot read files</span>
+<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    stdout.<span class="fn">println</span>(<span class="st">"I have no file access"</span>)
 }
 
-// This program can read/write files and print
-fn main(stdout: Stdout, fs: Fs) {
-    guard let data = fs.read_file("input.txt") else { return }
-    stdout.println(data)
+<span class="cm">// This program can read/write files and print</span>
+<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>, fs<span class="op">:</span> <span class="ty">Fs</span>) {
+    <span class="kw">guard</span> <span class="kw">let</span> data <span class="op">=</span> fs.<span class="fn">read_file</span>(<span class="st">"input.txt"</span>) <span class="kw">else</span> { <span class="kw">return</span> }
+    stdout.<span class="fn">println</span>(data)
 }</code></pre>
 <p>Pass capabilities to helper functions as regular parameters:</p>
-<pre><code>fn log(msg: string, stdout: Stdout) {
-    stdout.println("[LOG] " + msg)
+<pre><code><span class="kw">fn</span> <span class="fn">log</span>(msg<span class="op">:</span> <span class="ty">string</span>, stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    stdout.<span class="fn">println</span>(<span class="st">"[LOG] "</span> <span class="op">+</span> msg)
 }
 
-fn main(stdout: Stdout) {
-    log("starting up", stdout)
+<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="fn">log</span>(<span class="st">"starting up"</span>, stdout)
 }</code></pre>
 
         </article>

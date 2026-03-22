@@ -263,6 +263,14 @@
             .content pre { padding: 1rem; font-size: 0.82em; }
             .sidebar-nav a { font-size: 0.78rem; padding: 0.25rem 0.5rem; }
         }
+        /* Syntax highlighting */
+        .kw { color: #fbbf24; }
+        .ty { color: #a7d28b; }
+        .st { color: #a7d28b; }
+        .nu { color: #f0a8d0; }
+        .cm { color: #7a7060; font-style: italic; }
+        .fn { color: #7dd3fc; }
+        .op { color: #d4a574; }
     </style>
 </head>
 <body>
@@ -280,60 +288,60 @@
             <h1>Enums</h1>
             <p class="subtitle">Enum types with data-carrying variants</p>
             <p>Enums define a closed set of variants. Variants can carry data.</p>
-<pre><code>type Color { Red, Green, Blue }
+<pre><code><span class="kw">type</span> <span class="ty">Color</span> { <span class="ty">Red</span>, <span class="ty">Green</span>, <span class="ty">Blue</span> }
 
-type Option {
-    Some(i64)
-    None
+<span class="kw">type</span> <span class="ty">Option</span> {
+    <span class="ty">Some</span>(<span class="ty">i64</span>)
+    <span class="ty">None</span>
 }
 
-fn main(stdout: Stdout) {
-    let c = Color.Red
+<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> c <span class="op">=</span> <span class="ty">Color</span>.<span class="ty">Red</span>
 
-    let x = Option.Some(42)
-    match x {
-        Option.Some(val) =&gt; stdout.println(val as string)
-        Option.None =&gt; stdout.println("none")
+    <span class="kw">let</span> x <span class="op">=</span> <span class="ty">Option</span>.<span class="ty">Some</span>(<span class="nu">42</span>)
+    <span class="kw">match</span> x {
+        <span class="ty">Option</span>.<span class="ty">Some</span>(val) <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(val <span class="kw">as</span> <span class="ty">string</span>)
+        <span class="ty">Option</span>.<span class="ty">None</span> <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(<span class="st">"none"</span>)
     }
-    // Output: 42
+    <span class="cm">// Output: 42</span>
 }</code></pre>
 <h3>Data-carrying variants</h3>
-<pre><code>type Shape {
-    Circle(f64)
-    Rect(f64, f64)
+<pre><code><span class="kw">type</span> <span class="ty">Shape</span> {
+    <span class="ty">Circle</span>(<span class="ty">f64</span>)
+    <span class="ty">Rect</span>(<span class="ty">f64</span>, <span class="ty">f64</span>)
 }
 
-fn describe(s: Shape) -&gt; string {
-    match s {
-        Shape.Circle(r) =&gt; return "circle with radius " + (r as string)
-        Shape.Rect(w, h) =&gt; return (w as string) + "x" + (h as string) + " rectangle"
+<span class="kw">fn</span> <span class="fn">describe</span>(s<span class="op">:</span> <span class="ty">Shape</span>) <span class="op">-&gt;</span> <span class="ty">string</span> {
+    <span class="kw">match</span> s {
+        <span class="ty">Shape</span>.<span class="ty">Circle</span>(r) <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"circle with radius "</span> <span class="op">+</span> (r <span class="kw">as</span> <span class="ty">string</span>)
+        <span class="ty">Shape</span>.<span class="ty">Rect</span>(w, h) <span class="op">=&gt;</span> <span class="kw">return</span> (w <span class="kw">as</span> <span class="ty">string</span>) <span class="op">+</span> <span class="st">"x"</span> <span class="op">+</span> (h <span class="kw">as</span> <span class="ty">string</span>) <span class="op">+</span> <span class="st">" rectangle"</span>
     }
-    return ""
+    <span class="kw">return</span> <span class="st">""</span>
 }
 
-fn main(stdout: Stdout) {
-    stdout.println(describe(Shape.Circle(5.0)))
-    // Output: circle with radius 5
-    stdout.println(describe(Shape.Rect(3.0, 4.0)))
-    // Output: 3x4 rectangle
+<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    stdout.<span class="fn">println</span>(<span class="fn">describe</span>(<span class="ty">Shape</span>.<span class="ty">Circle</span>(<span class="nu">5.0</span>)))
+    <span class="cm">// Output: circle with radius 5</span>
+    stdout.<span class="fn">println</span>(<span class="fn">describe</span>(<span class="ty">Shape</span>.<span class="ty">Rect</span>(<span class="nu">3.0</span>, <span class="nu">4.0</span>)))
+    <span class="cm">// Output: 3x4 rectangle</span>
 }</code></pre>
 <h3>Testing variants with is</h3>
-<pre><code>fn main(stdout: Stdout) {
-    let x = Option.Some(42)
-    if x is Option.Some {
-        stdout.println("has a value")
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> x <span class="op">=</span> <span class="ty">Option</span>.<span class="ty">Some</span>(<span class="nu">42</span>)
+    <span class="kw">if</span> x <span class="kw">is</span> <span class="ty">Option</span>.<span class="ty">Some</span> {
+        stdout.<span class="fn">println</span>(<span class="st">"has a value"</span>)
     }
-    // Use match to destructure the inner data
+    <span class="cm">// Use match to destructure the inner data</span>
 }</code></pre>
 <h3>Recursive enums</h3>
 <p>Enum variants can reference the enclosing type, enabling trees and nested data:</p>
-<pre><code>type Json {
-    Null
-    Bool(bool)
-    Num(f64)
-    Str(string)
-    Arr([Json])
-    Obj([string: Json])
+<pre><code><span class="kw">type</span> <span class="ty">Json</span> {
+    <span class="ty">Null</span>
+    <span class="ty">Bool</span>(<span class="ty">bool</span>)
+    <span class="ty">Num</span>(<span class="ty">f64</span>)
+    <span class="ty">Str</span>(<span class="ty">string</span>)
+    <span class="ty">Arr</span>([<span class="ty">Json</span>])
+    <span class="ty">Obj</span>([<span class="ty">string</span><span class="op">:</span> <span class="ty">Json</span>])
 }</code></pre>
 
         </article>

@@ -263,6 +263,14 @@
             .content pre { padding: 1rem; font-size: 0.82em; }
             .sidebar-nav a { font-size: 0.78rem; padding: 0.25rem 0.5rem; }
         }
+        /* Syntax highlighting */
+        .kw { color: #fbbf24; }
+        .ty { color: #a7d28b; }
+        .st { color: #a7d28b; }
+        .nu { color: #f0a8d0; }
+        .cm { color: #7a7060; font-style: italic; }
+        .fn { color: #7dd3fc; }
+        .op { color: #d4a574; }
     </style>
 </head>
 <body>
@@ -280,107 +288,107 @@
             <h1>Types</h1>
             <p class="subtitle">Basalt's type system</p>
             <h3>Primitive Types</h3>
-<pre><code>fn main(stdout: Stdout) {
-    let i = 42              // i64 (default integer)
-    let f = 3.14            // f64
-    let b = true            // bool
-    let s = "hello"         // string (immutable, UTF-8)
-    let n = nil             // nil (absence of value)
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> i <span class="op">=</span> <span class="nu">42</span>              <span class="cm">// i64 (default integer)</span>
+    <span class="kw">let</span> f <span class="op">=</span> <span class="nu">3.14</span>            <span class="cm">// f64</span>
+    <span class="kw">let</span> b <span class="op">=</span> <span class="kw">true</span>            <span class="cm">// bool</span>
+    <span class="kw">let</span> s <span class="op">=</span> <span class="st">"hello"</span>         <span class="cm">// string (immutable, UTF-8)</span>
+    <span class="kw">let</span> n <span class="op">=</span> <span class="kw">nil</span>             <span class="cm">// nil (absence of value)</span>
 
-    // Sized integer types require annotation
-    let byte: u8 = 255
-    let small: i16 = -1000
-    let id: u64 = 0xDEADBEEF
+    <span class="cm">// Sized integer types require annotation</span>
+    <span class="kw">let</span> byte<span class="op">:</span> <span class="ty">u8</span> <span class="op">=</span> <span class="nu">255</span>
+    <span class="kw">let</span> small<span class="op">:</span> <span class="ty">i16</span> <span class="op">=</span> <span class="op">-</span><span class="nu">1000</span>
+    <span class="kw">let</span> id<span class="op">:</span> <span class="ty">u64</span> <span class="op">=</span> <span class="nu">0xDEADBEEF</span>
 
-    stdout.println(i as string)     // Output: 42
-    stdout.println(byte as string)  // Output: 255
+    stdout.<span class="fn">println</span>(i <span class="kw">as</span> <span class="ty">string</span>)     <span class="cm">// Output: 42</span>
+    stdout.<span class="fn">println</span>(byte <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 255</span>
 }</code></pre>
 <p>Integer types: <code>i8</code>, <code>i16</code>, <code>i32</code>, <code>i64</code> (signed) and <code>u8</code>, <code>u16</code>, <code>u32</code>, <code>u64</code> (unsigned). All integer literals default to <code>i64</code>. Integer arithmetic is checked — overflow panics at runtime.</p>
 <p>There is one float type: <code>f64</code> (IEEE 754 double precision).</p>
 <h3>Collections</h3>
-<pre><code>fn main(stdout: Stdout) {
-    // Arrays: ordered, growable, homogeneous
-    let nums = [1, 2, 3]
-    stdout.println(nums[0] as string)  // Output: 1
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="cm">// Arrays: ordered, growable, homogeneous</span>
+    <span class="kw">let</span> nums <span class="op">=</span> [<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>]
+    stdout.<span class="fn">println</span>(nums[<span class="nu">0</span>] <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 1</span>
 
-    // Maps: ordered by insertion, key-value pairs
-    let ages = {"alice": 30, "bob": 25}
-    stdout.println(ages["alice"] as string)  // Output: 30
+    <span class="cm">// Maps: ordered by insertion, key-value pairs</span>
+    <span class="kw">let</span> ages <span class="op">=</span> {<span class="st">"alice"</span><span class="op">:</span> <span class="nu">30</span>, <span class="st">"bob"</span><span class="op">:</span> <span class="nu">25</span>}
+    stdout.<span class="fn">println</span>(ages[<span class="st">"alice"</span>] <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 30</span>
 
-    // Tuples: fixed-size, heterogeneous, immutable
-    let pair = (42, "hello")
-    stdout.println(pair.0 as string)  // Output: 42
-    stdout.println(pair.1)            // Output: hello
+    <span class="cm">// Tuples: fixed-size, heterogeneous, immutable</span>
+    <span class="kw">let</span> pair <span class="op">=</span> (<span class="nu">42</span>, <span class="st">"hello"</span>)
+    stdout.<span class="fn">println</span>(pair<span class="nu">.0</span> <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 42</span>
+    stdout.<span class="fn">println</span>(pair<span class="nu">.1</span>)            <span class="cm">// Output: hello</span>
 }</code></pre>
 <p>Arrays and maps are reference types — assignment shares the same object. Use <code>.clone()</code> for an independent copy. Tuples are value types — assignment copies.</p>
-<pre><code>fn main(stdout: Stdout) {
-    let mut a = [1, 2, 3]
-    let mut b = a         // b and a point to the same array
-    b.push(4)
-    stdout.println(a.length as string)  // Output: 4 (same object!)
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> <span class="kw">mut</span> a <span class="op">=</span> [<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>]
+    <span class="kw">let</span> <span class="kw">mut</span> b <span class="op">=</span> a         <span class="cm">// b and a point to the same array</span>
+    b.<span class="fn">push</span>(<span class="nu">4</span>)
+    stdout.<span class="fn">println</span>(a.length <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 4 (same object!)</span>
 
-    let mut c = a.clone() // independent copy
-    c.push(5)
-    stdout.println(a.length as string)  // Output: 4 (unaffected)
+    <span class="kw">let</span> <span class="kw">mut</span> c <span class="op">=</span> a.<span class="fn">clone</span>() <span class="cm">// independent copy</span>
+    c.<span class="fn">push</span>(<span class="nu">5</span>)
+    stdout.<span class="fn">println</span>(a.length <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 4 (unaffected)</span>
 }</code></pre>
 <h3>Optional Types</h3>
 <p><code>T?</code> represents a value that might be absent. It is equivalent to <code>T | nil</code>.</p>
-<pre><code>fn find_user(id: i64) -&gt; string? {
-    if id == 1 { return "Alice" }
-    return nil
+<pre><code><span class="kw">fn</span> <span class="fn">find_user</span>(id<span class="op">:</span> <span class="ty">i64</span>) <span class="op">-&gt;</span> <span class="ty">string</span><span class="op">?</span> {
+    <span class="kw">if</span> id <span class="op">==</span> <span class="nu">1</span> { <span class="kw">return</span> <span class="st">"Alice"</span> }
+    <span class="kw">return</span> <span class="kw">nil</span>
 }
 
-fn main(stdout: Stdout) {
-    let name = find_user(1)
-    if name is string {
-        stdout.println("Found: " + name)  // Output: Found: Alice
+<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> name <span class="op">=</span> <span class="fn">find_user</span>(<span class="nu">1</span>)
+    <span class="kw">if</span> name <span class="kw">is</span> <span class="ty">string</span> {
+        stdout.<span class="fn">println</span>(<span class="st">"Found: "</span> <span class="op">+</span> name)  <span class="cm">// Output: Found: Alice</span>
     }
 
-    let missing = find_user(99)
-    if missing is nil {
-        stdout.println("Not found")  // Output: Not found
+    <span class="kw">let</span> missing <span class="op">=</span> <span class="fn">find_user</span>(<span class="nu">99</span>)
+    <span class="kw">if</span> missing <span class="kw">is</span> <span class="kw">nil</span> {
+        stdout.<span class="fn">println</span>(<span class="st">"Not found"</span>)  <span class="cm">// Output: Not found</span>
     }
 }</code></pre>
 <h3>Result Types</h3>
 <p><code>T!E</code> represents either a success value of type <code>T</code> or an error of type <code>E</code>. Errors are values, not exceptions.</p>
-<pre><code>fn parse_port(s: string) -&gt; i64!string {
-    if s.length == 0 { return !("empty input") }
-    let n = s as? i64
-    if n is nil { return !("not a number: " + s) }
-    return n as i64
+<pre><code><span class="kw">fn</span> <span class="fn">parse_port</span>(s<span class="op">:</span> <span class="ty">string</span>) <span class="op">-&gt;</span> <span class="ty">i64</span><span class="op">!</span><span class="ty">string</span> {
+    <span class="kw">if</span> s.length <span class="op">==</span> <span class="nu">0</span> { <span class="kw">return</span> <span class="op">!</span>(<span class="st">"empty input"</span>) }
+    <span class="kw">let</span> n <span class="op">=</span> s <span class="kw">as</span><span class="op">?</span> <span class="ty">i64</span>
+    <span class="kw">if</span> n <span class="kw">is</span> <span class="kw">nil</span> { <span class="kw">return</span> <span class="op">!</span>(<span class="st">"not a number: "</span> <span class="op">+</span> s) }
+    <span class="kw">return</span> n <span class="kw">as</span> <span class="ty">i64</span>
 }
 
-fn main(stdout: Stdout) {
-    match parse_port("8080") {
-        !err =&gt; stdout.println("Error: " + err)
-        port =&gt; stdout.println("Port: " + (port as string))
+<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">match</span> <span class="fn">parse_port</span>(<span class="st">"8080"</span>) {
+        <span class="op">!</span>err <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(<span class="st">"Error: "</span> <span class="op">+</span> err)
+        port <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(<span class="st">"Port: "</span> <span class="op">+</span> (port <span class="kw">as</span> <span class="ty">string</span>))
     }
-    // Output: Port: 8080
+    <span class="cm">// Output: Port: 8080</span>
 
-    match parse_port("abc") {
-        !err =&gt; stdout.println("Error: " + err)
-        _ =&gt; stdout.println("OK")
+    <span class="kw">match</span> <span class="fn">parse_port</span>(<span class="st">"abc"</span>) {
+        <span class="op">!</span>err <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(<span class="st">"Error: "</span> <span class="op">+</span> err)
+        _ <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(<span class="st">"OK"</span>)
     }
-    // Output: Error: not a number: abc
+    <span class="cm">// Output: Error: not a number: abc</span>
 }</code></pre>
 <p>See <a href="error-handling.html">Error Handling</a> for the full story.</p>
 <h3>Union Types</h3>
 <p>A union <code>A | B</code> accepts values of either type. Use <code>is</code> to narrow to a specific member.</p>
-<pre><code>fn describe(val: i64 | string) -&gt; string {
-    if val is i64 {
-        return "number: " + (val as string)
-    } else {
-        return "text: " + val
+<pre><code><span class="kw">fn</span> <span class="fn">describe</span>(val<span class="op">:</span> <span class="ty">i64</span> <span class="op">|</span> <span class="ty">string</span>) <span class="op">-&gt;</span> <span class="ty">string</span> {
+    <span class="kw">if</span> val <span class="kw">is</span> <span class="ty">i64</span> {
+        <span class="kw">return</span> <span class="st">"number: "</span> <span class="op">+</span> (val <span class="kw">as</span> <span class="ty">string</span>)
+    } <span class="kw">else</span> {
+        <span class="kw">return</span> <span class="st">"text: "</span> <span class="op">+</span> val
     }
 }
 
-fn main(stdout: Stdout) {
-    stdout.println(describe(42))       // Output: number: 42
-    stdout.println(describe("hello"))  // Output: text: hello
+<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    stdout.<span class="fn">println</span>(<span class="fn">describe</span>(<span class="nu">42</span>))       <span class="cm">// Output: number: 42</span>
+    stdout.<span class="fn">println</span>(<span class="fn">describe</span>(<span class="st">"hello"</span>))  <span class="cm">// Output: text: hello</span>
 }</code></pre>
 <p>You can name unions with type aliases:</p>
-<pre><code>type Numeric = i64 | f64
-type JsonPrimitive = bool | f64 | string | nil</code></pre>
+<pre><code><span class="kw">type</span> <span class="ty">Numeric</span> <span class="op">=</span> <span class="ty">i64</span> <span class="op">|</span> <span class="ty">f64</span>
+<span class="kw">type</span> <span class="ty">JsonPrimitive</span> <span class="op">=</span> <span class="ty">bool</span> <span class="op">|</span> <span class="ty">f64</span> <span class="op">|</span> <span class="ty">string</span> <span class="op">|</span> <span class="kw">nil</span></code></pre>
 
         </article>
         <footer class="footer">

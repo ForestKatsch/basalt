@@ -263,6 +263,14 @@
             .content pre { padding: 1rem; font-size: 0.82em; }
             .sidebar-nav a { font-size: 0.78rem; padding: 0.25rem 0.5rem; }
         }
+        /* Syntax highlighting */
+        .kw { color: #fbbf24; }
+        .ty { color: #a7d28b; }
+        .st { color: #a7d28b; }
+        .nu { color: #f0a8d0; }
+        .cm { color: #7a7060; font-style: italic; }
+        .fn { color: #7dd3fc; }
+        .op { color: #d4a574; }
     </style>
 </head>
 <body>
@@ -281,46 +289,55 @@
             <p class="subtitle">Type casting with as and as?</p>
             <h3>as (strict)</h3>
 <p>Converts the value or panics if impossible:</p>
-<pre><code>fn main(stdout: Stdout) {
-    stdout.println(42 as string)        // Output: 42
-    stdout.println(3.14 as string)      // Output: 3.14
-    stdout.println(true as string)      // Output: true
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    stdout.<span class="fn">println</span>(<span class="nu">42</span> <span class="kw">as</span> <span class="ty">string</span>)        <span class="cm">// Output: 42</span>
+    stdout.<span class="fn">println</span>(<span class="nu">3.14</span> <span class="kw">as</span> <span class="ty">string</span>)      <span class="cm">// Output: 3.14</span>
+    stdout.<span class="fn">println</span>(<span class="kw">true</span> <span class="kw">as</span> <span class="ty">string</span>)      <span class="cm">// Output: true</span>
 
-    let x = 42 as f64                   // 42.0
-    let n = 3.9 as i64                  // 3 (truncates toward zero)
-    let parsed = "42" as i64            // 42
+    <span class="kw">let</span> x <span class="op">=</span> <span class="nu">42</span> <span class="kw">as</span> <span class="ty">f64</span>                   <span class="cm">// 42.0</span>
+    <span class="kw">let</span> n <span class="op">=</span> <span class="nu">3.9</span> <span class="kw">as</span> <span class="ty">i64</span>                  <span class="cm">// 3 (truncates toward zero)</span>
+    <span class="kw">let</span> parsed <span class="op">=</span> <span class="st">"42"</span> <span class="kw">as</span> <span class="ty">i64</span>            <span class="cm">// 42</span>
 
-    stdout.println(n as string)         // Output: 3
-    // "hello" as i64                   // PANIC: cannot parse
-    // 300 as u8                        // PANIC: out of range
+    stdout.<span class="fn">println</span>(n <span class="kw">as</span> <span class="ty">string</span>)         <span class="cm">// Output: 3</span>
+    <span class="cm">// "hello" as i64                   // PANIC: cannot parse</span>
+    <span class="cm">// 300 as u8                        // PANIC: out of range</span>
 }</code></pre>
 <h3>as? (safe)</h3>
 <p>Returns <code>T?</code> — the converted value or <code>nil</code> on failure:</p>
-<pre><code>fn main(stdout: Stdout) {
-    let good = "42" as? i64       // 42
-    let bad = "hello" as? i64     // nil
-    let fits = 255 as? u8         // 255
-    let overflow = 300 as? u8     // nil
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> good <span class="op">=</span> <span class="st">"42"</span> <span class="kw">as</span><span class="op">?</span> <span class="ty">i64</span>       <span class="cm">// 42</span>
+    <span class="kw">let</span> bad <span class="op">=</span> <span class="st">"hello"</span> <span class="kw">as</span><span class="op">?</span> <span class="ty">i64</span>     <span class="cm">// nil</span>
+    <span class="kw">let</span> fits <span class="op">=</span> <span class="nu">255</span> <span class="kw">as</span><span class="op">?</span> <span class="ty">u8</span>         <span class="cm">// 255</span>
+    <span class="kw">let</span> overflow <span class="op">=</span> <span class="nu">300</span> <span class="kw">as</span><span class="op">?</span> <span class="ty">u8</span>     <span class="cm">// nil</span>
 
-    if good is i64 {
-        stdout.println("parsed: " + (good as string))
+    <span class="kw">if</span> good <span class="kw">is</span> <span class="ty">i64</span> {
+        stdout.<span class="fn">println</span>(<span class="st">"parsed: "</span> <span class="op">+</span> (good <span class="kw">as</span> <span class="ty">string</span>))
     }
-    if bad is nil {
-        stdout.println("parse failed")
+    <span class="kw">if</span> bad <span class="kw">is</span> <span class="kw">nil</span> {
+        stdout.<span class="fn">println</span>(<span class="st">"parse failed"</span>)
     }
-    // Output:
-    // parsed: 42
-    // parse failed
+    <span class="cm">// Output:</span>
+    <span class="cm">// parsed: 42</span>
+    <span class="cm">// parse failed</span>
 }</code></pre>
 <h3>Conversion table</h3>
-<p>| From | To | Behavior | |---|---|---| | any integer | any integer | Range-checked (panics/nil on overflow) | | any integer | <code>f64</code> | Always succeeds (widening) | | <code>f64</code> | any integer | Truncates toward zero, range-checked | | any numeric | <code>string</code> | Display representation | | <code>string</code> | any numeric | Parses (panics/nil on invalid input) | | <code>bool</code> | <code>string</code> | <code>"true"</code> or <code>"false"</code> |</p>
+<table>
+<thead><tr><th>From</th><th>To</th><th>Behavior</th></tr></thead>
+<tbody>
+<tr><td>any integer</td><td>any integer</td><td>Range-checked (panics/nil on overflow)</td></tr>
+<tr><td>any integer</td><td><code>f64</code></td><td>Always succeeds (widening)</td></tr>
+<tr><td><code>f64</code></td><td>any integer</td><td>Truncates toward zero, range-checked</td></tr>
+<tr><td>any numeric</td><td><code>string</code></td><td>Display representation</td></tr>
+<tr><td><code>string</code></td><td>any numeric</td><td>Parses (panics/nil on invalid input)</td></tr>
+<tr><td><code>bool</code></td><td><code>string</code></td><td><code>"true"</code> or <code>"false"</code></td></tr>
+</tbody></table>
 <p>Cross-width arithmetic is a type error. Convert explicitly:</p>
-<pre><code>fn main(stdout: Stdout) {
-    let a: i32 = 10
-    let b: i64 = 20
-    // let c = a + b        // COMPILE ERROR: type mismatch
-    let c = (a as i64) + b  // correct
-    stdout.println(c as string)  // Output: 30
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> a<span class="op">:</span> <span class="ty">i32</span> <span class="op">=</span> <span class="nu">10</span>
+    <span class="kw">let</span> b<span class="op">:</span> <span class="ty">i64</span> <span class="op">=</span> <span class="nu">20</span>
+    <span class="cm">// let c = a + b        // COMPILE ERROR: type mismatch</span>
+    <span class="kw">let</span> c <span class="op">=</span> (a <span class="kw">as</span> <span class="ty">i64</span>) <span class="op">+</span> b  <span class="cm">// correct</span>
+    stdout.<span class="fn">println</span>(c <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 30</span>
 }</code></pre>
 
         </article>

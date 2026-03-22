@@ -263,6 +263,14 @@
             .content pre { padding: 1rem; font-size: 0.82em; }
             .sidebar-nav a { font-size: 0.78rem; padding: 0.25rem 0.5rem; }
         }
+        /* Syntax highlighting */
+        .kw { color: #fbbf24; }
+        .ty { color: #a7d28b; }
+        .st { color: #a7d28b; }
+        .nu { color: #f0a8d0; }
+        .cm { color: #7a7060; font-style: italic; }
+        .fn { color: #7dd3fc; }
+        .op { color: #d4a574; }
     </style>
 </head>
 <body>
@@ -281,59 +289,59 @@
             <p class="subtitle">Exhaustive pattern matching with match expressions</p>
             <p><code>match</code> is an expression with exhaustive checking. It works on literals, enums, results, and union types.</p>
 <h3>Literal patterns</h3>
-<pre><code>fn classify(n: i64) -&gt; string {
-    match n {
-        0 =&gt; return "zero"
-        1 =&gt; return "one"
-        _ =&gt; return "other"
+<pre><code><span class="kw">fn</span> <span class="fn">classify</span>(n<span class="op">:</span> <span class="ty">i64</span>) <span class="op">-&gt;</span> <span class="ty">string</span> {
+    <span class="kw">match</span> n {
+        <span class="nu">0</span> <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"zero"</span>
+        <span class="nu">1</span> <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"one"</span>
+        _ <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"other"</span>
     }
-    return "unreachable"
+    <span class="kw">return</span> <span class="st">"unreachable"</span>
 }
 
-fn main(stdout: Stdout) {
-    stdout.println(classify(0))   // Output: zero
-    stdout.println(classify(42))  // Output: other
+<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    stdout.<span class="fn">println</span>(<span class="fn">classify</span>(<span class="nu">0</span>))   <span class="cm">// Output: zero</span>
+    stdout.<span class="fn">println</span>(<span class="fn">classify</span>(<span class="nu">42</span>))  <span class="cm">// Output: other</span>
 }</code></pre>
 <h3>Enum variant patterns</h3>
-<pre><code>type Shape {
-    Circle(f64)
-    Rect(f64, f64)
+<pre><code><span class="kw">type</span> <span class="ty">Shape</span> {
+    <span class="ty">Circle</span>(<span class="ty">f64</span>)
+    <span class="ty">Rect</span>(<span class="ty">f64</span>, <span class="ty">f64</span>)
 }
 
-fn area(s: Shape) -&gt; f64 {
-    match s {
-        Shape.Circle(r) =&gt; return 3.14159 * r * r
-        Shape.Rect(w, h) =&gt; return w * h
+<span class="kw">fn</span> <span class="fn">area</span>(s<span class="op">:</span> <span class="ty">Shape</span>) <span class="op">-&gt;</span> <span class="ty">f64</span> {
+    <span class="kw">match</span> s {
+        <span class="ty">Shape</span>.<span class="ty">Circle</span>(r) <span class="op">=&gt;</span> <span class="kw">return</span> <span class="nu">3.14159</span> <span class="op">*</span> r <span class="op">*</span> r
+        <span class="ty">Shape</span>.<span class="ty">Rect</span>(w, h) <span class="op">=&gt;</span> <span class="kw">return</span> w <span class="op">*</span> h
     }
-    return 0.0
+    <span class="kw">return</span> <span class="nu">0.0</span>
 }
 
-fn main(stdout: Stdout) {
-    let c = Shape.Circle(5.0)
-    stdout.println(area(c) as string)  // Output: 78.53975
+<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> c <span class="op">=</span> <span class="ty">Shape</span>.<span class="ty">Circle</span>(<span class="nu">5.0</span>)
+    stdout.<span class="fn">println</span>(<span class="fn">area</span>(c) <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 78.53975</span>
 }</code></pre>
 <h3>Type narrowing with is</h3>
 <p>Use <code>is</code> patterns to match union members:</p>
-<pre><code>fn to_string(val: i64 | f64 | string) -&gt; string {
-    match val {
-        is i64 =&gt; return "int: " + (val as string)
-        is f64 =&gt; return "float: " + (val as string)
-        is string =&gt; return "str: " + val
+<pre><code><span class="kw">fn</span> <span class="fn">to_string</span>(val<span class="op">:</span> <span class="ty">i64</span> <span class="op">|</span> <span class="ty">f64</span> <span class="op">|</span> <span class="ty">string</span>) <span class="op">-&gt;</span> <span class="ty">string</span> {
+    <span class="kw">match</span> val {
+        <span class="kw">is</span> <span class="ty">i64</span> <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"int: "</span> <span class="op">+</span> (val <span class="kw">as</span> <span class="ty">string</span>)
+        <span class="kw">is</span> <span class="ty">f64</span> <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"float: "</span> <span class="op">+</span> (val <span class="kw">as</span> <span class="ty">string</span>)
+        <span class="kw">is</span> <span class="ty">string</span> <span class="op">=&gt;</span> <span class="kw">return</span> <span class="st">"str: "</span> <span class="op">+</span> val
     }
-    return ""
+    <span class="kw">return</span> <span class="st">""</span>
 }</code></pre>
 <h3>Matching results</h3>
-<pre><code>fn divide(a: f64, b: f64) -&gt; f64!string {
-    if b == 0.0 { return !("division by zero") }
-    return a / b
+<pre><code><span class="kw">fn</span> <span class="fn">divide</span>(a<span class="op">:</span> <span class="ty">f64</span>, b<span class="op">:</span> <span class="ty">f64</span>) <span class="op">-&gt;</span> <span class="ty">f64</span><span class="op">!</span><span class="ty">string</span> {
+    <span class="kw">if</span> b <span class="op">==</span> <span class="nu">0.0</span> { <span class="kw">return</span> <span class="op">!</span>(<span class="st">"division by zero"</span>) }
+    <span class="kw">return</span> a <span class="op">/</span> b
 }
 
-fn main(stdout: Stdout) {
-    match divide(10.0, 3.0) {
-        !err =&gt; stdout.println("Error: " + err)
-        val =&gt; stdout.println("Result: " + (val as string))
+<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">match</span> <span class="fn">divide</span>(<span class="nu">10.0</span>, <span class="nu">3.0</span>) {
+        <span class="op">!</span>err <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(<span class="st">"Error: "</span> <span class="op">+</span> err)
+        val <span class="op">=&gt;</span> stdout.<span class="fn">println</span>(<span class="st">"Result: "</span> <span class="op">+</span> (val <span class="kw">as</span> <span class="ty">string</span>))
     }
-    // Output: Result: 3.3333333333333335
+    <span class="cm">// Output: Result: 3.3333333333333335</span>
 }</code></pre>
 
         </article>

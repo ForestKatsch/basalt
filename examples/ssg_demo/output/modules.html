@@ -263,6 +263,14 @@
             .content pre { padding: 1rem; font-size: 0.82em; }
             .sidebar-nav a { font-size: 0.78rem; padding: 0.25rem 0.5rem; }
         }
+        /* Syntax highlighting */
+        .kw { color: #fbbf24; }
+        .ty { color: #a7d28b; }
+        .st { color: #a7d28b; }
+        .nu { color: #f0a8d0; }
+        .cm { color: #7a7060; font-style: italic; }
+        .fn { color: #7dd3fc; }
+        .op { color: #d4a574; }
     </style>
 </head>
 <body>
@@ -280,33 +288,33 @@
             <h1>Modules</h1>
             <p class="subtitle">Module system and imports</p>
             <p>Each <code>.bas</code> file is a module. Import with the <code>import</code> keyword.</p>
-<pre><code>// geometry.bas
-type Point {
-    x: f64
-    y: f64
+<pre><code><span class="cm">// geometry.bas</span>
+<span class="kw">type</span> <span class="ty">Point</span> {
+    x<span class="op">:</span> <span class="ty">f64</span>
+    y<span class="op">:</span> <span class="ty">f64</span>
 }
 
-fn distance(a: Point, b: Point) -&gt; f64 {
-    let dx = a.x - b.x
-    let dy = a.y - b.y
-    return math.sqrt(dx * dx + dy * dy)
+<span class="kw">fn</span> <span class="fn">distance</span>(a<span class="op">:</span> <span class="ty">Point</span>, b<span class="op">:</span> <span class="ty">Point</span>) <span class="op">-&gt;</span> <span class="ty">f64</span> {
+    <span class="kw">let</span> dx <span class="op">=</span> a.x <span class="op">-</span> b.x
+    <span class="kw">let</span> dy <span class="op">=</span> a.y <span class="op">-</span> b.y
+    <span class="kw">return</span> math.<span class="fn">sqrt</span>(dx <span class="op">*</span> dx <span class="op">+</span> dy <span class="op">*</span> dy)
 }</code></pre>
-<pre><code>// main.bas
-import "geometry"
+<pre><code><span class="cm">// main.bas</span>
+<span class="kw">import</span> <span class="st">"geometry"</span>
 
-fn main(stdout: Stdout) {
-    let a = geometry.Point { x: 0.0, y: 0.0 }
-    let b = geometry.Point { x: 3.0, y: 4.0 }
-    stdout.println(geometry.distance(a, b) as string)
+<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> a <span class="op">=</span> geometry.<span class="ty">Point</span> { x<span class="op">:</span> <span class="nu">0.0</span>, y<span class="op">:</span> <span class="nu">0.0</span> }
+    <span class="kw">let</span> b <span class="op">=</span> geometry.<span class="ty">Point</span> { x<span class="op">:</span> <span class="nu">3.0</span>, y<span class="op">:</span> <span class="nu">4.0</span> }
+    stdout.<span class="fn">println</span>(geometry.<span class="fn">distance</span>(a, b) <span class="kw">as</span> <span class="ty">string</span>)
 }</code></pre>
 <p>All imported names are accessed with the module qualifier. There is no unqualified import. Circular imports are prohibited.</p>
 <p>Import with alias:</p>
-<pre><code>import "lib/utils" as helpers</code></pre>
+<pre><code><span class="kw">import</span> <span class="st">"lib/utils"</span> <span class="kw">as</span> helpers</code></pre>
 <p>Standard library modules use the <code>std/</code> prefix:</p>
-<pre><code>import "std/math"
+<pre><code><span class="kw">import</span> <span class="st">"std/math"</span>
 
-fn main(stdout: Stdout) {
-    stdout.println(math.sqrt(2.0) as string)
+<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    stdout.<span class="fn">println</span>(math.<span class="fn">sqrt</span>(<span class="nu">2.0</span>) <span class="kw">as</span> <span class="ty">string</span>)
 }</code></pre>
 
         </article>

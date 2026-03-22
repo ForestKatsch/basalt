@@ -263,6 +263,14 @@
             .content pre { padding: 1rem; font-size: 0.82em; }
             .sidebar-nav a { font-size: 0.78rem; padding: 0.25rem 0.5rem; }
         }
+        /* Syntax highlighting */
+        .kw { color: #fbbf24; }
+        .ty { color: #a7d28b; }
+        .st { color: #a7d28b; }
+        .nu { color: #f0a8d0; }
+        .cm { color: #7a7060; font-style: italic; }
+        .fn { color: #7dd3fc; }
+        .op { color: #d4a574; }
     </style>
 </head>
 <body>
@@ -280,31 +288,31 @@
             <h1>Variables</h1>
             <p class="subtitle">Variables, mutability, and type inference</p>
             <p>Variables are immutable by default:</p>
-<pre><code>fn main(stdout: Stdout) {
-    let name = "Basalt"
-    let age = 1
-    stdout.println("\(name) is \(age) year old")
-    // Output: Basalt is 1 year old
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> name <span class="op">=</span> <span class="st">"Basalt"</span>
+    <span class="kw">let</span> age <span class="op">=</span> <span class="nu">1</span>
+    stdout.<span class="fn">println</span>(<span class="st">"\(name) is \(age) year old"</span>)
+    <span class="cm">// Output: Basalt is 1 year old</span>
 }</code></pre>
 <p>Use <code>mut</code> when you need to reassign or mutate:</p>
-<pre><code>fn main(stdout: Stdout) {
-    let mut count = 0
-    count = count + 1
-    stdout.println(count as string)  // Output: 1
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> <span class="kw">mut</span> count <span class="op">=</span> <span class="nu">0</span>
+    count <span class="op">=</span> count <span class="op">+</span> <span class="nu">1</span>
+    stdout.<span class="fn">println</span>(count <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 1</span>
 
-    // mut is also required for mutating methods on collections
-    let mut items = [1, 2, 3]
-    items.push(4)
-    stdout.println(items.length as string)  // Output: 4
+    <span class="cm">// mut is also required for mutating methods on collections</span>
+    <span class="kw">let</span> <span class="kw">mut</span> items <span class="op">=</span> [<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>]
+    items.<span class="fn">push</span>(<span class="nu">4</span>)
+    stdout.<span class="fn">println</span>(items.length <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 4</span>
 }</code></pre>
 <p>Type inference works for most declarations. Add annotations when needed:</p>
-<pre><code>fn main(stdout: Stdout) {
-    let x = 42                  // inferred as i64
-    let y: f64 = 42.0           // annotated
-    let byte: u8 = 255          // required for non-default integer widths
-    let mut m: [string: i64] = {}  // required for empty collections
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> x <span class="op">=</span> <span class="nu">42</span>                  <span class="cm">// inferred as i64</span>
+    <span class="kw">let</span> y<span class="op">:</span> <span class="ty">f64</span> <span class="op">=</span> <span class="nu">42.0</span>           <span class="cm">// annotated</span>
+    <span class="kw">let</span> byte<span class="op">:</span> <span class="ty">u8</span> <span class="op">=</span> <span class="nu">255</span>          <span class="cm">// required for non-default integer widths</span>
+    <span class="kw">let</span> <span class="kw">mut</span> m<span class="op">:</span> [<span class="ty">string</span><span class="op">:</span> <span class="ty">i64</span>] <span class="op">=</span> {}  <span class="cm">// required for empty collections</span>
 
-    stdout.println(x as string)
+    stdout.<span class="fn">println</span>(x <span class="kw">as</span> <span class="ty">string</span>)
 }</code></pre>
 
         </article>

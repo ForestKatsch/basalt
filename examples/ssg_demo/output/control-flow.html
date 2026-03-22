@@ -263,6 +263,14 @@
             .content pre { padding: 1rem; font-size: 0.82em; }
             .sidebar-nav a { font-size: 0.78rem; padding: 0.25rem 0.5rem; }
         }
+        /* Syntax highlighting */
+        .kw { color: #fbbf24; }
+        .ty { color: #a7d28b; }
+        .st { color: #a7d28b; }
+        .nu { color: #f0a8d0; }
+        .cm { color: #7a7060; font-style: italic; }
+        .fn { color: #7dd3fc; }
+        .op { color: #d4a574; }
     </style>
 </head>
 <body>
@@ -282,100 +290,100 @@
             <h3>if/else</h3>
 <p>Conditions must be <code>bool</code>. There is no truthiness — <code>if 0</code> and <code>if ""</code> are compile errors.</p>
 <p><code>if</code> is an expression that produces a value:</p>
-<pre><code>fn main(stdout: Stdout) {
-    let x = 10
-    let label = if x &gt; 0 { "positive" } else { "non-positive" }
-    stdout.println(label)  // Output: positive
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> x <span class="op">=</span> <span class="nu">10</span>
+    <span class="kw">let</span> label <span class="op">=</span> <span class="kw">if</span> x <span class="op">&gt;</span> <span class="nu">0</span> { <span class="st">"positive"</span> } <span class="kw">else</span> { <span class="st">"non-positive"</span> }
+    stdout.<span class="fn">println</span>(label)  <span class="cm">// Output: positive</span>
 
-    let grade = if x &gt;= 90 { "A" }
-        else if x &gt;= 80 { "B" }
-        else if x &gt;= 70 { "C" }
-        else { "F" }
-    stdout.println(grade)  // Output: F
+    <span class="kw">let</span> grade <span class="op">=</span> <span class="kw">if</span> x <span class="op">&gt;=</span> <span class="nu">90</span> { <span class="st">"A"</span> }
+        <span class="kw">else</span> <span class="kw">if</span> x <span class="op">&gt;=</span> <span class="nu">80</span> { <span class="st">"B"</span> }
+        <span class="kw">else</span> <span class="kw">if</span> x <span class="op">&gt;=</span> <span class="nu">70</span> { <span class="st">"C"</span> }
+        <span class="kw">else</span> { <span class="st">"F"</span> }
+    stdout.<span class="fn">println</span>(grade)  <span class="cm">// Output: F</span>
 }</code></pre>
 <h3>while</h3>
-<pre><code>fn main(stdout: Stdout) {
-    let mut i = 1
-    while i &lt;= 5 {
-        stdout.print(i as string + " ")
-        i = i + 1
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> <span class="kw">mut</span> i <span class="op">=</span> <span class="nu">1</span>
+    <span class="kw">while</span> i <span class="op">&lt;=</span> <span class="nu">5</span> {
+        stdout.<span class="fn">print</span>(i <span class="kw">as</span> <span class="ty">string</span> <span class="op">+</span> <span class="st">" "</span>)
+        i <span class="op">=</span> i <span class="op">+</span> <span class="nu">1</span>
     }
-    stdout.println("")
-    // Output: 1 2 3 4 5
+    stdout.<span class="fn">println</span>(<span class="st">""</span>)
+    <span class="cm">// Output: 1 2 3 4 5</span>
 }</code></pre>
 <h3>for-in</h3>
 <p>Iterate over arrays, maps, strings, and ranges:</p>
-<pre><code>fn main(stdout: Stdout) {
-    // Array iteration
-    let fruits = ["apple", "banana", "cherry"]
-    for fruit in fruits {
-        stdout.println(fruit)
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="cm">// Array iteration</span>
+    <span class="kw">let</span> fruits <span class="op">=</span> [<span class="st">"apple"</span>, <span class="st">"banana"</span>, <span class="st">"cherry"</span>]
+    <span class="kw">for</span> fruit <span class="kw">in</span> fruits {
+        stdout.<span class="fn">println</span>(fruit)
     }
 
-    // With index (value first, index second)
-    for fruit, i in fruits {
-        stdout.println("\(i as string): \(fruit)")
+    <span class="cm">// With index (value first, index second)</span>
+    <span class="kw">for</span> fruit, i <span class="kw">in</span> fruits {
+        stdout.<span class="fn">println</span>(<span class="st">"\(i as string): \(fruit)"</span>)
     }
 
-    // Map iteration (key first, value second)
-    let ages = {"alice": 30, "bob": 25}
-    for name, age in ages {
-        stdout.println("\(name) is \(age as string)")
+    <span class="cm">// Map iteration (key first, value second)</span>
+    <span class="kw">let</span> ages <span class="op">=</span> {<span class="st">"alice"</span><span class="op">:</span> <span class="nu">30</span>, <span class="st">"bob"</span><span class="op">:</span> <span class="nu">25</span>}
+    <span class="kw">for</span> name, age <span class="kw">in</span> ages {
+        stdout.<span class="fn">println</span>(<span class="st">"\(name) is \(age as string)"</span>)
     }
 
-    // Range (exclusive end)
-    let mut sum = 0
-    for i in 0..10 {
-        sum = sum + i
+    <span class="cm">// Range (exclusive end)</span>
+    <span class="kw">let</span> <span class="kw">mut</span> sum <span class="op">=</span> <span class="nu">0</span>
+    <span class="kw">for</span> i <span class="kw">in</span> <span class="nu">0..10</span> {
+        sum <span class="op">=</span> sum <span class="op">+</span> i
     }
-    stdout.println(sum as string)  // Output: 45
+    stdout.<span class="fn">println</span>(sum <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 45</span>
 
-    // String iteration (by character)
-    for ch in "hi!" {
-        stdout.print("[" + ch + "]")
+    <span class="cm">// String iteration (by character)</span>
+    <span class="kw">for</span> ch <span class="kw">in</span> <span class="st">"hi!"</span> {
+        stdout.<span class="fn">print</span>(<span class="st">"["</span> <span class="op">+</span> ch <span class="op">+</span> <span class="st">"]"</span>)
     }
-    stdout.println("")  // Output: [h][i][!]
+    stdout.<span class="fn">println</span>(<span class="st">""</span>)  <span class="cm">// Output: [h][i][!]</span>
 }</code></pre>
 <h3>loop, break, continue</h3>
-<pre><code>fn main(stdout: Stdout) {
-    // Infinite loop with break
-    let mut n = 0
-    loop {
-        n = n + 1
-        if n &gt; 5 { break }
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="cm">// Infinite loop with break</span>
+    <span class="kw">let</span> <span class="kw">mut</span> n <span class="op">=</span> <span class="nu">0</span>
+    <span class="kw">loop</span> {
+        n <span class="op">=</span> n <span class="op">+</span> <span class="nu">1</span>
+        <span class="kw">if</span> n <span class="op">&gt;</span> <span class="nu">5</span> { <span class="kw">break</span> }
     }
-    stdout.println(n as string)  // Output: 6
+    stdout.<span class="fn">println</span>(n <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 6</span>
 
-    // Skip odd numbers with continue
-    let mut evens = 0
-    for i in 0..10 {
-        if i % 2 != 0 { continue }
-        evens = evens + 1
+    <span class="cm">// Skip odd numbers with continue</span>
+    <span class="kw">let</span> <span class="kw">mut</span> evens <span class="op">=</span> <span class="nu">0</span>
+    <span class="kw">for</span> i <span class="kw">in</span> <span class="nu">0..10</span> {
+        <span class="kw">if</span> i <span class="op">%</span> <span class="nu">2</span> <span class="op">!=</span> <span class="nu">0</span> { <span class="kw">continue</span> }
+        evens <span class="op">=</span> evens <span class="op">+</span> <span class="nu">1</span>
     }
-    stdout.println(evens as string)  // Output: 5
+    stdout.<span class="fn">println</span>(evens <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 5</span>
 }</code></pre>
 <h3>guard / guard let</h3>
 <p><code>guard</code> asserts a condition. If it fails, the <code>else</code> block must diverge (<code>return</code>, <code>break</code>, <code>continue</code>, or <code>panic</code>).</p>
-<pre><code>fn process(x: i64, stdout: Stdout) {
-    guard x &gt; 0 else {
-        stdout.println("must be positive")
-        return
+<pre><code><span class="kw">fn</span> <span class="fn">process</span>(x<span class="op">:</span> <span class="ty">i64</span>, stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">guard</span> x <span class="op">&gt;</span> <span class="nu">0</span> <span class="kw">else</span> {
+        stdout.<span class="fn">println</span>(<span class="st">"must be positive"</span>)
+        <span class="kw">return</span>
     }
-    stdout.println("processing: " + (x as string))
+    stdout.<span class="fn">println</span>(<span class="st">"processing: "</span> <span class="op">+</span> (x <span class="kw">as</span> <span class="ty">string</span>))
 }
 
-fn main(stdout: Stdout) {
-    process(5, stdout)   // Output: processing: 5
-    process(-1, stdout)  // Output: must be positive
+<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="fn">process</span>(<span class="nu">5</span>, stdout)   <span class="cm">// Output: processing: 5</span>
+    <span class="fn">process</span>(<span class="op">-</span><span class="nu">1</span>, stdout)  <span class="cm">// Output: must be positive</span>
 }</code></pre>
 <p><code>guard let</code> unwraps optionals and results into the enclosing scope:</p>
-<pre><code>fn load_config(fs: Fs, stdout: Stdout) {
-    guard let content = fs.read_file("config.txt") else {
-        stdout.println("Could not read config")
-        return
+<pre><code><span class="kw">fn</span> <span class="fn">load_config</span>(fs<span class="op">:</span> <span class="ty">Fs</span>, stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">guard</span> <span class="kw">let</span> content <span class="op">=</span> fs.<span class="fn">read_file</span>(<span class="st">"config.txt"</span>) <span class="kw">else</span> {
+        stdout.<span class="fn">println</span>(<span class="st">"Could not read config"</span>)
+        <span class="kw">return</span>
     }
-    // content is `string` here, not a result type
-    stdout.println("Config loaded: " + (content.length as string) + " chars")
+    <span class="cm">// content is `string` here, not a result type</span>
+    stdout.<span class="fn">println</span>(<span class="st">"Config loaded: "</span> <span class="op">+</span> (content.length <span class="kw">as</span> <span class="ty">string</span>) <span class="op">+</span> <span class="st">" chars"</span>)
 }</code></pre>
 
         </article>

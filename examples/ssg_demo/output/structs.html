@@ -263,6 +263,14 @@
             .content pre { padding: 1rem; font-size: 0.82em; }
             .sidebar-nav a { font-size: 0.78rem; padding: 0.25rem 0.5rem; }
         }
+        /* Syntax highlighting */
+        .kw { color: #fbbf24; }
+        .ty { color: #a7d28b; }
+        .st { color: #a7d28b; }
+        .nu { color: #f0a8d0; }
+        .cm { color: #7a7060; font-style: italic; }
+        .fn { color: #7dd3fc; }
+        .op { color: #d4a574; }
     </style>
 </head>
 <body>
@@ -280,48 +288,48 @@
             <h1>Structs</h1>
             <p class="subtitle">Struct types, methods, and reference semantics</p>
             <p>Define structs with the <code>type</code> keyword. Structs are reference types.</p>
-<pre><code>type Point {
-    x: f64
-    y: f64
+<pre><code><span class="kw">type</span> <span class="ty">Point</span> {
+    x<span class="op">:</span> <span class="ty">f64</span>
+    y<span class="op">:</span> <span class="ty">f64</span>
 }
 
-fn main(stdout: Stdout) {
-    let p = Point { x: 3.0, y: 4.0 }
-    stdout.println(p.x as string)  // Output: 3
-    stdout.println(p.y as string)  // Output: 4
+<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> p <span class="op">=</span> <span class="ty">Point</span> { x<span class="op">:</span> <span class="nu">3.0</span>, y<span class="op">:</span> <span class="nu">4.0</span> }
+    stdout.<span class="fn">println</span>(p.x <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 3</span>
+    stdout.<span class="fn">println</span>(p.y <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 4</span>
 }</code></pre>
 <h3>Methods</h3>
 <p>Instance methods take <code>self: Self</code> as their first parameter. Static methods do not.</p>
-<pre><code>type Point {
-    x: f64
-    y: f64
+<pre><code><span class="kw">type</span> <span class="ty">Point</span> {
+    x<span class="op">:</span> <span class="ty">f64</span>
+    y<span class="op">:</span> <span class="ty">f64</span>
 
-    fn origin() -&gt; Point {
-        return Point { x: 0.0, y: 0.0 }
+    <span class="kw">fn</span> <span class="fn">origin</span>() <span class="op">-&gt;</span> <span class="ty">Point</span> {
+        <span class="kw">return</span> <span class="ty">Point</span> { x<span class="op">:</span> <span class="nu">0.0</span>, y<span class="op">:</span> <span class="nu">0.0</span> }
     }
 
-    fn distance(self: Self, other: Point) -&gt; f64 {
-        let dx = self.x - other.x
-        let dy = self.y - other.y
-        return math.sqrt(dx * dx + dy * dy)
+    <span class="kw">fn</span> <span class="fn">distance</span>(self<span class="op">:</span> <span class="ty">Self</span>, other<span class="op">:</span> <span class="ty">Point</span>) <span class="op">-&gt;</span> <span class="ty">f64</span> {
+        <span class="kw">let</span> dx <span class="op">=</span> self.x <span class="op">-</span> other.x
+        <span class="kw">let</span> dy <span class="op">=</span> self.y <span class="op">-</span> other.y
+        <span class="kw">return</span> math.<span class="fn">sqrt</span>(dx <span class="op">*</span> dx <span class="op">+</span> dy <span class="op">*</span> dy)
     }
 }
 
-fn main(stdout: Stdout) {
-    let a = Point.origin()
-    let b = Point { x: 3.0, y: 4.0 }
-    stdout.println(a.distance(b) as string)  // Output: 5
+<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> a <span class="op">=</span> <span class="ty">Point</span>.<span class="fn">origin</span>()
+    <span class="kw">let</span> b <span class="op">=</span> <span class="ty">Point</span> { x<span class="op">:</span> <span class="nu">3.0</span>, y<span class="op">:</span> <span class="nu">4.0</span> }
+    stdout.<span class="fn">println</span>(a.<span class="fn">distance</span>(b) <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 5</span>
 }</code></pre>
 <h3>Reference semantics</h3>
-<pre><code>fn main(stdout: Stdout) {
-    let mut p = Point { x: 1.0, y: 2.0 }
-    let mut q = p        // q and p refer to the same struct
-    q.x = 10.0
-    stdout.println(p.x as string)  // Output: 10 (same object)
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> <span class="kw">mut</span> p <span class="op">=</span> <span class="ty">Point</span> { x<span class="op">:</span> <span class="nu">1.0</span>, y<span class="op">:</span> <span class="nu">2.0</span> }
+    <span class="kw">let</span> <span class="kw">mut</span> q <span class="op">=</span> p        <span class="cm">// q and p refer to the same struct</span>
+    q.x <span class="op">=</span> <span class="nu">10.0</span>
+    stdout.<span class="fn">println</span>(p.x <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 10 (same object)</span>
 
-    let mut r = p.clone()  // independent copy
-    r.x = 99.0
-    stdout.println(p.x as string)  // Output: 10 (unaffected)
+    <span class="kw">let</span> <span class="kw">mut</span> r <span class="op">=</span> p.<span class="fn">clone</span>()  <span class="cm">// independent copy</span>
+    r.x <span class="op">=</span> <span class="nu">99.0</span>
+    stdout.<span class="fn">println</span>(p.x <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 10 (unaffected)</span>
 }</code></pre>
 
         </article>

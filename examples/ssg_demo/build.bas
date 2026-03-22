@@ -104,13 +104,27 @@ fn inline_md(text: string) -> string {
     return result
 }
 
+// --- Table row splitting helper ---
+fn split_table_row(line: string) -> [string] {
+    let parts = line.split("|")
+    let mut cells: [string] = []
+    let mut idx = 1
+    while idx < parts.length - 1 {
+        cells.push(parts[idx].trim())
+        idx = idx + 1
+    }
+    return cells
+}
+
 // --- Block-level markdown to HTML ---
-fn md_to_html(md: string) -> string {
+fn md_to_html(md: string, highlight: Highlight) -> string {
     let lines = md.split("\n")
     let mut html = ""
     let mut in_list = false
+    let mut in_table = false
     let mut in_code_block = false
     let mut code_content = ""
+    let mut code_lang = ""
     let mut in_blockquote = false
     let mut para_lines: [string] = []
     let mut i = 0
@@ -123,8 +137,9 @@ fn md_to_html(md: string) -> string {
         if line.trim().starts_with("```") {
             if in_code_block {
                 // Close code block — content was accumulated raw
-                html = html + "<pre><code>" + escape_html(code_content) + "</code></pre>\n"
+                html = html + "<pre><code>" + highlight.code(code_content, code_lang) + "</code></pre>\n"
                 code_content = ""
+                code_lang = ""
                 in_code_block = false
             } else {
                 // Flush any open structures before opening code block
@@ -139,6 +154,13 @@ fn md_to_html(md: string) -> string {
                 if in_blockquote {
                     html = html + "</blockquote>\n"
                     in_blockquote = false
+                }
+                // Extract language tag from ```lang
+                let trimmed = line.trim()
+                if trimmed.length > 3 {
+                    code_lang = trimmed.slice(3, trimmed.length)
+                } else {
+                    code_lang = ""
                 }
                 in_code_block = true
             }
@@ -256,6 +278,50 @@ fn md_to_html(md: string) -> string {
             continue
         }
 
+        // Table: line starts with |
+        if line.starts_with("|") {
+            if !in_table {
+                // Start table — flush open structures
+                if para_lines.length > 0 {
+                    html = html + "<p>" + inline_md(para_lines.join(" ")) + "</p>\n"
+                    para_lines = []
+                }
+                if in_list {
+                    html = html + "</ul>\n"
+                    in_list = false
+                }
+                if in_blockquote {
+                    html = html + "</blockquote>\n"
+                    in_blockquote = false
+                }
+                in_table = true
+                let cells = split_table_row(line)
+                html = html + "<table>\n<thead><tr>"
+                for cell in cells {
+                    html = html + "<th>" + inline_md(cell) + "</th>"
+                }
+                html = html + "</tr></thead>\n<tbody>\n"
+                continue
+            }
+            // Separator row (|---|---|): skip
+            if line.contains("---") {
+                continue
+            }
+            // Data row
+            let cells = split_table_row(line)
+            html = html + "<tr>"
+            for cell in cells {
+                html = html + "<td>" + inline_md(cell) + "</td>"
+            }
+            html = html + "</tr>\n"
+            continue
+        }
+        // Close table if we were in one
+        if in_table {
+            html = html + "</tbody></table>\n"
+            in_table = false
+        }
+
         // Regular text line: accumulate for paragraph
         if in_list {
             html = html + "</ul>\n"
@@ -272,6 +338,9 @@ fn md_to_html(md: string) -> string {
     if para_lines.length > 0 {
         html = html + "<p>" + inline_md(para_lines.join(" ")) + "</p>\n"
     }
+    if in_table {
+        html = html + "</tbody></table>\n"
+    }
     if in_list {
         html = html + "</ul>\n"
     }
@@ -280,7 +349,7 @@ fn md_to_html(md: string) -> string {
     }
     if in_code_block {
         // Unclosed code block — emit what we have
-        html = html + "<pre><code>" + escape_html(code_content) + "</code></pre>\n"
+        html = html + "<pre><code>" + highlight.code(code_content, code_lang) + "</code></pre>\n"
     }
 
     return html
@@ -357,7 +426,7 @@ fn apply_template(template: string, vars: [string: string]) -> string {
 }
 
 // --- Main build pipeline ---
-fn main(stdout: Stdout, fs: Fs) {
+fn main(stdout: Stdout, fs: Fs, highlight: Highlight) {
     stdout.println("=== Basalt Static Site Generator ===")
     stdout.println("")
 
@@ -432,7 +501,7 @@ fn main(stdout: Stdout, fs: Fs) {
         let desc = if meta.contains_key("description") { meta["description"] } else { "" }
 
         let md_content = strip_frontmatter(content)
-        let body_html = md_to_html(md_content)
+        let body_html = md_to_html(md_content, highlight)
 
         stems.push(stem)
         titles.push(title)

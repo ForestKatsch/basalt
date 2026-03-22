@@ -263,6 +263,14 @@
             .content pre { padding: 1rem; font-size: 0.82em; }
             .sidebar-nav a { font-size: 0.78rem; padding: 0.25rem 0.5rem; }
         }
+        /* Syntax highlighting */
+        .kw { color: #fbbf24; }
+        .ty { color: #a7d28b; }
+        .st { color: #a7d28b; }
+        .nu { color: #f0a8d0; }
+        .cm { color: #7a7060; font-style: italic; }
+        .fn { color: #7dd3fc; }
+        .op { color: #d4a574; }
     </style>
 </head>
 <body>
@@ -279,32 +287,32 @@
         <article class="content">
             <h1>Functions</h1>
             <p class="subtitle">Function declarations and first-class functions</p>
-            <pre><code>fn add(a: i64, b: i64) -&gt; i64 {
-    return a + b
+            <pre><code><span class="kw">fn</span> <span class="fn">add</span>(a<span class="op">:</span> <span class="ty">i64</span>, b<span class="op">:</span> <span class="ty">i64</span>) <span class="op">-&gt;</span> <span class="ty">i64</span> {
+    <span class="kw">return</span> a <span class="op">+</span> b
 }
 
-fn greet(name: string, stdout: Stdout) {
-    stdout.println("Hello, \(name)!")
+<span class="kw">fn</span> <span class="fn">greet</span>(name<span class="op">:</span> <span class="ty">string</span>, stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    stdout.<span class="fn">println</span>(<span class="st">"Hello, \(name)!"</span>)
 }
 
-fn main(stdout: Stdout) {
-    let sum = add(3, 4)
-    stdout.println(sum as string)  // Output: 7
-    greet("world", stdout)         // Output: Hello, world!
+<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> sum <span class="op">=</span> <span class="fn">add</span>(<span class="nu">3</span>, <span class="nu">4</span>)
+    stdout.<span class="fn">println</span>(sum <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 7</span>
+    <span class="fn">greet</span>(<span class="st">"world"</span>, stdout)         <span class="cm">// Output: Hello, world!</span>
 }</code></pre>
 <p>All parameters need type annotations. Return type is required unless the function returns <code>nil</code>. Explicit <code>return</code> is required — the last expression is not implicitly returned.</p>
 <p>Functions are first-class values:</p>
-<pre><code>fn apply(f: fn(i64) -&gt; i64, x: i64) -&gt; i64 {
-    return f(x)
+<pre><code><span class="kw">fn</span> <span class="fn">apply</span>(f<span class="op">:</span> <span class="kw">fn</span>(<span class="ty">i64</span>) <span class="op">-&gt;</span> <span class="ty">i64</span>, x<span class="op">:</span> <span class="ty">i64</span>) <span class="op">-&gt;</span> <span class="ty">i64</span> {
+    <span class="kw">return</span> <span class="fn">f</span>(x)
 }
 
-fn double(x: i64) -&gt; i64 {
-    return x * 2
+<span class="kw">fn</span> <span class="fn">double</span>(x<span class="op">:</span> <span class="ty">i64</span>) <span class="op">-&gt;</span> <span class="ty">i64</span> {
+    <span class="kw">return</span> x <span class="op">*</span> <span class="nu">2</span>
 }
 
-fn main(stdout: Stdout) {
-    let result = apply(double, 5)
-    stdout.println(result as string)  // Output: 10
+<span class="kw">fn</span> <span class="fn">main</span>(stdout<span class="op">:</span> <span class="ty">Stdout</span>) {
+    <span class="kw">let</span> result <span class="op">=</span> <span class="fn">apply</span>(double, <span class="nu">5</span>)
+    stdout.<span class="fn">println</span>(result <span class="kw">as</span> <span class="ty">string</span>)  <span class="cm">// Output: 10</span>
 }</code></pre>
 
         </article>

@@ -98,6 +98,9 @@ impl VM {
                                 args: self.env_args.clone(),
                             },
                         ),
+                        "Highlight" => {
+                            Value::capability("Highlight".into(), CapabilityData::Highlight)
+                        }
                         _ => Value::Nil,
                     };
                     args.push(cap);
@@ -1395,6 +1398,22 @@ impl VM {
                     Ok(val) => Ok(Value::string(val)),
                     Err(_) => Ok(Value::Nil),
                 }
+            }
+
+            // === Highlight ===
+            ("Highlight", "code") => {
+                let source = self.val_to_string(&args[0]);
+                let lang = self.val_to_string(&args[1]);
+                Ok(Value::string(crate::highlight::highlight_code(
+                    &source, &lang,
+                )))
+            }
+            ("Highlight", "inline") => {
+                let source = self.val_to_string(&args[0]);
+                let lang = self.val_to_string(&args[1]);
+                Ok(Value::string(crate::highlight::highlight_inline(
+                    &source, &lang,
+                )))
             }
 
             _ => Err(format!(
