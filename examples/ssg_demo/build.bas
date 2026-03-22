@@ -790,6 +790,9 @@ fn main(stdout: Stdout, fs: Fs, highlight: Highlight) {
         }
     }
 
+    // Note: static assets (fonts, images) must be placed in output/ manually.
+    // The Fs capability reads/writes text — binary files need external tooling.
+
     stdout.println("")
     stdout.println("Build complete: \(page_count as string) pages generated")
 }

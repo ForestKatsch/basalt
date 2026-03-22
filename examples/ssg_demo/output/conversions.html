@@ -5,332 +5,252 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Type Conversions — Basalt</title>
     <meta name="description" content="Explicit casting. The compiler never guesses.">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
+        @font-face {
+            font-family: 'Arcadia';
+            src: url('Arcadia-VF.woff2') format('woff2');
+            font-weight: 100 900;
+            font-display: swap;
+        }
+
         :root {
-            --bg: #fffbf5;
-            --bg-warm: #fff7ed;
-            --text: #3c3226;
-            --text-soft: #6b5e50;
-            --text-faint: #a89882;
-            --accent: #d97706;
-            --accent-hover: #b45309;
-            --accent-light: #fef3c7;
-            --accent-glow: #fbbf24;
-            --link: #b45309;
-            --link-hover: #92400e;
-            --border: #e8ddd0;
-            --border-light: #f0e6d8;
-            --code-bg: #fdf4e8;
-            --code-text: #7c4d12;
-            --pre-bg: #2c2418;
-            --pre-text: #f5e6d0;
-            --pre-comment: #9a8b7a;
-            --pre-keyword: #fbbf24;
-            --pre-string: #a7d28b;
-            --success: #16a34a;
-            --radius: 12px;
+            --bg: #fafaf8;
+            --text: #1a1a18;
+            --text-2: #52524e;
+            --text-3: #8a8a84;
+            --accent: #c05e00;
+            --accent-hover: #a04e00;
+            --accent-bg: #fef3e8;
+            --border: #d0d0c8;
+            --border-dot: #c0c0b8;
+            --surface: #f2f2ee;
+            --code-bg: #f0ede6;
+            --code-text: #6b4c1a;
+            --pre-bg: #1c1c1a;
+            --pre-text: #e8e4da;
+            --radius: 2px;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-            font-size: 17px;
-            line-height: 1.75;
+            font-family: 'Arcadia', system-ui, sans-serif;
+            font-size: 16px;
+            line-height: 1.7;
             color: var(--text);
             background: var(--bg);
+            font-weight: 400;
         }
 
-        .page {
-            max-width: 52rem;
-            margin: 0 auto;
-            padding: 0 2rem;
-        }
+        .page { max-width: 50rem; margin: 0 auto; padding: 0 2rem; }
 
         /* --- Top bar --- */
         .topbar {
             background: var(--pre-bg);
-            color: var(--pre-text);
-            padding: 0.65rem 0;
-            font-size: 0.85rem;
+            padding: 0.6rem 0;
+            font-size: 0.8rem;
+            letter-spacing: 0.04em;
         }
-        .topbar .page {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
+        .topbar .page { display: flex; align-items: center; justify-content: space-between; }
         .topbar .brand {
             font-weight: 700;
-            font-size: 1.05rem;
-            color: var(--accent-glow);
+            font-size: 0.85rem;
+            color: var(--accent);
             text-decoration: none;
-            letter-spacing: 0.02em;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
         }
         .topbar .brand:hover { color: #fff; }
-        .topbar .tagline {
-            color: var(--pre-comment);
-            font-size: 0.82rem;
-        }
+        .topbar .tagline { color: #706a60; font-size: 0.75rem; letter-spacing: 0.06em; }
 
         /* --- Navigation --- */
-        .sidebar-nav {
-            background: var(--bg-warm);
-            border-bottom: 1px solid var(--border);
-            padding: 0.75rem 0;
+        .nav-bar {
+            border-bottom: 1px dotted var(--border-dot);
+            padding: 0.6rem 0;
             position: sticky;
             top: 0;
             z-index: 10;
+            background: var(--bg);
         }
-        .sidebar-nav .page {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.15rem 0;
-        }
-        .sidebar-nav a {
-            color: var(--text-soft);
+        .nav-bar .page { display: flex; flex-wrap: wrap; gap: 0; }
+        .nav-bar a {
+            color: var(--text-2);
             text-decoration: none;
-            font-size: 0.82rem;
+            font-size: 0.78rem;
             font-weight: 500;
-            padding: 0.3rem 0.7rem;
-            border-radius: 99px;
-            transition: all 0.15s ease;
+            padding: 0.25rem 0.6rem;
+            letter-spacing: 0.02em;
+            border-radius: var(--radius);
         }
-        .sidebar-nav a:hover {
-            color: var(--accent-hover);
-            background: var(--accent-light);
-        }
+        .nav-bar a:hover { color: var(--accent); background: var(--accent-bg); }
 
         /* --- Content --- */
-        .content {
-            padding: 2.5rem 0 4rem;
-        }
+        .content { padding: 3rem 0 4rem; }
 
         .content h1 {
-            font-size: 2.2rem;
+            font-size: 2rem;
             font-weight: 700;
-            color: var(--text);
             letter-spacing: -0.02em;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.25rem;
         }
         .content .subtitle {
-            color: var(--text-faint);
-            font-size: 1.05rem;
+            color: var(--text-3);
+            font-size: 0.95rem;
             margin-bottom: 2.5rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px dotted var(--border-dot);
         }
 
         .content h2 {
-            font-size: 1.45rem;
+            font-size: 1.25rem;
             font-weight: 600;
-            color: var(--text);
+            letter-spacing: -0.01em;
             margin-top: 3rem;
-            margin-bottom: 0.75rem;
-            padding-bottom: 0.4rem;
-            border-bottom: 2px solid var(--border-light);
+            margin-bottom: 0.6rem;
+            padding-top: 1.5rem;
+            border-top: 1px dotted var(--border-dot);
         }
+        .content h2:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
 
         .content h3 {
-            font-size: 1.1rem;
+            font-size: 1rem;
             font-weight: 600;
-            color: var(--text-soft);
-            margin-top: 2rem;
-            margin-bottom: 0.5rem;
+            color: var(--text-2);
+            margin-top: 1.75rem;
+            margin-bottom: 0.4rem;
         }
 
-        .content p {
-            margin: 0.85rem 0;
-        }
+        .content p { margin: 0.7rem 0; }
+        .content ul, .content ol { margin: 0.7rem 0; padding-left: 1.4rem; }
+        .content li { margin: 0.2rem 0; }
+        .content li::marker { color: var(--text-3); }
 
-        .content ul, .content ol {
-            margin: 0.85rem 0;
-            padding-left: 1.5rem;
-        }
-        .content li {
-            margin: 0.35rem 0;
-        }
-        .content li::marker {
-            color: var(--accent);
-        }
-
-        /* --- Inline code --- */
+        /* --- Code --- */
         .content code {
-            font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', Menlo, monospace;
-            font-size: 0.88em;
+            font-family: 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+            font-size: 0.85em;
             background: var(--code-bg);
             color: var(--code-text);
-            padding: 0.15em 0.45em;
-            border-radius: 6px;
-            font-weight: 500;
+            padding: 0.12em 0.35em;
+            border-radius: var(--radius);
         }
-
-        /* --- Code blocks --- */
         .content pre {
             background: var(--pre-bg);
             color: var(--pre-text);
-            padding: 1.4rem 1.6rem;
+            padding: 1.25rem 1.5rem;
             border-radius: var(--radius);
             overflow-x: auto;
-            margin: 1.25rem 0;
-            line-height: 1.55;
-            border: 1px solid rgba(255,255,255,0.06);
-            box-shadow: 0 4px 16px rgba(44,36,24,0.12);
+            margin: 1rem 0;
+            line-height: 1.5;
+            border: 1px solid #2a2a28;
         }
         .content pre code {
             background: none;
             color: inherit;
             padding: 0;
-            font-size: 0.85em;
+            font-size: 0.82em;
             font-weight: 400;
         }
 
+        /* --- Syntax highlighting --- */
+        .kw { color: #e0a040; }
+        .ty { color: #8cbd6a; }
+        .st { color: #8cbd6a; }
+        .nu { color: #d4a0c0; }
+        .cm { color: #666660; font-style: italic; }
+        .fn { color: #6abcd4; }
+        .op { color: #b8a080; }
+
         /* --- Links --- */
-        .content a {
-            color: var(--link);
-            text-decoration: underline;
-            text-decoration-color: var(--border);
-            text-underline-offset: 2px;
-            transition: all 0.15s ease;
-        }
-        .content a:hover {
-            color: var(--link-hover);
-            text-decoration-color: var(--link-hover);
-        }
+        .content a { color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--border-dot); }
+        .content a:hover { color: var(--accent-hover); border-bottom-color: var(--accent); }
 
         /* --- Blockquotes --- */
         .content blockquote {
-            border-left: 4px solid var(--accent);
-            padding: 0.75rem 1.25rem;
-            margin: 1.25rem 0;
-            background: var(--accent-light);
-            border-radius: 0 var(--radius) var(--radius) 0;
-            color: var(--text-soft);
-            font-style: italic;
+            border-left: 3px solid var(--accent);
+            padding: 0.6rem 1rem;
+            margin: 1rem 0;
+            background: var(--accent-bg);
+            border-radius: var(--radius);
+            color: var(--text-2);
         }
-        .content blockquote p { margin: 0.3rem 0; }
+        .content blockquote p { margin: 0.2rem 0; }
 
-        /* --- Strong and emphasis --- */
-        .content strong { color: var(--text); font-weight: 600; }
-        .content em { color: var(--text-soft); }
-
-        /* --- Horizontal rule --- */
-        .content hr {
-            border: none;
-            border-top: 2px solid var(--border-light);
-            margin: 2.5rem 0;
-        }
+        .content strong { font-weight: 600; }
+        .content em { color: var(--text-2); }
+        .content hr { border: none; border-top: 1px dotted var(--border-dot); margin: 2.5rem 0; }
 
         /* --- Tables --- */
-        .content table {
-            border-collapse: collapse;
-            width: 100%;
+        .content table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: 0.88em; }
+        .content th {
+            background: var(--surface);
+            font-weight: 600;
+            text-align: left;
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .content td { padding: 0.45rem 0.75rem; border-bottom: 1px dotted var(--border-dot); }
+        .content tr:last-child td { border-bottom: none; }
+
+        /* --- Callouts --- */
+        .content .callout {
+            padding: 0.9rem 1.1rem;
+            border-radius: var(--radius);
             margin: 1.25rem 0;
             font-size: 0.92em;
-            border-radius: var(--radius);
-            overflow: hidden;
-            border: 1px solid var(--border);
+            border-left: 3px solid;
         }
-        .content th {
-            background: var(--bg-warm);
-            font-weight: 600;
-            color: var(--text);
-            text-align: left;
-            padding: 0.6rem 0.9rem;
-            border-bottom: 2px solid var(--border);
-        }
-        .content td {
-            padding: 0.55rem 0.9rem;
-            border-bottom: 1px solid var(--border-light);
-        }
-        .content tr:last-child td { border-bottom: none; }
-        .content tr:hover td { background: var(--bg-warm); }
+        .content .callout-tip { background: #f0f7ee; border-color: #4a8c3f; }
+        .content .callout-warn { background: var(--accent-bg); border-color: var(--accent); }
+        .content .callout-note { background: #eef3fa; border-color: #4a72a0; }
+        .content .callout p { margin: 0.25rem 0; }
+        .content .callout strong { display: block; margin-bottom: 0.2rem; font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.05em; }
 
-        /* --- Footer --- */
-        .footer {
-            padding: 2rem 0;
-            border-top: 1px solid var(--border);
-            color: var(--text-faint);
-            font-size: 0.85rem;
-            text-align: center;
-        }
-
-        /* --- Page navigation (prev/next) --- */
+        /* --- Prev/Next --- */
         .page-nav {
             display: flex;
             justify-content: space-between;
-            padding: 2rem 0;
+            padding: 1.5rem 0;
             margin-top: 2rem;
-            border-top: 1px solid var(--border);
+            border-top: 1px dotted var(--border-dot);
         }
         .page-nav a {
-            color: var(--text-soft);
+            color: var(--text-2);
             text-decoration: none;
             font-weight: 500;
-            padding: 0.5rem 1rem;
+            font-size: 0.88rem;
+            padding: 0.4rem 0.8rem;
+            border: 1px dotted var(--border-dot);
             border-radius: var(--radius);
-            border: 1px solid var(--border);
-            transition: all 0.15s ease;
-            max-width: 45%;
         }
-        .page-nav a:hover {
-            color: var(--accent-hover);
-            border-color: var(--accent);
-            background: var(--accent-light);
-        }
+        .page-nav a:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-bg); }
         .page-nav .prev::before { content: '\2190\00a0'; }
         .page-nav .next::after { content: '\00a0\2192'; }
 
-        /* --- Callout boxes --- */
-        .content .callout {
-            padding: 1rem 1.25rem;
-            border-radius: var(--radius);
-            margin: 1.25rem 0;
-            font-size: 0.95em;
+        /* --- Footer --- */
+        .footer {
+            padding: 1.5rem 0;
+            border-top: 1px dotted var(--border-dot);
+            color: var(--text-3);
+            font-size: 0.78rem;
+            text-align: center;
+            letter-spacing: 0.03em;
         }
-        .content .callout-tip {
-            background: #f0fdf4;
-            border-left: 4px solid #16a34a;
-        }
-        .content .callout-warn {
-            background: #fffbeb;
-            border-left: 4px solid #d97706;
-        }
-        .content .callout-note {
-            background: #eff6ff;
-            border-left: 4px solid #3b82f6;
-        }
-        .content .callout p { margin: 0.3rem 0; }
-        .content .callout strong { display: block; margin-bottom: 0.25rem; }
 
-        /* --- Responsive --- */
         @media (max-width: 640px) {
-            body { font-size: 16px; }
-            .page { padding: 0 1.25rem; }
-            .content h1 { font-size: 1.75rem; }
-            .content pre { padding: 1rem; font-size: 0.82em; }
-            .sidebar-nav a { font-size: 0.78rem; padding: 0.25rem 0.5rem; }
+            body { font-size: 15px; }
+            .page { padding: 0 1rem; }
+            .content h1 { font-size: 1.6rem; }
+            .content pre { padding: 0.9rem 1rem; font-size: 0.8em; }
         }
-        /* Syntax highlighting */
-        .kw { color: #fbbf24; }
-        .ty { color: #a7d28b; }
-        .st { color: #a7d28b; }
-        .nu { color: #f0a8d0; }
-        .cm { color: #7a7060; font-style: italic; }
-        .fn { color: #7dd3fc; }
-        .op { color: #d4a574; }
     </style>
 </head>
 <body>
-    <div class="topbar">
-        <div class="page">
-            <a href="index.html" class="brand">basalt</a>
-            <span class="tagline">a language that tells the truth</span>
-        </div>
-    </div>
-    <div class="sidebar-nav">
-        <div class="page"><a href="index.html">Home</a> <a href="types.html">Types</a> <a href="variables.html">Variables</a> <a href="functions.html">Functions</a> <a href="control-flow.html">Control Flow</a> <a href="pattern-matching.html">Pattern Matching</a> <a href="error-handling.html">Error Handling</a> <a href="structs.html">Structs</a> <a href="enums.html">Enums</a> <a href="closures.html">Closures</a> <a href="modules.html">Modules</a> <a href="stdlib.html">Standard Library</a> <a href="capabilities.html">Capabilities</a> <a href="conversions.html">Type Conversions</a></div>
-    </div>
+    <div class="topbar"><div class="page">
+        <a href="index.html" class="brand">Basalt</a>
+        <span class="tagline">a language that tells the truth</span>
+    </div></div>
+    <div class="nav-bar"><div class="page"><a href="index.html">Home</a> <a href="types.html">Types</a> <a href="variables.html">Variables</a> <a href="functions.html">Functions</a> <a href="control-flow.html">Control Flow</a> <a href="pattern-matching.html">Pattern Matching</a> <a href="error-handling.html">Error Handling</a> <a href="structs.html">Structs</a> <a href="enums.html">Enums</a> <a href="closures.html">Closures</a> <a href="modules.html">Modules</a> <a href="stdlib.html">Standard Library</a> <a href="capabilities.html">Capabilities</a> <a href="conversions.html">Type Conversions</a></div></div>
     <div class="page">
         <article class="content">
             <h1>Type Conversions</h1>
@@ -460,9 +380,7 @@ Even "safe" conversions like <code>i32</code> to <code>i64</code> require an exp
             <a href="capabilities.html" class="prev">Capabilities</a>
             
         </nav>
-        <footer class="footer">
-            Built with a static site generator written in Basalt
-        </footer>
+        <footer class="footer">Built with a static site generator written in Basalt</footer>
     </div>
 </body>
 </html>
