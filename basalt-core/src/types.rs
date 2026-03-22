@@ -468,13 +468,14 @@ impl TypeChecker {
                 // A union is assignable to T only if ALL members are assignable to T
                 members.iter().all(|m| self.is_assignable(m, &to))
             }
-            // Empty array is compatible with any array type
+            // Empty array [nil] is compatible with any array type
             (Type::Array(inner_from), Type::Array(inner_to)) => {
-                self.is_assignable(inner_from, inner_to)
+                **inner_from == Type::Nil || self.is_assignable(inner_from, inner_to)
             }
-            // Empty map is compatible with any map type
+            // Empty map [nil:nil] is compatible with any map type
             (Type::Map(kf, vf), Type::Map(kt, vt)) => {
-                self.is_assignable(kf, kt) && self.is_assignable(vf, vt)
+                (**kf == Type::Nil && **vf == Type::Nil)
+                    || (self.is_assignable(kf, kt) && self.is_assignable(vf, vt))
             }
             // Subtype compatibility
             (Type::Struct(sub), Type::Struct(parent))

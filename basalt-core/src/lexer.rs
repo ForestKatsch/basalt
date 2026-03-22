@@ -186,7 +186,10 @@ impl Lexer {
                     // Multiline string
                     let tok = self.lex_multiline_string()?;
                     tokens.push(self.make_token(tok, line, col));
-                    last_was_newline = false;
+                    // The multiline string consumed through newlines, so emit
+                    // a newline token to terminate the statement.
+                    tokens.push(self.make_token(Token::Newline, self.line, self.col));
+                    last_was_newline = true;
                     continue;
                 }
                 Some(ch) => {

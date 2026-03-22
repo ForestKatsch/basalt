@@ -1317,8 +1317,8 @@ impl Parser {
             let pattern = self.parse_pattern()?;
             self.expect(&Token::FatArrow)?;
             self.skip_newlines();
-            let body = if *self.peek() == Token::Return {
-                // Return statement in match arm - wrap in a block
+            let body = if matches!(self.peek(), Token::Return | Token::Break | Token::Continue) {
+                // Statement in match arm - wrap in a block
                 let stmt = self.parse_stmt()?;
                 Expr::Block(Block { stmts: vec![stmt] })
             } else if *self.peek() == Token::LBrace {
