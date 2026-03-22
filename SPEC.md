@@ -2,7 +2,8 @@
 
 This document describes the Basalt programming language in sufficient detail to
 implement a compatible compiler and runtime from scratch. It covers syntax,
-semantics, the type system, the standard library, and the embedding API.
+semantics, the type system, the standard library, and the capability system.
+For the embedding API, see [EMBEDDING.md](EMBEDDING.md).
 
 ## Table of Contents
 
@@ -18,8 +19,7 @@ semantics, the type system, the standard library, and the embedding API.
 10. [Modules](#10-modules)
 11. [Standard Library](#11-standard-library)
 12. [Capabilities and IO](#12-capabilities-and-io)
-13. [Embedding API](#13-embedding-api)
-14. [Grammar Summary](#14-grammar-summary)
+13. [Grammar Summary](#13-grammar-summary)
 
 ---
 
@@ -1534,75 +1534,12 @@ host controls what capabilities are available.
 
 ### 12.4 Host Objects
 
-The embedding host can inject custom capability objects:
-
-```rust
-// Rust host code
-struct GameApi;
-impl HostObject for GameApi {
-    fn call_method(&self, name: &str, args: &[Value]) -> Result<Value, String> {
-        match name {
-            "get_time" => Ok(Value::float(0.0)),
-            _ => Err(format!("unknown method: {name}"))
-        }
-    }
-    fn type_name(&self) -> &str { "GameApi" }
-}
-vm.set_global("game", Value::host_object(GameApi));
-```
+See [EMBEDDING.md](EMBEDDING.md) for the host object trait and the embedding
+API including compilation, VM interaction, value types, and runtime limits.
 
 ---
 
-## 13. Embedding API
-
-### 13.1 Compilation
-
-```rust
-use basalt_core::Engine;
-
-let engine = Engine::new();
-let result = engine.run_source(source)?;
-```
-
-### 13.2 VM Interaction
-
-```rust
-let mut vm = basalt_vm::VM::new(program);
-
-// Inject host globals
-vm.set_global("game", Value::host_object(MyApi));
-
-// Execute
-let result = vm.run()?;
-```
-
-### 13.3 Value Types
-
-The `Value` type is an untagged 8-byte slot. The host must use the
-correct constructor for the intended type — the VM interprets the raw
-bits according to the compiler's type information, not runtime tags.
-Constructors:
-
-```rust
-Value::int(42)
-Value::float(3.14)
-Value::bool(true)
-Value::string("hello".to_string())
-Value::array(vec![Value::int(1), Value::int(2)])
-Value::map(indexmap! { Value::string("a") => Value::int(1) })
-Value::NIL
-Value::host_object(my_obj)     // custom host object
-```
-
-### 13.4 Runtime Limits
-
-| Limit             | Default | Description                                      |
-| ----------------- | ------- | ------------------------------------------------ |
-| Max call depth    | 512     | Prevents stack overflow from deep recursion      |
-| Max registers     | 256K    | Prevents memory exhaustion from deep call stacks |
-| Max instructions  | 100M    | Prevents infinite loops (execution fuel)         |
-| Max string repeat | 16 MiB  | Prevents OOM from `string.repeat()`              |
-
+## 13. Grammar Summary
 ---
 
 ## 14. Grammar Summary
