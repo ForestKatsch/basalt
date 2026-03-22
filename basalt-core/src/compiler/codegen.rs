@@ -405,7 +405,14 @@ impl Compiler {
         match &expr.kind {
             TypedExprKind::IntLit(n) => {
                 let reg = fc.alloc_reg();
-                fc.emit(Op::LoadInt(reg, *n));
+                match &expr.ty {
+                    Type::U8 | Type::U16 | Type::U32 | Type::U64 => {
+                        fc.emit(Op::LoadUInt(reg, *n as u64));
+                    }
+                    _ => {
+                        fc.emit(Op::LoadInt(reg, *n as i64));
+                    }
+                }
                 Ok(reg)
             }
             TypedExprKind::FloatLit(f) => {
@@ -1219,7 +1226,7 @@ impl Compiler {
         fc: &mut FnCompiler,
         scrutinee_reg: u16,
         pattern: &Pattern,
-        _scrutinee_ty: &Type,
+        scrutinee_ty: &Type,
     ) -> Result<Option<usize>, String> {
         match &pattern.kind {
             PatternKind::Wildcard | PatternKind::Binding(_) => {
@@ -1229,7 +1236,14 @@ impl Compiler {
             PatternKind::IntLit(n) => {
                 let cmp_reg = fc.alloc_reg();
                 let val_reg = fc.alloc_reg();
-                fc.emit(Op::LoadInt(val_reg, *n));
+                match scrutinee_ty {
+                    Type::U8 | Type::U16 | Type::U32 | Type::U64 => {
+                        fc.emit(Op::LoadUInt(val_reg, *n as u64));
+                    }
+                    _ => {
+                        fc.emit(Op::LoadInt(val_reg, *n as i64));
+                    }
+                }
                 fc.emit(Op::EqInt(cmp_reg, scrutinee_reg, val_reg));
                 let jump = fc.emit(Op::JumpIfFalse(cmp_reg, 0));
                 Ok(Some(jump))

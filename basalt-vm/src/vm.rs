@@ -175,6 +175,9 @@ impl VM {
                 Op::LoadInt(d, n) => {
                     reg[d as usize] = Value::int(n);
                 }
+                Op::LoadUInt(d, n) => {
+                    reg[d as usize] = Value::uint(n);
+                }
                 Op::LoadFloat(d, f) => {
                     reg[d as usize] = Value::float(f);
                 }
@@ -194,90 +197,117 @@ impl VM {
                 }
 
                 // === Integer Arithmetic ===
-                Op::AddInt(d, a, b) => {
-                    let va = reg[a as usize].try_as_int()?;
-                    let vb = reg[b as usize].try_as_int()?;
-                    reg[d as usize] = match va.checked_add(vb) {
-                        Some(r) => Value::int(r),
-                        None => {
-                            return Err(format!(
-                                "integer overflow: {} + {} exceeds i64 range",
-                                va, vb
-                            ))
-                        }
-                    };
-                }
-                Op::SubInt(d, a, b) => {
-                    let va = reg[a as usize].try_as_int()?;
-                    let vb = reg[b as usize].try_as_int()?;
-                    reg[d as usize] = match va.checked_sub(vb) {
-                        Some(r) => Value::int(r),
-                        None => {
-                            return Err(format!(
-                                "integer overflow: {} - {} exceeds i64 range",
-                                va, vb
-                            ))
-                        }
-                    };
-                }
-                Op::MulInt(d, a, b) => {
-                    let va = reg[a as usize].try_as_int()?;
-                    let vb = reg[b as usize].try_as_int()?;
-                    reg[d as usize] = match va.checked_mul(vb) {
-                        Some(r) => Value::int(r),
-                        None => {
-                            return Err(format!(
-                                "integer overflow: {} * {} exceeds i64 range",
-                                va, vb
-                            ))
-                        }
-                    };
-                }
-                Op::DivInt(d, a, b) => {
-                    let va = reg[a as usize].try_as_int()?;
-                    let vb = reg[b as usize].try_as_int()?;
-                    if vb == 0 {
-                        return Err("division by zero".to_string());
+                Op::AddInt(d, a, b) => match (&reg[a as usize], &reg[b as usize]) {
+                    (Value::Int(va), Value::Int(vb)) => {
+                        reg[d as usize] = match va.checked_add(*vb) {
+                            Some(r) => Value::int(r),
+                            None => return Err(format!("integer overflow: {} + {}", va, vb)),
+                        };
                     }
-                    reg[d as usize] = match va.checked_div(vb) {
-                        Some(r) => Value::int(r),
-                        None => return Err(format!("integer overflow: {} / {}", va, vb)),
-                    };
-                }
-                Op::ModInt(d, a, b) => {
-                    let va = reg[a as usize].try_as_int()?;
-                    let vb = reg[b as usize].try_as_int()?;
-                    if vb == 0 {
-                        return Err("modulo by zero".to_string());
+                    (Value::UInt(va), Value::UInt(vb)) => {
+                        reg[d as usize] = match va.checked_add(*vb) {
+                            Some(r) => Value::uint(r),
+                            None => return Err(format!("integer overflow: {} + {}", va, vb)),
+                        };
                     }
-                    reg[d as usize] = match va.checked_rem(vb) {
-                        Some(r) => Value::int(r),
-                        None => return Err(format!("integer overflow: {} % {}", va, vb)),
-                    };
-                }
-                Op::PowInt(d, a, b) => {
-                    let base = reg[a as usize].try_as_int()?;
-                    let exp = reg[b as usize].try_as_int()?;
-                    if exp < 0 {
-                        return Err("negative exponent for integer power".to_string());
+                    _ => return Err("type mismatch in integer addition".to_string()),
+                },
+                Op::SubInt(d, a, b) => match (&reg[a as usize], &reg[b as usize]) {
+                    (Value::Int(va), Value::Int(vb)) => {
+                        reg[d as usize] = match va.checked_sub(*vb) {
+                            Some(r) => Value::int(r),
+                            None => return Err(format!("integer overflow: {} - {}", va, vb)),
+                        };
                     }
-                    reg[d as usize] = match checked_pow_i64(base, exp as u64) {
-                        Some(r) => Value::int(r),
-                        None => {
-                            return Err(format!(
-                                "integer overflow: {} ** {} exceeds i64 range",
-                                base, exp
-                            ))
+                    (Value::UInt(va), Value::UInt(vb)) => {
+                        reg[d as usize] = match va.checked_sub(*vb) {
+                            Some(r) => Value::uint(r),
+                            None => return Err(format!("integer overflow: {} - {}", va, vb)),
+                        };
+                    }
+                    _ => return Err("type mismatch in integer subtraction".to_string()),
+                },
+                Op::MulInt(d, a, b) => match (&reg[a as usize], &reg[b as usize]) {
+                    (Value::Int(va), Value::Int(vb)) => {
+                        reg[d as usize] = match va.checked_mul(*vb) {
+                            Some(r) => Value::int(r),
+                            None => return Err(format!("integer overflow: {} * {}", va, vb)),
+                        };
+                    }
+                    (Value::UInt(va), Value::UInt(vb)) => {
+                        reg[d as usize] = match va.checked_mul(*vb) {
+                            Some(r) => Value::uint(r),
+                            None => return Err(format!("integer overflow: {} * {}", va, vb)),
+                        };
+                    }
+                    _ => return Err("type mismatch in integer multiplication".to_string()),
+                },
+                Op::DivInt(d, a, b) => match (&reg[a as usize], &reg[b as usize]) {
+                    (Value::Int(va), Value::Int(vb)) => {
+                        if *vb == 0 {
+                            return Err("division by zero".to_string());
                         }
-                    };
-                }
-                Op::NegInt(d, s) => {
-                    let v = reg[s as usize].try_as_int()?;
-                    reg[d as usize] = match v.checked_neg() {
-                        Some(r) => Value::int(r),
-                        None => return Err(format!("integer overflow: -{} exceeds i64 range", v)),
-                    };
-                }
+                        reg[d as usize] = match va.checked_div(*vb) {
+                            Some(r) => Value::int(r),
+                            None => return Err(format!("integer overflow: {} / {}", va, vb)),
+                        };
+                    }
+                    (Value::UInt(va), Value::UInt(vb)) => {
+                        if *vb == 0 {
+                            return Err("division by zero".to_string());
+                        }
+                        reg[d as usize] = Value::uint(va / vb);
+                    }
+                    _ => return Err("type mismatch in integer division".to_string()),
+                },
+                Op::ModInt(d, a, b) => match (&reg[a as usize], &reg[b as usize]) {
+                    (Value::Int(va), Value::Int(vb)) => {
+                        if *vb == 0 {
+                            return Err("modulo by zero".to_string());
+                        }
+                        reg[d as usize] = match va.checked_rem(*vb) {
+                            Some(r) => Value::int(r),
+                            None => return Err(format!("integer overflow: {} % {}", va, vb)),
+                        };
+                    }
+                    (Value::UInt(va), Value::UInt(vb)) => {
+                        if *vb == 0 {
+                            return Err("modulo by zero".to_string());
+                        }
+                        reg[d as usize] = Value::uint(va % vb);
+                    }
+                    _ => return Err("type mismatch in integer modulo".to_string()),
+                },
+                Op::PowInt(d, a, b) => match (&reg[a as usize], &reg[b as usize]) {
+                    (Value::Int(va), Value::Int(vb)) => {
+                        if *vb < 0 {
+                            return Err("negative exponent for integer power".to_string());
+                        }
+                        reg[d as usize] = match checked_pow_i64(*va, *vb as u64) {
+                            Some(r) => Value::int(r),
+                            None => return Err(format!("integer overflow: {} ** {}", va, vb)),
+                        };
+                    }
+                    (Value::UInt(va), Value::UInt(vb)) => {
+                        reg[d as usize] = match checked_pow_u64(*va, *vb) {
+                            Some(r) => Value::uint(r),
+                            None => return Err(format!("integer overflow: {} ** {}", va, vb)),
+                        };
+                    }
+                    _ => return Err("type mismatch in integer power".to_string()),
+                },
+                Op::NegInt(d, s) => match &reg[s as usize] {
+                    Value::Int(v) => {
+                        reg[d as usize] = match v.checked_neg() {
+                            Some(r) => Value::int(r),
+                            None => return Err(format!("integer overflow: -{}", v)),
+                        };
+                    }
+                    Value::UInt(_) => {
+                        return Err("cannot negate unsigned integer".to_string());
+                    }
+                    _ => return Err("expected integer for negation".to_string()),
+                },
 
                 // === Float Arithmetic ===
                 Op::AddFloat(d, a, b) => {
@@ -332,28 +362,26 @@ impl VM {
 
                 // === Integer Comparisons ===
                 Op::EqInt(d, a, b) => {
-                    reg[d as usize] =
-                        Value::bool(reg[a as usize].try_as_int()? == reg[b as usize].try_as_int()?);
+                    reg[d as usize] = Value::bool(int_cmp_eq(&reg[a as usize], &reg[b as usize])?);
                 }
                 Op::NeqInt(d, a, b) => {
-                    reg[d as usize] =
-                        Value::bool(reg[a as usize].try_as_int()? != reg[b as usize].try_as_int()?);
+                    reg[d as usize] = Value::bool(!int_cmp_eq(&reg[a as usize], &reg[b as usize])?);
                 }
                 Op::LtInt(d, a, b) => {
                     reg[d as usize] =
-                        Value::bool(reg[a as usize].try_as_int()? < reg[b as usize].try_as_int()?);
+                        Value::bool(int_cmp(&reg[a as usize], &reg[b as usize])?.is_lt());
                 }
                 Op::LteInt(d, a, b) => {
                     reg[d as usize] =
-                        Value::bool(reg[a as usize].try_as_int()? <= reg[b as usize].try_as_int()?);
+                        Value::bool(!int_cmp(&reg[a as usize], &reg[b as usize])?.is_gt());
                 }
                 Op::GtInt(d, a, b) => {
                     reg[d as usize] =
-                        Value::bool(reg[a as usize].try_as_int()? > reg[b as usize].try_as_int()?);
+                        Value::bool(int_cmp(&reg[a as usize], &reg[b as usize])?.is_gt());
                 }
                 Op::GteInt(d, a, b) => {
                     reg[d as usize] =
-                        Value::bool(reg[a as usize].try_as_int()? >= reg[b as usize].try_as_int()?);
+                        Value::bool(!int_cmp(&reg[a as usize], &reg[b as usize])?.is_lt());
                 }
 
                 // === Float Comparisons ===
@@ -460,46 +488,73 @@ impl VM {
                 }
 
                 // === Bitwise ===
-                Op::BitAnd(d, a, b) => {
-                    reg[d as usize] =
-                        Value::int(reg[a as usize].try_as_int()? & reg[b as usize].try_as_int()?);
-                }
-                Op::BitOr(d, a, b) => {
-                    reg[d as usize] =
-                        Value::int(reg[a as usize].try_as_int()? | reg[b as usize].try_as_int()?);
-                }
-                Op::BitXor(d, a, b) => {
-                    reg[d as usize] =
-                        Value::int(reg[a as usize].try_as_int()? ^ reg[b as usize].try_as_int()?);
-                }
-                Op::BitNot(d, s) => {
-                    reg[d as usize] = Value::int(!reg[s as usize].try_as_int()?);
-                }
+                Op::BitAnd(d, a, b) => match (&reg[a as usize], &reg[b as usize]) {
+                    (Value::Int(va), Value::Int(vb)) => reg[d as usize] = Value::int(va & vb),
+                    (Value::UInt(va), Value::UInt(vb)) => reg[d as usize] = Value::uint(va & vb),
+                    _ => return Err("type mismatch in bitwise and".to_string()),
+                },
+                Op::BitOr(d, a, b) => match (&reg[a as usize], &reg[b as usize]) {
+                    (Value::Int(va), Value::Int(vb)) => reg[d as usize] = Value::int(va | vb),
+                    (Value::UInt(va), Value::UInt(vb)) => reg[d as usize] = Value::uint(va | vb),
+                    _ => return Err("type mismatch in bitwise or".to_string()),
+                },
+                Op::BitXor(d, a, b) => match (&reg[a as usize], &reg[b as usize]) {
+                    (Value::Int(va), Value::Int(vb)) => reg[d as usize] = Value::int(va ^ vb),
+                    (Value::UInt(va), Value::UInt(vb)) => reg[d as usize] = Value::uint(va ^ vb),
+                    _ => return Err("type mismatch in bitwise xor".to_string()),
+                },
+                Op::BitNot(d, s) => match &reg[s as usize] {
+                    Value::Int(v) => reg[d as usize] = Value::int(!v),
+                    Value::UInt(v) => reg[d as usize] = Value::uint(!v),
+                    _ => return Err("expected integer for bitwise not".to_string()),
+                },
                 Op::ShiftLeft(d, a, b) => {
                     let shift = reg[b as usize].try_as_int()?;
                     if !(0..=63).contains(&shift) {
                         return Err(format!("shift amount {} out of range", shift));
                     }
-                    reg[d as usize] = Value::int(reg[a as usize].try_as_int()? << shift);
+                    match &reg[a as usize] {
+                        Value::Int(v) => reg[d as usize] = Value::int(v << shift),
+                        Value::UInt(v) => reg[d as usize] = Value::uint(v << shift as u64),
+                        _ => return Err("expected integer for shift".to_string()),
+                    }
                 }
                 Op::ShiftRight(d, a, b) => {
                     let shift = reg[b as usize].try_as_int()?;
                     if !(0..=63).contains(&shift) {
                         return Err(format!("shift amount {} out of range", shift));
                     }
-                    reg[d as usize] = Value::int(reg[a as usize].try_as_int()? >> shift);
+                    match &reg[a as usize] {
+                        Value::Int(v) => reg[d as usize] = Value::int(v >> shift),
+                        Value::UInt(v) => reg[d as usize] = Value::uint(v >> shift as u64),
+                        _ => return Err("expected integer for shift".to_string()),
+                    }
                 }
 
                 // === Type Conversions ===
                 Op::IntToFloat(d, s) => {
-                    reg[d as usize] = Value::float(reg[s as usize].try_as_int()? as f64);
+                    reg[d as usize] = match &reg[s as usize] {
+                        Value::Int(n) => Value::float(*n as f64),
+                        Value::UInt(n) => Value::float(*n as f64),
+                        _ => {
+                            return Err(format!(
+                                "expected integer, got {}",
+                                reg[s as usize].type_tag()
+                            ))
+                        }
+                    };
                 }
                 Op::FloatToInt(d, s) => {
                     let f = reg[s as usize].try_as_float()?;
                     if f.is_nan() || f.is_infinite() {
                         return Err(format!("cannot convert {} to integer", f));
                     }
-                    reg[d as usize] = Value::int(f as i64);
+                    // If the value is non-negative and exceeds i64::MAX, produce UInt
+                    if f >= 0.0 && f > i64::MAX as f64 {
+                        reg[d as usize] = Value::uint(f as u64);
+                    } else {
+                        reg[d as usize] = Value::int(f as i64);
+                    }
                 }
                 Op::FloatToIntSafe(d, s) => {
                     let f = reg[s as usize].try_as_float()?;
@@ -510,7 +565,16 @@ impl VM {
                     }
                 }
                 Op::IntToString(d, s) => {
-                    reg[d as usize] = Value::string(reg[s as usize].try_as_int()?.to_string());
+                    reg[d as usize] = match &reg[s as usize] {
+                        Value::Int(n) => Value::string(n.to_string()),
+                        Value::UInt(n) => Value::string(n.to_string()),
+                        _ => {
+                            return Err(format!(
+                                "expected integer, got {}",
+                                reg[s as usize].type_tag()
+                            ))
+                        }
+                    };
                 }
                 Op::FloatToString(d, s) => {
                     reg[d as usize] = Value::string(format_float(reg[s as usize].try_as_float()?));
@@ -556,15 +620,26 @@ impl VM {
                     };
                 }
                 Op::IntNarrow(d, s, it) => {
-                    reg[d as usize] = Value::int(narrow_int(reg[s as usize].try_as_int()?, it)?);
+                    let val = match &reg[s as usize] {
+                        Value::Int(n) => *n as i128,
+                        Value::UInt(n) => *n as i128,
+                        _ => return Err("expected integer for narrow".to_string()),
+                    };
+                    reg[d as usize] = narrow_int_wide(val, it)?;
                 }
                 Op::IntNarrowSafe(d, s, it) => {
-                    reg[d as usize] = match narrow_int(reg[s as usize].try_as_int()?, it) {
-                        Ok(v) => Value::int(v),
+                    let val = match &reg[s as usize] {
+                        Value::Int(n) => *n as i128,
+                        Value::UInt(n) => *n as i128,
+                        _ => return Err("expected integer for narrow".to_string()),
+                    };
+                    reg[d as usize] = match narrow_int_wide(val, it) {
+                        Ok(v) => v,
                         Err(_) => Value::Nil,
                     };
                 }
                 Op::IntWiden(d, s) => {
+                    // Just copies the value — already widened at load time
                     reg[d as usize] = reg[s as usize].clone();
                 }
 
@@ -2025,6 +2100,7 @@ impl VM {
 fn val_to_map_key(val: &Value) -> Result<MapKey, String> {
     match val {
         Value::Int(n) => Ok(MapKey::Int(*n)),
+        Value::UInt(n) => Ok(MapKey::UInt(*n)),
         Value::Bool(b) => Ok(MapKey::Bool(*b)),
         Value::Heap(href) => {
             let obj = href.borrow();
@@ -2057,56 +2133,62 @@ fn checked_pow_i64(base: i64, exp: u64) -> Option<i64> {
     Some(result)
 }
 
-fn narrow_int(val: i64, target: IntType) -> Result<i64, String> {
+fn narrow_int_wide(val: i128, target: IntType) -> Result<Value, String> {
     match target {
         IntType::I8 => {
-            if val < i8::MIN as i64 || val > i8::MAX as i64 {
+            if val < i8::MIN as i128 || val > i8::MAX as i128 {
                 Err(format!("{} out of range for i8", val))
             } else {
-                Ok(val)
+                Ok(Value::int(val as i64))
             }
         }
         IntType::I16 => {
-            if val < i16::MIN as i64 || val > i16::MAX as i64 {
+            if val < i16::MIN as i128 || val > i16::MAX as i128 {
                 Err(format!("{} out of range for i16", val))
             } else {
-                Ok(val)
+                Ok(Value::int(val as i64))
             }
         }
         IntType::I32 => {
-            if val < i32::MIN as i64 || val > i32::MAX as i64 {
+            if val < i32::MIN as i128 || val > i32::MAX as i128 {
                 Err(format!("{} out of range for i32", val))
             } else {
-                Ok(val)
+                Ok(Value::int(val as i64))
             }
         }
-        IntType::I64 => Ok(val),
+        IntType::I64 => {
+            if val < i64::MIN as i128 || val > i64::MAX as i128 {
+                Err(format!("{} out of range for i64", val))
+            } else {
+                Ok(Value::int(val as i64))
+            }
+        }
         IntType::U8 => {
-            if val < 0 || val > u8::MAX as i64 {
+            if val < 0 || val > u8::MAX as i128 {
                 Err(format!("{} out of range for u8", val))
             } else {
-                Ok(val)
+                Ok(Value::uint(val as u64))
             }
         }
         IntType::U16 => {
-            if val < 0 || val > u16::MAX as i64 {
+            if val < 0 || val > u16::MAX as i128 {
                 Err(format!("{} out of range for u16", val))
             } else {
-                Ok(val)
+                Ok(Value::uint(val as u64))
             }
         }
         IntType::U32 => {
-            if val < 0 || val > u32::MAX as i64 {
+            if val < 0 || val > u32::MAX as i128 {
                 Err(format!("{} out of range for u32", val))
             } else {
-                Ok(val)
+                Ok(Value::uint(val as u64))
             }
         }
         IntType::U64 => {
-            if val < 0 {
+            if val < 0 || val > u64::MAX as i128 {
                 Err(format!("{} out of range for u64", val))
             } else {
-                Ok(val)
+                Ok(Value::uint(val as u64))
             }
         }
     }
@@ -2117,6 +2199,7 @@ fn narrow_int(val: i64, target: IntType) -> Result<i64, String> {
 fn values_identical(a: &Value, b: &Value) -> bool {
     match (a, b) {
         (Value::Int(x), Value::Int(y)) => x == y,
+        (Value::UInt(x), Value::UInt(y)) => x == y,
         (Value::Float(x), Value::Float(y)) => x == y,
         (Value::Bool(x), Value::Bool(y)) => x == y,
         (Value::Nil, Value::Nil) => true,
@@ -2127,9 +2210,8 @@ fn values_identical(a: &Value, b: &Value) -> bool {
 
 fn value_is_type(val: &Value, type_name: &str) -> bool {
     match type_name {
-        "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" => {
-            matches!(val, Value::Int(_))
-        }
+        "i8" | "i16" | "i32" | "i64" => matches!(val, Value::Int(_)),
+        "u8" | "u16" | "u32" | "u64" => matches!(val, Value::Int(_) | Value::UInt(_)),
         "f64" => matches!(val, Value::Float(_)),
         "bool" => matches!(val, Value::Bool(_)),
         "nil" => val.is_nil(),
@@ -2177,6 +2259,41 @@ fn extract_closure(val: &Value) -> Result<(usize, Vec<Value>), String> {
         return Ok((*idx as usize, Vec::new()));
     }
     Err("expected closure argument".to_string())
+}
+
+fn int_cmp_eq(a: &Value, b: &Value) -> Result<bool, String> {
+    match (a, b) {
+        (Value::Int(va), Value::Int(vb)) => Ok(va == vb),
+        (Value::UInt(va), Value::UInt(vb)) => Ok(va == vb),
+        _ => Err("type mismatch in integer comparison".to_string()),
+    }
+}
+
+fn int_cmp(a: &Value, b: &Value) -> Result<std::cmp::Ordering, String> {
+    match (a, b) {
+        (Value::Int(va), Value::Int(vb)) => Ok(va.cmp(vb)),
+        (Value::UInt(va), Value::UInt(vb)) => Ok(va.cmp(vb)),
+        _ => Err("type mismatch in integer comparison".to_string()),
+    }
+}
+
+fn checked_pow_u64(base: u64, exp: u64) -> Option<u64> {
+    if exp == 0 {
+        return Some(1);
+    }
+    let mut result: u64 = 1;
+    let mut b = base;
+    let mut e = exp;
+    while e > 0 {
+        if e & 1 == 1 {
+            result = result.checked_mul(b)?;
+        }
+        e >>= 1;
+        if e > 0 {
+            b = b.checked_mul(b)?;
+        }
+    }
+    Some(result)
 }
 
 /// Resolve a user-provided path within the sandbox root.

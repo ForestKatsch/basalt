@@ -98,7 +98,7 @@ pub struct Expr {
 
 #[derive(Debug, Clone)]
 pub enum ExprKind {
-    IntLit(i64),
+    IntLit(i128),
     FloatLit(f64),
     BoolLit(bool),
     StringLit(String),
@@ -237,7 +237,7 @@ pub struct Pattern {
 #[derive(Debug, Clone)]
 pub enum PatternKind {
     Wildcard,
-    IntLit(i64),
+    IntLit(i128),
     FloatLit(f64),
     BoolLit(bool),
     StringLit(String),

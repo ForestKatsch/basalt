@@ -67,7 +67,8 @@ type information, not runtime tags.
 ```rust
 use basalt_vm::Value;
 
-Value::int(42)
+Value::int(42)              // signed integer (i8-i64)
+Value::uint(255)            // unsigned integer (u8-u64)
 Value::float(3.14)
 Value::bool(true)
 Value::string("hello".to_string())

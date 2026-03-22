@@ -1704,7 +1704,7 @@ fn main() {
     let c = a - b
 }
 "#,
-        "out of range",
+        "integer overflow",
     );
 }
 
@@ -2799,4 +2799,88 @@ fn test_fs_sandbox_escape() {
             || vm.captured_output[0].contains("blocked")
     );
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+// === UInt tests ===
+
+#[test]
+fn test_u64_full_range() {
+    run_expect_output(
+        r#"
+        fn main(stdout: Stdout) {
+            let max: u64 = 18446744073709551615
+            stdout.println(max as string)
+        }
+        "#,
+        &["18446744073709551615"],
+    );
+}
+
+#[test]
+fn test_u64_arithmetic() {
+    run_expect_output(
+        r#"
+        fn main(stdout: Stdout) {
+            let a: u64 = 9223372036854775808
+            let b: u64 = 1
+            stdout.println((a + b) as string)
+        }
+        "#,
+        &["9223372036854775809"],
+    );
+}
+
+#[test]
+fn test_u64_overflow() {
+    run_expect_panic(
+        r#"
+        fn main(stdout: Stdout) {
+            let max: u64 = 18446744073709551615
+            let x = max + (1 as u64)
+        }
+        "#,
+        "integer overflow",
+    );
+}
+
+#[test]
+fn test_u8_basic() {
+    run_expect_output(
+        r#"
+        fn main(stdout: Stdout) {
+            let x: u8 = 255
+            stdout.println(x as string)
+        }
+        "#,
+        &["255"],
+    );
+}
+
+#[test]
+fn test_u32_arithmetic() {
+    run_expect_output(
+        r#"
+        fn main(stdout: Stdout) {
+            let a: u32 = 1000000
+            let b: u32 = 2000000
+            stdout.println((a + b) as string)
+        }
+        "#,
+        &["3000000"],
+    );
+}
+
+#[test]
+fn test_u64_comparison() {
+    run_expect_output(
+        r#"
+        fn main(stdout: Stdout) {
+            let a: u64 = 18446744073709551615
+            let b: u64 = 18446744073709551614
+            stdout.println((a > b) as string)
+            stdout.println((a == b) as string)
+        }
+        "#,
+        &["true", "false"],
+    );
 }

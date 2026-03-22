@@ -5,7 +5,7 @@ use crate::error::CompileError;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
     // Literals
-    IntLit(i64),
+    IntLit(i128),
     FloatLit(f64),
     StringLit(String),
     /// String with interpolations: parts alternate between literal strings and expressions
@@ -533,7 +533,7 @@ impl Lexer {
                     .iter()
                     .filter(|c| **c != '_')
                     .collect();
-                let val = i64::from_str_radix(&hex_str, 16).map_err(|e| {
+                let val = i128::from_str_radix(&hex_str, 16).map_err(|e| {
                     CompileError::new(
                         format!("invalid hex literal: {}", e),
                         Span::new(self.line as u32, self.col as u32),
@@ -562,7 +562,7 @@ impl Lexer {
                     .iter()
                     .filter(|c| **c != '_')
                     .collect();
-                let val = i64::from_str_radix(&bin_str, 2).map_err(|e| {
+                let val = i128::from_str_radix(&bin_str, 2).map_err(|e| {
                     CompileError::new(
                         format!("invalid binary literal: {}", e),
                         Span::new(self.line as u32, self.col as u32),
@@ -637,7 +637,7 @@ impl Lexer {
             })?;
             Ok(Token::FloatLit(val))
         } else {
-            let val: i64 = num_str.parse().map_err(|e| {
+            let val: i128 = num_str.parse().map_err(|e| {
                 CompileError::new(
                     format!("invalid integer literal '{}': {}", num_str, e),
                     Span::new(self.line as u32, self.col as u32),

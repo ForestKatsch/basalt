@@ -14,8 +14,10 @@ use std::sync::Arc;
 /// A value slot. Inline for primitives, heap-allocated for compound types.
 #[derive(Clone, Debug)]
 pub enum Value {
-    /// 64-bit integer (used for all integer types, widened to i64 in registers)
+    /// 64-bit signed integer (used for i8-i64, widened to i64 in registers)
     Int(i64),
+    /// 64-bit unsigned integer (used for u8-u64, widened to u64 in registers)
+    UInt(u64),
     /// IEEE 754 double-precision float
     Float(f64),
     /// Boolean
@@ -103,6 +105,7 @@ pub enum IterState {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum MapKey {
     Int(i64),
+    UInt(u64),
     Bool(bool),
     String(String),
 }
@@ -113,6 +116,10 @@ pub type HeapRef = Arc<RefCell<HeapObject>>;
 impl Value {
     pub fn int(n: i64) -> Value {
         Value::Int(n)
+    }
+
+    pub fn uint(n: u64) -> Value {
+        Value::UInt(n)
     }
 
     pub fn float(f: f64) -> Value {
@@ -126,6 +133,7 @@ impl Value {
     pub fn as_int(&self) -> i64 {
         match self {
             Value::Int(n) => *n,
+            Value::UInt(n) if *n <= i64::MAX as u64 => *n as i64,
             _ => panic!("VM bug: expected Int, got {}", self.type_tag()),
         }
     }
@@ -148,8 +156,19 @@ impl Value {
     pub fn try_as_int(&self) -> Result<i64, String> {
         match self {
             Value::Int(n) => Ok(*n),
+            Value::UInt(n) if *n <= i64::MAX as u64 => Ok(*n as i64),
             _ => Err(format!(
                 "expected integer, got {}",
+                self.display_as_string()
+            )),
+        }
+    }
+
+    pub fn try_as_uint(&self) -> Result<u64, String> {
+        match self {
+            Value::UInt(n) => Ok(*n),
+            _ => Err(format!(
+                "expected unsigned integer, got {}",
                 self.display_as_string()
             )),
         }
@@ -172,6 +191,7 @@ impl Value {
     pub fn type_tag(&self) -> &'static str {
         match self {
             Value::Int(_) => "Int",
+            Value::UInt(_) => "UInt",
             Value::Float(_) => "Float",
             Value::Bool(_) => "Bool",
             Value::Nil => "Nil",
@@ -254,6 +274,7 @@ impl Value {
     pub fn deep_eq(&self, other: &Value) -> bool {
         match (self, other) {
             (Value::Int(a), Value::Int(b)) => a == b,
+            (Value::UInt(a), Value::UInt(b)) => a == b,
             (Value::Float(a), Value::Float(b)) => a == b,
             (Value::Bool(a), Value::Bool(b)) => a == b,
             (Value::Nil, Value::Nil) => true,
@@ -272,6 +293,7 @@ impl Value {
     pub fn display_as_string(&self) -> String {
         match self {
             Value::Int(n) => n.to_string(),
+            Value::UInt(n) => n.to_string(),
             Value::Float(f) => format_float(*f),
             Value::Bool(b) => {
                 if *b {
@@ -329,6 +351,7 @@ pub fn format_float(f: f64) -> String {
 fn format_map_key(key: &MapKey) -> String {
     match key {
         MapKey::Int(n) => n.to_string(),
+        MapKey::UInt(n) => n.to_string(),
         MapKey::Bool(b) => b.to_string(),
         MapKey::String(s) => format!("\"{}\"", s),
     }
@@ -382,6 +405,7 @@ fn heap_obj_eq(a: &HeapObject, b: &HeapObject) -> bool {
 pub fn map_key_to_value(key: &MapKey) -> Value {
     match key {
         MapKey::Int(n) => Value::int(*n),
+        MapKey::UInt(n) => Value::uint(*n),
         MapKey::Bool(b) => Value::bool(*b),
         MapKey::String(s) => Value::string(s.clone()),
     }

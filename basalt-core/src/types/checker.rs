@@ -1061,7 +1061,7 @@ impl TypeChecker {
     }
 
     fn check_let_decl(&mut self, decl: &LetDecl) -> Result<TypedLetDecl, CompileError> {
-        let value = self.check_expr(&decl.value)?;
+        let mut value = self.check_expr(&decl.value)?;
 
         let ty = if let Some(ref type_expr) = decl.ty {
             let declared = self
@@ -1085,6 +1085,9 @@ impl TypeChecker {
             // Compile-time range check for integer literals assigned to narrow types
             if let Some(n) = int_literal_value {
                 Self::check_int_literal_range(n, &declared, &decl.name, decl.span)?;
+                // Update the expression's type to match the declared type so codegen
+                // emits the correct opcode (LoadInt vs LoadUInt)
+                value.ty = declared.clone();
             }
             declared
         } else {
@@ -3388,7 +3391,7 @@ impl TypeChecker {
     }
 
     /// Extract an integer literal value, including through unary negation.
-    fn extract_int_literal(expr: &TypedExpr) -> Option<i64> {
+    fn extract_int_literal(expr: &TypedExpr) -> Option<i128> {
         match &expr.kind {
             TypedExprKind::IntLit(n) => Some(*n),
             TypedExprKind::UnaryOp(crate::ast::UnaryOp::Neg, inner) => {
@@ -3404,19 +3407,21 @@ impl TypeChecker {
 
     /// Check that an integer literal fits within a declared narrow integer type.
     fn check_int_literal_range(
-        n: i64,
+        n: i128,
         ty: &Type,
         name: &str,
         span: Span,
     ) -> Result<(), CompileError> {
-        let (min, max): (i64, i64) = match ty {
-            Type::I8 => (i8::MIN as i64, i8::MAX as i64),
-            Type::I16 => (i16::MIN as i64, i16::MAX as i64),
-            Type::I32 => (i32::MIN as i64, i32::MAX as i64),
-            Type::U8 => (0, u8::MAX as i64),
-            Type::U16 => (0, u16::MAX as i64),
-            Type::U32 => (0, u32::MAX as i64),
-            _ => return Ok(()), // i64, u64, or non-integer — no check needed
+        let (min, max): (i128, i128) = match ty {
+            Type::I8 => (i8::MIN as i128, i8::MAX as i128),
+            Type::I16 => (i16::MIN as i128, i16::MAX as i128),
+            Type::I32 => (i32::MIN as i128, i32::MAX as i128),
+            Type::I64 => (i64::MIN as i128, i64::MAX as i128),
+            Type::U8 => (0, u8::MAX as i128),
+            Type::U16 => (0, u16::MAX as i128),
+            Type::U32 => (0, u32::MAX as i128),
+            Type::U64 => (0, u64::MAX as i128),
+            _ => return Ok(()), // non-integer — no check needed
         };
         if n < min || n > max {
             return Err(CompileError::new(

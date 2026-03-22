@@ -8,6 +8,7 @@ use std::collections::HashMap;
 pub enum Op {
     // Constants
     LoadInt(u16, i64),    // reg = i64 value
+    LoadUInt(u16, u64),   // reg = u64 value
     LoadFloat(u16, f64),  // reg = f64 value
     LoadBool(u16, bool),  // reg = bool value
     LoadString(u16, u32), // reg = string constant index
