@@ -2676,3 +2676,127 @@ fn test_multiple_errors_reported() {
         Ok(_) => panic!("Expected compile errors"),
     }
 }
+
+// ==================== Capability System ====================
+
+use std::path::PathBuf;
+
+#[test]
+fn test_fs_write_and_read() {
+    let dir = std::env::temp_dir().join("basalt_test_fs");
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::create_dir_all(&dir);
+    let source = r#"
+        fn main(stdout: Stdout, fs: Fs) {
+            let err = fs.write_file("test.txt", "hello from basalt")
+            let content = fs.read_file("test.txt")
+            match content {
+                !err => stdout.println("read error: " + err)
+                data => stdout.println(data)
+            }
+        }
+    "#;
+    let program = basalt_core::compile(source).unwrap();
+    let mut vm = VM::new(program);
+    vm.set_fs_root(dir.clone());
+    vm.run().unwrap();
+    assert_eq!(vm.captured_output, vec!["hello from basalt"]);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_fs_exists_and_read_dir() {
+    let dir = std::env::temp_dir().join("basalt_test_fs2");
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::create_dir_all(&dir);
+    std::fs::write(dir.join("a.txt"), "aaa").unwrap();
+    std::fs::write(dir.join("b.txt"), "bbb").unwrap();
+    let source = r#"
+        fn main(stdout: Stdout, fs: Fs) {
+            stdout.println(fs.exists("a.txt") as string)
+            stdout.println(fs.exists("nope.txt") as string)
+            let files = fs.read_dir(".")
+            match files {
+                !err => stdout.println("error")
+                list => stdout.println(list.join(", "))
+            }
+        }
+    "#;
+    let program = basalt_core::compile(source).unwrap();
+    let mut vm = VM::new(program);
+    vm.set_fs_root(dir.clone());
+    vm.run().unwrap();
+    assert_eq!(vm.captured_output, vec!["true", "false", "a.txt, b.txt"]);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_env_args() {
+    let source = r#"
+        fn main(stdout: Stdout, env: Env) {
+            let args = env.args()
+            stdout.println(args.length as string)
+            for arg in args {
+                stdout.println(arg)
+            }
+        }
+    "#;
+    let program = basalt_core::compile(source).unwrap();
+    let mut vm = VM::new(program);
+    vm.set_env_args(vec!["hello".into(), "world".into()]);
+    vm.run().unwrap();
+    assert_eq!(vm.captured_output, vec!["2", "hello", "world"]);
+}
+
+#[test]
+fn test_fs_path_helpers() {
+    let source = r#"
+        fn main(stdout: Stdout, fs: Fs) {
+            let p = fs.join("dir", "file.txt")
+            stdout.println(p)
+            let ext = fs.extension("photo.png")
+            if ext is nil {
+                stdout.println("no ext")
+            } else {
+                stdout.println(ext as string)
+            }
+            let stem = fs.stem("photo.png")
+            if stem is nil {
+                stdout.println("no stem")
+            } else {
+                stdout.println(stem as string)
+            }
+        }
+    "#;
+    let program = basalt_core::compile(source).unwrap();
+    let mut vm = VM::new(program);
+    vm.set_fs_root(PathBuf::from("."));
+    vm.run().unwrap();
+    assert_eq!(vm.captured_output, vec!["dir/file.txt", "png", "photo"]);
+}
+
+#[test]
+fn test_fs_sandbox_escape() {
+    let dir = std::env::temp_dir().join("basalt_test_sandbox");
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::create_dir_all(&dir);
+    let source = r#"
+        fn main(stdout: Stdout, fs: Fs) {
+            let result = fs.read_file("../../etc/passwd")
+            match result {
+                !err => stdout.println("blocked: " + err)
+                data => stdout.println("ESCAPED!")
+            }
+        }
+    "#;
+    let program = basalt_core::compile(source).unwrap();
+    let mut vm = VM::new(program);
+    vm.set_fs_root(dir.clone());
+    vm.run().unwrap();
+    assert!(
+        vm.captured_output[0].contains("escape")
+            || vm.captured_output[0].contains("sandbox")
+            || vm.captured_output[0].contains("blocked")
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}

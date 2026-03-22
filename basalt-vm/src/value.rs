@@ -1,5 +1,6 @@
 use indexmap::IndexMap;
 use std::cell::RefCell;
+use std::path::PathBuf;
 /// Basalt Value - Runtime value representation.
 ///
 /// Conceptually, all values occupy 8-byte register slots. At the bytecode
@@ -40,6 +41,21 @@ pub enum HeapObject {
     Closure(ClosureObj),
     /// A shared mutable cell for capture-by-reference closures.
     CaptureCell(Box<Value>),
+    Capability(CapabilityObj),
+}
+
+#[derive(Debug, Clone)]
+pub struct CapabilityObj {
+    pub name: String,
+    pub data: CapabilityData,
+}
+
+#[derive(Debug, Clone)]
+pub enum CapabilityData {
+    Stdout,
+    Stdin,
+    Fs { root: PathBuf },
+    Env { args: Vec<String> },
 }
 
 #[derive(Debug, Clone)]
@@ -194,6 +210,12 @@ impl Value {
         Value::Heap(Arc::new(RefCell::new(HeapObject::Range(start, end))))
     }
 
+    pub fn capability(name: String, data: CapabilityData) -> Value {
+        Value::Heap(Arc::new(RefCell::new(HeapObject::Capability(
+            CapabilityObj { name, data },
+        ))))
+    }
+
     pub fn is_error(&self) -> bool {
         if let Value::Heap(href) = self {
             matches!(&*href.borrow(), HeapObject::Error(_))
@@ -263,6 +285,7 @@ impl Value {
                     HeapObject::Closure(c) => format!("<closure func_{}>", c.func_idx),
                     HeapObject::CaptureCell(val) => val.display_as_string(),
                     HeapObject::Iterator(_) => "<iterator>".to_string(),
+                    HeapObject::Capability(cap) => format!("<{} capability>", cap.name),
                 }
             }
         }

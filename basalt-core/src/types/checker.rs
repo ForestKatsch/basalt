@@ -224,8 +224,8 @@ impl TypeChecker {
             "nil" => Ok(Type::Nil),
             "Stdout" => Ok(Type::Capability("Stdout".to_string())),
             "Stdin" => Ok(Type::Capability("Stdin".to_string())),
-            "FileReader" => Ok(Type::Capability("FileReader".to_string())),
-            "FileSystem" => Ok(Type::Capability("FileSystem".to_string())),
+            "Fs" => Ok(Type::Capability("Fs".to_string())),
+            "Env" => Ok(Type::Capability("Env".to_string())),
             _ => {
                 if let Some(alias) = self.type_info.aliases.get(name) {
                     return Ok(alias.clone());
@@ -2617,6 +2617,81 @@ impl TypeChecker {
                 }
                 _ => Err(CompileError::new(
                     format!("unknown method '{}' on Stdin", method),
+                    span,
+                )),
+            },
+            "Fs" => match method {
+                "read_file" => {
+                    if args.len() != 1 {
+                        return Err(CompileError::new("read_file takes 1 argument", span));
+                    }
+                    Ok(Type::Result(Box::new(Type::String), Box::new(Type::String)))
+                }
+                "write_file" => {
+                    if args.len() != 2 {
+                        return Err(CompileError::new("write_file takes 2 arguments", span));
+                    }
+                    Ok(Type::Result(Box::new(Type::Nil), Box::new(Type::String)))
+                }
+                "read_dir" => {
+                    if args.len() != 1 {
+                        return Err(CompileError::new("read_dir takes 1 argument", span));
+                    }
+                    Ok(Type::Result(
+                        Box::new(Type::Array(Box::new(Type::String))),
+                        Box::new(Type::String),
+                    ))
+                }
+                "exists" | "is_dir" => {
+                    if args.len() != 1 {
+                        return Err(CompileError::new(
+                            format!("{} takes 1 argument", method),
+                            span,
+                        ));
+                    }
+                    Ok(Type::Bool)
+                }
+                "mkdir" => {
+                    if args.len() != 1 {
+                        return Err(CompileError::new("mkdir takes 1 argument", span));
+                    }
+                    Ok(Type::Result(Box::new(Type::Nil), Box::new(Type::String)))
+                }
+                "join" => {
+                    if args.is_empty() {
+                        return Err(CompileError::new("join takes at least 1 argument", span));
+                    }
+                    Ok(Type::String)
+                }
+                "extension" | "stem" => {
+                    if args.len() != 1 {
+                        return Err(CompileError::new(
+                            format!("{} takes 1 argument", method),
+                            span,
+                        ));
+                    }
+                    Ok(Type::Optional(Box::new(Type::String)))
+                }
+                _ => Err(CompileError::new(
+                    format!("unknown method '{}' on Fs", method),
+                    span,
+                )),
+            },
+            "Env" => match method {
+                "args" => {
+                    if !args.is_empty() {
+                        return Err(CompileError::new("args takes 0 arguments", span));
+                    }
+                    Ok(Type::Array(Box::new(Type::String)))
+                }
+                "get" => {
+                    if args.len() != 1 {
+                        return Err(CompileError::new("get takes 1 argument", span));
+                    }
+                    Ok(Type::Optional(Box::new(Type::String)))
+                }
+                _ => Err(CompileError::new(
+                    format!("unknown method '{}' on Env", method),
                     span,
                 )),
             },

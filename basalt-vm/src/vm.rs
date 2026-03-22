@@ -3,6 +3,8 @@ use crate::value::*;
 use basalt_core::compiler::{IntType, Op, Program};
 use indexmap::IndexMap;
 use std::cell::RefCell;
+use std::io::Read;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 const MAX_CALL_DEPTH: usize = 256;
@@ -18,6 +20,8 @@ pub struct VM {
     stdin_pos: usize,
     /// Call stack for error reporting: (function_index, instruction_pointer)
     call_stack: Vec<(usize, usize)>,
+    fs_root: Option<PathBuf>,
+    env_args: Vec<String>,
 }
 
 /// Helper to extract a heap reference, returning a runtime error instead of panicking.
@@ -53,11 +57,21 @@ impl VM {
             stdin_lines: Vec::new(),
             stdin_pos: 0,
             call_stack: Vec::new(),
+            fs_root: None,
+            env_args: Vec::new(),
         }
     }
 
     pub fn set_stdin(&mut self, lines: Vec<String>) {
         self.stdin_lines = lines;
+    }
+
+    pub fn set_fs_root(&mut self, root: PathBuf) {
+        self.fs_root = Some(root);
+    }
+
+    pub fn set_env_args(&mut self, args: Vec<String>) {
+        self.env_args = args;
     }
 
     pub fn run(&mut self) -> Result<Value, String> {
@@ -69,12 +83,24 @@ impl VM {
         for pt in &main_func.param_types {
             match pt {
                 basalt_core::types::Type::Capability(name) => {
-                    // Capabilities are identified by a marker value
-                    args.push(Value::int(match name.as_str() {
-                        "Stdout" => 1,
-                        "Stdin" => 2,
-                        _ => 0,
-                    }));
+                    let cap = match name.as_str() {
+                        "Stdout" => Value::capability("Stdout".into(), CapabilityData::Stdout),
+                        "Stdin" => Value::capability("Stdin".into(), CapabilityData::Stdin),
+                        "Fs" => Value::capability(
+                            "Fs".into(),
+                            CapabilityData::Fs {
+                                root: self.fs_root.clone().unwrap_or_else(|| PathBuf::from(".")),
+                            },
+                        ),
+                        "Env" => Value::capability(
+                            "Env".into(),
+                            CapabilityData::Env {
+                                args: self.env_args.clone(),
+                            },
+                        ),
+                        _ => Value::Nil,
+                    };
+                    args.push(cap);
                 }
                 _ => args.push(Value::Nil),
             }
@@ -720,7 +746,8 @@ impl VM {
                     for i in 0..ac as usize {
                         args.push(reg[start + i].clone());
                     }
-                    reg[d as usize] = self.call_capability(&method, &args)?;
+                    let cap_val = reg[c as usize].clone();
+                    reg[d as usize] = self.call_capability_on(&cap_val, &method, &args)?;
                 }
 
                 // === Error Handling ===
@@ -1146,9 +1173,27 @@ impl VM {
         ))
     }
 
-    fn call_capability(&mut self, method: &str, args: &[Value]) -> Result<Value, String> {
-        match method {
-            "println" => {
+    fn call_capability_on(
+        &mut self,
+        cap: &Value,
+        method: &str,
+        args: &[Value],
+    ) -> Result<Value, String> {
+        let href = cap
+            .as_heap_ref()
+            .ok_or_else(|| format!("expected capability object, got {}", cap.type_tag()))?;
+        let obj = href.borrow();
+        let cap_obj = match &*obj {
+            HeapObject::Capability(c) => c,
+            _ => return Err("expected capability object".to_string()),
+        };
+        let cap_name = cap_obj.name.clone();
+        let data = cap_obj.data.clone();
+        drop(obj); // Release borrow before calling methods that may need self
+
+        match (cap_name.as_str(), method) {
+            // === Stdout ===
+            ("Stdout", "println") => {
                 let text = if !args.is_empty() {
                     self.val_to_string(&args[0])
                 } else {
@@ -1158,7 +1203,7 @@ impl VM {
                 println!("{}", text);
                 Ok(Value::Nil)
             }
-            "print" => {
+            ("Stdout", "print") => {
                 let text = if !args.is_empty() {
                     self.val_to_string(&args[0])
                 } else {
@@ -1168,12 +1213,14 @@ impl VM {
                 print!("{}", text);
                 Ok(Value::Nil)
             }
-            "flush" => {
+            ("Stdout", "flush") => {
                 use std::io::Write;
                 std::io::stdout().flush().ok();
                 Ok(Value::Nil)
             }
-            "read_line" => {
+
+            // === Stdin ===
+            ("Stdin", "read_line") => {
                 if self.stdin_pos < self.stdin_lines.len() {
                     let line = self.stdin_lines[self.stdin_pos].clone();
                     self.stdin_pos += 1;
@@ -1186,7 +1233,174 @@ impl VM {
                     Ok(Value::string(input.trim_end_matches('\n').to_string()))
                 }
             }
-            _ => Err(format!("unknown capability method '{}'", method)),
+            ("Stdin", "read_key") => {
+                if self.stdin_pos < self.stdin_lines.len() {
+                    let line = &self.stdin_lines[self.stdin_pos];
+                    let ch = line.chars().next().unwrap_or('\0').to_string();
+                    self.stdin_pos += 1;
+                    Ok(Value::string(ch))
+                } else {
+                    let mut buf = [0u8; 4];
+                    let n = std::io::stdin()
+                        .read(&mut buf)
+                        .map_err(|e| format!("stdin: {}", e))?;
+                    let s = std::str::from_utf8(&buf[..n]).unwrap_or("").to_string();
+                    Ok(Value::string(s))
+                }
+            }
+
+            // === Fs (file system, sandboxed) ===
+            ("Fs", "read_file") => {
+                let path_arg = self.val_to_string(&args[0]);
+                let root = match &data {
+                    CapabilityData::Fs { root } => root.clone(),
+                    _ => unreachable!(),
+                };
+                match resolve_sandboxed_path(&root, &path_arg) {
+                    Err(e) => Ok(Value::error(Value::string(e))),
+                    Ok(full_path) => match std::fs::read_to_string(&full_path) {
+                        Ok(content) => Ok(Value::string(content)),
+                        Err(e) => Ok(Value::error(Value::string(format!("{}", e)))),
+                    },
+                }
+            }
+            ("Fs", "write_file") => {
+                let path_arg = self.val_to_string(&args[0]);
+                let content = self.val_to_string(&args[1]);
+                let root = match &data {
+                    CapabilityData::Fs { root } => root.clone(),
+                    _ => unreachable!(),
+                };
+                let full_path = resolve_sandboxed_path(&root, &path_arg)?;
+                if let Some(parent) = full_path.parent() {
+                    if !parent.exists() {
+                        std::fs::create_dir_all(parent).map_err(|e| format!("fs error: {}", e))?;
+                    }
+                }
+                match std::fs::write(&full_path, content) {
+                    Ok(_) => Ok(Value::Nil),
+                    Err(e) => Ok(Value::error(Value::string(format!("{}", e)))),
+                }
+            }
+            ("Fs", "read_dir") => {
+                let path_arg = self.val_to_string(&args[0]);
+                let root = match &data {
+                    CapabilityData::Fs { root } => root.clone(),
+                    _ => unreachable!(),
+                };
+                let full_path = resolve_sandboxed_path(&root, &path_arg)?;
+                match std::fs::read_dir(&full_path) {
+                    Ok(entries) => {
+                        let mut names: Vec<Value> = Vec::new();
+                        for e in entries.flatten() {
+                            names.push(Value::string(e.file_name().to_string_lossy().to_string()));
+                        }
+                        names.sort_by(|a, b| {
+                            let sa = if let Value::Heap(ha) = a {
+                                if let HeapObject::String(s) = &*ha.borrow() {
+                                    s.clone()
+                                } else {
+                                    String::new()
+                                }
+                            } else {
+                                String::new()
+                            };
+                            let sb = if let Value::Heap(hb) = b {
+                                if let HeapObject::String(s) = &*hb.borrow() {
+                                    s.clone()
+                                } else {
+                                    String::new()
+                                }
+                            } else {
+                                String::new()
+                            };
+                            sa.cmp(&sb)
+                        });
+                        Ok(Value::array(names))
+                    }
+                    Err(e) => Ok(Value::error(Value::string(format!("{}", e)))),
+                }
+            }
+            ("Fs", "exists") => {
+                let path_arg = self.val_to_string(&args[0]);
+                let root = match &data {
+                    CapabilityData::Fs { root } => root.clone(),
+                    _ => unreachable!(),
+                };
+                match resolve_sandboxed_path(&root, &path_arg) {
+                    Ok(full_path) => Ok(Value::bool(full_path.exists())),
+                    Err(_) => Ok(Value::bool(false)),
+                }
+            }
+            ("Fs", "mkdir") => {
+                let path_arg = self.val_to_string(&args[0]);
+                let root = match &data {
+                    CapabilityData::Fs { root } => root.clone(),
+                    _ => unreachable!(),
+                };
+                let full_path = resolve_sandboxed_path(&root, &path_arg)?;
+                match std::fs::create_dir_all(&full_path) {
+                    Ok(_) => Ok(Value::Nil),
+                    Err(e) => Ok(Value::error(Value::string(format!("{}", e)))),
+                }
+            }
+            ("Fs", "join") => {
+                let mut result = PathBuf::new();
+                for arg in args {
+                    result.push(self.val_to_string(arg));
+                }
+                Ok(Value::string(result.to_string_lossy().to_string()))
+            }
+            ("Fs", "extension") => {
+                let path_arg = self.val_to_string(&args[0]);
+                let p = std::path::Path::new(&path_arg);
+                Ok(match p.extension().and_then(|e| e.to_str()) {
+                    Some(ext) => Value::string(ext.to_string()),
+                    None => Value::Nil,
+                })
+            }
+            ("Fs", "stem") => {
+                let path_arg = self.val_to_string(&args[0]);
+                let p = std::path::Path::new(&path_arg);
+                Ok(match p.file_stem().and_then(|s| s.to_str()) {
+                    Some(stem) => Value::string(stem.to_string()),
+                    None => Value::Nil,
+                })
+            }
+            ("Fs", "is_dir") => {
+                let path_arg = self.val_to_string(&args[0]);
+                let root = match &data {
+                    CapabilityData::Fs { root } => root.clone(),
+                    _ => unreachable!(),
+                };
+                match resolve_sandboxed_path(&root, &path_arg) {
+                    Ok(full_path) => Ok(Value::bool(full_path.is_dir())),
+                    Err(_) => Ok(Value::bool(false)),
+                }
+            }
+
+            // === Env ===
+            ("Env", "args") => {
+                let env_args = match &data {
+                    CapabilityData::Env { args: a } => a.clone(),
+                    _ => unreachable!(),
+                };
+                Ok(Value::array(
+                    env_args.into_iter().map(Value::string).collect(),
+                ))
+            }
+            ("Env", "get") => {
+                let key = self.val_to_string(&args[0]);
+                match std::env::var(&key) {
+                    Ok(val) => Ok(Value::string(val)),
+                    Err(_) => Ok(Value::Nil),
+                }
+            }
+
+            _ => Err(format!(
+                "unknown method '{}' on capability '{}'",
+                method, cap_name
+            )),
         }
     }
 
@@ -1820,4 +2034,60 @@ fn extract_closure(val: &Value) -> Result<(usize, Vec<Value>), String> {
         return Ok((*idx as usize, Vec::new()));
     }
     Err("expected closure argument".to_string())
+}
+
+/// Resolve a path relative to a root directory, preventing escape via ..
+fn resolve_sandboxed_path(root: &Path, user_path: &str) -> Result<PathBuf, String> {
+    // Reject obvious escape attempts before any I/O
+    let normalized = normalize_path_components(user_path);
+    if normalized.starts_with("..") || normalized.contains("/../") || normalized.ends_with("/..") {
+        return Err(format!("path '{}' escapes sandbox root", user_path));
+    }
+
+    let joined = root.join(user_path);
+    // Canonicalize to resolve symlinks and verify containment
+    let resolved = if joined.exists() {
+        joined
+            .canonicalize()
+            .map_err(|e| format!("path error: {}", e))?
+    } else {
+        // For non-existent paths, canonicalize parent + filename
+        let parent = joined.parent().unwrap_or(root);
+        let parent_canonical = if parent.exists() {
+            parent
+                .canonicalize()
+                .map_err(|e| format!("path error: {}", e))?
+        } else {
+            parent.to_path_buf()
+        };
+        parent_canonical.join(joined.file_name().unwrap_or_default())
+    };
+    let root_canonical = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
+    if !resolved.starts_with(&root_canonical) {
+        return Err(format!("path '{}' escapes sandbox root", user_path));
+    }
+    Ok(resolved)
+}
+
+/// Normalize path components, collapsing foo/.. sequences.
+fn normalize_path_components(path: &str) -> String {
+    let mut parts: Vec<&str> = Vec::new();
+    for component in path.split('/') {
+        match component {
+            "" | "." => {}
+            ".." => {
+                if parts.last().is_none_or(|p| *p == "..") {
+                    parts.push("..");
+                } else {
+                    parts.pop();
+                }
+            }
+            other => parts.push(other),
+        }
+    }
+    if parts.is_empty() {
+        ".".to_string()
+    } else {
+        parts.join("/")
+    }
 }

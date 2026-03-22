@@ -31,7 +31,8 @@ fn parse_and_run(args: &[String]) -> Result<(), CliError> {
         }
         Some("run") => {
             let path = require_file_arg(args)?;
-            run_file(path)
+            let extra_args: Vec<String> = args.get(2..).unwrap_or_default().to_vec();
+            run_file(path, &extra_args)
         }
         Some("check") => {
             let path = require_file_arg(args)?;
@@ -94,7 +95,7 @@ fn check_file(path: &str) -> Result<(), CliError> {
     }
 }
 
-fn run_file(path: &str) -> Result<(), CliError> {
+fn run_file(path: &str, extra_args: &[String]) -> Result<(), CliError> {
     let file_path = Path::new(path);
     if !file_path.exists() {
         eprintln!("error: file '{path}' not found");
@@ -110,6 +111,11 @@ fn run_file(path: &str) -> Result<(), CliError> {
     };
 
     let mut vm = basalt_vm::VM::new(result.program);
+    // Fs capability scoped to file's directory
+    let fs_root = file_path.parent().unwrap_or(Path::new(".")).to_path_buf();
+    vm.set_fs_root(fs_root);
+    // Pass remaining CLI args (after the file path) to Env
+    vm.set_env_args(extra_args.to_vec());
     match vm.run() {
         Ok(_) => Ok(()),
         Err(e) => {
