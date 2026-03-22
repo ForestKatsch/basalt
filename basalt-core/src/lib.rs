@@ -42,20 +42,10 @@ pub fn compile_file_rich(path: &Path) -> Result<CompileResult, (CompileErrors, S
         .map(|f| f.to_string_lossy().to_string())
         .unwrap_or_else(|| path.display().to_string());
 
-    let tokens = lexer::lex(&source).map_err(|e| {
-        (
-            CompileErrors::single(CompileError::from_legacy(&e)),
-            source.clone(),
-            filename.clone(),
-        )
-    })?;
-    let mut ast = parser::parse(tokens).map_err(|e| {
-        (
-            CompileErrors::single(CompileError::from_legacy(&e)),
-            source.clone(),
-            filename.clone(),
-        )
-    })?;
+    let tokens = lexer::lex(&source)
+        .map_err(|e| (CompileErrors::single(e), source.clone(), filename.clone()))?;
+    let mut ast = parser::parse(tokens)
+        .map_err(|e| (CompileErrors::single(e), source.clone(), filename.clone()))?;
 
     // Resolve imports
     let dir = path.parent().unwrap_or(Path::new("."));

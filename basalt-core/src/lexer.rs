@@ -1,4 +1,6 @@
 /// Basalt Lexer - Converts source text into tokens.
+use crate::ast::Span;
+use crate::error::CompileError;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
@@ -83,6 +85,50 @@ pub enum Token {
     Eof,
 }
 
+impl Token {
+    /// Human-readable name for use in error messages.
+    pub fn display_name(&self) -> &'static str {
+        match self {
+            Token::LParen => "(",
+            Token::RParen => ")",
+            Token::LBrace => "{",
+            Token::RBrace => "}",
+            Token::LBracket => "[",
+            Token::RBracket => "]",
+            Token::Comma => ",",
+            Token::Colon => ":",
+            Token::Dot => ".",
+            Token::Eq => "=",
+            Token::Arrow => "->",
+            Token::FatArrow => "=>",
+            Token::Newline => "newline",
+            Token::Eof => "end of file",
+            Token::Let => "let",
+            Token::Mut => "mut",
+            Token::Fn => "fn",
+            Token::Return => "return",
+            Token::If => "if",
+            Token::Else => "else",
+            Token::Match => "match",
+            Token::For => "for",
+            Token::In => "in",
+            Token::While => "while",
+            Token::Loop => "loop",
+            Token::Break => "break",
+            Token::Continue => "continue",
+            Token::Type => "type",
+            Token::Guard => "guard",
+            Token::Import => "import",
+            Token::As => "as",
+            Token::Is => "is",
+            Token::True => "true",
+            Token::False => "false",
+            Token::Nil => "nil",
+            _ => "token",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum StringPart {
     Literal(String),
@@ -96,7 +142,7 @@ pub struct SpannedToken {
     pub col: usize,
 }
 
-pub fn lex(source: &str) -> Result<Vec<SpannedToken>, String> {
+pub fn lex(source: &str) -> Result<Vec<SpannedToken>, CompileError> {
     let mut lexer = Lexer::new(source);
     lexer.lex_all()
 }
@@ -142,7 +188,7 @@ impl Lexer {
         SpannedToken { token, line, col }
     }
 
-    fn lex_all(&mut self) -> Result<Vec<SpannedToken>, String> {
+    fn lex_all(&mut self) -> Result<Vec<SpannedToken>, CompileError> {
         let mut tokens = Vec::new();
         let mut last_was_newline = true; // Start as if we just had a newline
 
@@ -287,7 +333,7 @@ impl Lexer {
         }
     }
 
-    fn lex_token(&mut self, ch: char) -> Result<SpannedToken, String> {
+    fn lex_token(&mut self, ch: char) -> Result<SpannedToken, CompileError> {
         let line = self.line;
         let col = self.col;
 
@@ -454,14 +500,14 @@ impl Lexer {
                 self.advance();
                 Ok(self.make_token(Token::Colon, line, col))
             }
-            _ => Err(format!(
-                "unexpected character '{}' at line {} col {}",
-                ch, line, col
+            _ => Err(CompileError::new(
+                format!("unexpected character '{}'", ch),
+                Span::new(line as u32, col as u32),
             )),
         }
     }
 
-    fn lex_number(&mut self) -> Result<Token, String> {
+    fn lex_number(&mut self) -> Result<Token, CompileError> {
         let start = self.pos;
 
         // Check for hex/binary prefix
@@ -478,17 +524,21 @@ impl Lexer {
                     }
                 }
                 if self.pos == hex_start {
-                    return Err(format!(
-                        "expected hex digit at line {} col {}",
-                        self.line, self.col
+                    return Err(CompileError::new(
+                        "expected hex digit",
+                        Span::new(self.line as u32, self.col as u32),
                     ));
                 }
                 let hex_str: String = self.chars[hex_start..self.pos]
                     .iter()
                     .filter(|c| **c != '_')
                     .collect();
-                let val = i64::from_str_radix(&hex_str, 16)
-                    .map_err(|e| format!("invalid hex literal: {}", e))?;
+                let val = i64::from_str_radix(&hex_str, 16).map_err(|e| {
+                    CompileError::new(
+                        format!("invalid hex literal: {}", e),
+                        Span::new(self.line as u32, self.col as u32),
+                    )
+                })?;
                 return Ok(Token::IntLit(val));
             }
             if self.peek_at(1) == Some('b') || self.peek_at(1) == Some('B') {
@@ -503,17 +553,21 @@ impl Lexer {
                     }
                 }
                 if self.pos == bin_start {
-                    return Err(format!(
-                        "expected binary digit at line {} col {}",
-                        self.line, self.col
+                    return Err(CompileError::new(
+                        "expected binary digit",
+                        Span::new(self.line as u32, self.col as u32),
                     ));
                 }
                 let bin_str: String = self.chars[bin_start..self.pos]
                     .iter()
                     .filter(|c| **c != '_')
                     .collect();
-                let val = i64::from_str_radix(&bin_str, 2)
-                    .map_err(|e| format!("invalid binary literal: {}", e))?;
+                let val = i64::from_str_radix(&bin_str, 2).map_err(|e| {
+                    CompileError::new(
+                        format!("invalid binary literal: {}", e),
+                        Span::new(self.line as u32, self.col as u32),
+                    )
+                })?;
                 return Ok(Token::IntLit(val));
             }
         }
@@ -575,26 +629,37 @@ impl Lexer {
             .collect();
 
         if is_float || has_exp {
-            let val: f64 = num_str
-                .parse()
-                .map_err(|e| format!("invalid float literal '{}': {}", num_str, e))?;
+            let val: f64 = num_str.parse().map_err(|e| {
+                CompileError::new(
+                    format!("invalid float literal '{}': {}", num_str, e),
+                    Span::new(self.line as u32, self.col as u32),
+                )
+            })?;
             Ok(Token::FloatLit(val))
         } else {
-            let val: i64 = num_str
-                .parse()
-                .map_err(|e| format!("invalid integer literal '{}': {}", num_str, e))?;
+            let val: i64 = num_str.parse().map_err(|e| {
+                CompileError::new(
+                    format!("invalid integer literal '{}': {}", num_str, e),
+                    Span::new(self.line as u32, self.col as u32),
+                )
+            })?;
             Ok(Token::IntLit(val))
         }
     }
 
-    fn lex_string(&mut self) -> Result<Token, String> {
+    fn lex_string(&mut self) -> Result<Token, CompileError> {
         self.advance(); // consume opening quote
         let mut parts: Vec<StringPart> = Vec::new();
         let mut current = String::new();
 
         loop {
             match self.peek() {
-                None => return Err(format!("unterminated string at line {}", self.line)),
+                None => {
+                    return Err(CompileError::new(
+                        "unterminated string",
+                        Span::new(self.line as u32, self.col as u32),
+                    ))
+                }
                 Some('"') => {
                     self.advance();
                     break;
@@ -640,12 +705,17 @@ impl Lexer {
                             parts.push(StringPart::Expr(expr_tokens));
                         }
                         Some(ch) => {
-                            return Err(format!(
-                                "unknown escape sequence '\\{}' at line {}",
-                                ch, self.line
+                            return Err(CompileError::new(
+                                format!("unknown escape sequence '\\{}'", ch),
+                                Span::new(self.line as u32, self.col as u32),
                             ))
                         }
-                        None => return Err(format!("unterminated escape at line {}", self.line)),
+                        None => {
+                            return Err(CompileError::new(
+                                "unterminated escape",
+                                Span::new(self.line as u32, self.col as u32),
+                            ))
+                        }
                     }
                 }
                 Some(ch) => {
@@ -665,14 +735,19 @@ impl Lexer {
         }
     }
 
-    fn lex_interpolation_expr(&mut self) -> Result<Vec<Token>, String> {
+    fn lex_interpolation_expr(&mut self) -> Result<Vec<Token>, CompileError> {
         let mut tokens = Vec::new();
         let mut paren_depth = 1;
 
         loop {
             self.skip_whitespace_not_newline();
             match self.peek() {
-                None => return Err("unterminated string interpolation".to_string()),
+                None => {
+                    return Err(CompileError::new(
+                        "unterminated string interpolation",
+                        Span::new(self.line as u32, self.col as u32),
+                    ))
+                }
                 Some('(') => {
                     paren_depth += 1;
                     let line = self.line;
@@ -709,7 +784,7 @@ impl Lexer {
         Ok(tokens.into_iter().map(|st| st.token).collect())
     }
 
-    fn lex_multiline_string(&mut self) -> Result<Token, String> {
+    fn lex_multiline_string(&mut self) -> Result<Token, CompileError> {
         let mut lines = Vec::new();
 
         loop {
@@ -751,7 +826,7 @@ impl Lexer {
         Ok(Token::StringLit(result))
     }
 
-    fn lex_identifier(&mut self) -> Result<Token, String> {
+    fn lex_identifier(&mut self) -> Result<Token, CompileError> {
         let start = self.pos;
         while let Some(ch) = self.peek() {
             if ch.is_ascii_alphanumeric() || ch == '_' {
@@ -785,9 +860,9 @@ impl Lexer {
             "false" => Token::False,
             "nil" => Token::Nil,
             "async" | "await" => {
-                return Err(format!(
-                    "'{}' is reserved for future use at line {} col {}",
-                    ident, self.line, self.col
+                return Err(CompileError::new(
+                    format!("'{}' is reserved for future use", ident),
+                    Span::new(self.line as u32, self.col as u32),
                 ))
             }
             "_" => Token::Ident("_".to_string()), // wildcard
@@ -796,7 +871,7 @@ impl Lexer {
         Ok(token)
     }
 
-    fn lex_type_identifier(&mut self) -> Result<Token, String> {
+    fn lex_type_identifier(&mut self) -> Result<Token, CompileError> {
         let start = self.pos;
         while let Some(ch) = self.peek() {
             if ch.is_ascii_alphanumeric() || ch == '_' {

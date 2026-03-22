@@ -282,9 +282,11 @@ impl TypeChecker {
                 // A union is assignable to T only if ALL members are assignable to T
                 members.iter().all(|m| self.is_assignable(m, &to))
             }
-            // Empty array [nil] is compatible with any array type
+            // Arrays are invariant: [T] is only assignable to [T], not [T | U].
+            // This prevents the covariance hole where writing through a wider type
+            // corrupts data visible through the original narrow reference.
             (Type::Array(inner_from), Type::Array(inner_to)) => {
-                **inner_from == Type::Nil || self.is_assignable(inner_from, inner_to)
+                **inner_from == Type::Nil || **inner_from == **inner_to
             }
             // Empty map [nil:nil] is compatible with any map type
             (Type::Map(kf, vf), Type::Map(kt, vt)) => {
@@ -850,6 +852,21 @@ impl TypeChecker {
 
         let body = self.check_block(&fdef.body)?;
 
+        // Check that non-void functions return on all paths
+        if info.return_type != Type::Nil
+            && info.return_type != Type::Void
+            && !self.block_always_returns(&body)
+        {
+            return Err(CompileError::new(
+                format!(
+                    "function '{}' declares return type {} but not all code paths return a value",
+                    fdef.name,
+                    info.return_type.display_name()
+                ),
+                fdef.span,
+            ));
+        }
+
         self.current_fn_return = old_return;
         self.pop_scope();
 
@@ -876,6 +893,21 @@ impl TypeChecker {
         }
 
         let body = self.check_block(&method.body)?;
+
+        // Check that non-void methods return on all paths
+        if info.return_type != Type::Nil
+            && info.return_type != Type::Void
+            && !self.block_always_returns(&body)
+        {
+            return Err(CompileError::new(
+                format!(
+                    "method '{}' declares return type {} but not all code paths return a value",
+                    method.name,
+                    info.return_type.display_name()
+                ),
+                method.span,
+            ));
+        }
 
         self.current_fn_return = old_return;
         self.pop_scope();
@@ -1949,6 +1981,20 @@ impl TypeChecker {
                 let typed_body = self.check_block(body)?;
                 self.current_fn_return = old_return;
                 self.pop_scope();
+
+                // Check that non-void lambdas return on all paths
+                if ret_ty != Type::Nil
+                    && ret_ty != Type::Void
+                    && !self.block_always_returns(&typed_body)
+                {
+                    return Err(CompileError::new(
+                        format!(
+                            "lambda declares return type {} but not all code paths return a value",
+                            ret_ty.display_name()
+                        ),
+                        expr.span,
+                    ));
+                }
 
                 let func_type = Type::Function(
                     param_types.iter().map(|(_, t)| t.clone()).collect(),
@@ -3452,6 +3498,44 @@ impl TypeChecker {
         }
 
         Ok((bindings, pattern.clone()))
+    }
+
+    /// Check if a block always returns a value (for missing-return detection).
+    /// Conservative: returns true only if every path through the block ends in return.
+    fn block_always_returns(&self, block: &TypedBlock) -> bool {
+        if block.stmts.is_empty() {
+            return false;
+        }
+        match block.stmts.last() {
+            Some(TypedStmt::Return(Some(_))) => true,
+            Some(TypedStmt::ReturnError(_)) => true,
+            Some(TypedStmt::Expr(expr)) => match &expr.kind {
+                // if/else where both branches return
+                TypedExprKind::If(_, then_block, Some(else_expr)) => {
+                    self.block_always_returns(then_block) && self.expr_always_returns(else_expr)
+                }
+                TypedExprKind::Match(_, arms) => {
+                    !arms.is_empty() && arms.iter().all(|arm| self.expr_always_returns(&arm.body))
+                }
+                TypedExprKind::Block(inner) => self.block_always_returns(inner),
+                TypedExprKind::Loop(_) => true, // loop without break runs forever
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+
+    fn expr_always_returns(&self, expr: &TypedExpr) -> bool {
+        match &expr.kind {
+            TypedExprKind::Block(block) => self.block_always_returns(block),
+            TypedExprKind::If(_, then_block, Some(else_expr)) => {
+                self.block_always_returns(then_block) && self.expr_always_returns(else_expr)
+            }
+            TypedExprKind::Match(_, arms) => {
+                !arms.is_empty() && arms.iter().all(|arm| self.expr_always_returns(&arm.body))
+            }
+            _ => false,
+        }
     }
 }
 

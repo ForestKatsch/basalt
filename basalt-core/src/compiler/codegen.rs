@@ -478,24 +478,30 @@ impl Compiler {
                 let obj_reg = self.compile_expr(fc, obj)?;
                 let dst = fc.alloc_reg();
 
-                // Handle .length
+                // Handle .length on built-in types
                 if field == "length" {
-                    match &obj.ty {
+                    let handled = match &obj.ty {
                         Type::String => {
                             fc.emit(Op::StringLen(dst, obj_reg));
+                            true
                         }
                         Type::Array(_) => {
                             fc.emit(Op::ArrayLen(dst, obj_reg));
+                            true
                         }
                         Type::Map(_, _) => {
                             fc.emit(Op::MapLen(dst, obj_reg));
+                            true
                         }
                         Type::Tuple(elems) => {
                             fc.emit(Op::LoadInt(dst, elems.len() as i64));
+                            true
                         }
-                        _ => return Err(format!("no .length on {}", obj.ty.display_name())),
+                        _ => false, // structs etc. — fall through to field access
+                    };
+                    if handled {
+                        return Ok(dst);
                     }
-                    return Ok(dst);
                 }
 
                 // Handle tuple index

@@ -1,8 +1,9 @@
 /// Basalt Parser - Converts tokens into AST.
 use crate::ast::*;
+use crate::error::CompileError;
 use crate::lexer::{SpannedToken, StringPart as LexStringPart, Token};
 
-pub fn parse(tokens: Vec<SpannedToken>) -> Result<Program, String> {
+pub fn parse(tokens: Vec<SpannedToken>) -> Result<Program, CompileError> {
     let mut parser = Parser::new(tokens);
     parser.parse_program()
 }
@@ -39,9 +40,9 @@ impl Parser {
         Span::new(line as u32, col as u32)
     }
 
-    fn error(&self, msg: impl std::fmt::Display) -> String {
+    fn error(&self, msg: impl std::fmt::Display) -> CompileError {
         let (line, col) = self.current_span();
-        format!("[line {}:{}] {}", line, col, msg)
+        CompileError::new(msg.to_string(), Span::new(line as u32, col as u32))
     }
 
     fn peek(&self) -> &Token {
@@ -58,26 +59,33 @@ impl Parser {
         tok
     }
 
-    fn expect(&mut self, expected: &Token) -> Result<(), String> {
+    fn expect(&mut self, expected: &Token) -> Result<(), CompileError> {
         let tok = self.advance();
         if std::mem::discriminant(&tok) == std::mem::discriminant(expected) {
             Ok(())
         } else {
-            Err(self.error(format!("expected {:?}, got {:?}", expected, tok)))
+            Err(self.error(format!(
+                "expected {}, got {}",
+                expected.display_name(),
+                tok.display_name()
+            )))
         }
     }
 
-    fn expect_ident(&mut self) -> Result<String, String> {
+    fn expect_ident(&mut self) -> Result<String, CompileError> {
         match self.advance() {
             Token::Ident(name) => Ok(name),
-            tok => Err(self.error(format!("expected identifier, got {:?}", tok))),
+            tok => Err(self.error(format!("expected identifier, got {}", tok.display_name()))),
         }
     }
 
-    fn expect_type_ident(&mut self) -> Result<String, String> {
+    fn expect_type_ident(&mut self) -> Result<String, CompileError> {
         match self.advance() {
             Token::TypeIdent(name) => Ok(name),
-            tok => Err(self.error(format!("expected type identifier, got {:?}", tok))),
+            tok => Err(self.error(format!(
+                "expected type identifier, got {}",
+                tok.display_name()
+            ))),
         }
     }
 
@@ -87,7 +95,7 @@ impl Parser {
         }
     }
 
-    fn expect_newline_or_eof(&mut self) -> Result<(), String> {
+    fn expect_newline_or_eof(&mut self) -> Result<(), CompileError> {
         match self.peek() {
             Token::Newline => {
                 self.advance();
@@ -95,11 +103,11 @@ impl Parser {
             }
             Token::Eof => Ok(()),
             Token::RBrace => Ok(()), // Allow statements before closing brace
-            tok => Err(self.error(format!("expected newline, got {:?}", tok))),
+            tok => Err(self.error(format!("expected newline, got {}", tok.display_name()))),
         }
     }
 
-    fn parse_program(&mut self) -> Result<Program, String> {
+    fn parse_program(&mut self) -> Result<Program, CompileError> {
         let mut items = Vec::new();
         self.skip_newlines();
 
@@ -115,7 +123,7 @@ impl Parser {
         })
     }
 
-    fn parse_item(&mut self) -> Result<Item, String> {
+    fn parse_item(&mut self) -> Result<Item, CompileError> {
         match self.peek().clone() {
             Token::Fn => {
                 let func = self.parse_fn_def()?;
@@ -136,17 +144,22 @@ impl Parser {
                 Ok(Item::Import(imp))
             }
             tok => Err(self.error(format!(
-                "expected item (fn, type, let, import), got {:?}",
-                tok
+                "expected item (fn, type, let, import), got {}",
+                tok.display_name()
             ))),
         }
     }
 
-    fn parse_import(&mut self) -> Result<ImportDecl, String> {
+    fn parse_import(&mut self) -> Result<ImportDecl, CompileError> {
         self.expect(&Token::Import)?;
         let path = match self.advance() {
             Token::StringLit(s) => s,
-            tok => return Err(self.error(format!("expected string after import, got {:?}", tok))),
+            tok => {
+                return Err(self.error(format!(
+                    "expected string after import, got {}",
+                    tok.display_name()
+                )))
+            }
         };
         let alias = if *self.peek() == Token::As {
             self.advance();
@@ -157,7 +170,7 @@ impl Parser {
         Ok(ImportDecl { path, alias })
     }
 
-    fn parse_fn_def(&mut self) -> Result<FnDef, String> {
+    fn parse_fn_def(&mut self) -> Result<FnDef, CompileError> {
         let span = self.span();
         self.expect(&Token::Fn)?;
         let name = self.expect_ident()?;
@@ -184,7 +197,7 @@ impl Parser {
         })
     }
 
-    fn parse_params(&mut self) -> Result<Vec<Param>, String> {
+    fn parse_params(&mut self) -> Result<Vec<Param>, CompileError> {
         let mut params = Vec::new();
         if *self.peek() == Token::RParen {
             return Ok(params);
@@ -208,7 +221,7 @@ impl Parser {
         Ok(params)
     }
 
-    fn parse_type_expr(&mut self) -> Result<TypeExpr, String> {
+    fn parse_type_expr(&mut self) -> Result<TypeExpr, CompileError> {
         let base = self.parse_base_type()?;
 
         // Check for union: T | U | V
@@ -224,7 +237,7 @@ impl Parser {
         Ok(base)
     }
 
-    fn parse_base_type(&mut self) -> Result<TypeExpr, String> {
+    fn parse_base_type(&mut self) -> Result<TypeExpr, CompileError> {
         let mut ty = match self.peek().clone() {
             Token::Ident(ref name) => {
                 let name = name.clone();
@@ -321,7 +334,7 @@ impl Parser {
                 };
                 TypeExpr::Function(param_types, Box::new(ret))
             }
-            tok => return Err(self.error(format!("expected type, got {:?}", tok))),
+            tok => return Err(self.error(format!("expected type, got {}", tok.display_name()))),
         };
 
         // Check for postfix type operators: ?, !
@@ -343,7 +356,7 @@ impl Parser {
         Ok(ty)
     }
 
-    fn parse_type_def(&mut self) -> Result<TypeDef, String> {
+    fn parse_type_def(&mut self) -> Result<TypeDef, CompileError> {
         let span = self.span();
         self.expect(&Token::Type)?;
         let name = self.expect_type_ident()?;
@@ -436,7 +449,11 @@ impl Parser {
                     }
                     self.skip_newlines();
                 }
-                tok => return Err(self.error(format!("unexpected token in type body: {:?}", tok))),
+                tok => {
+                    return Err(
+                        self.error(format!("unexpected {} in type body", tok.display_name()))
+                    )
+                }
             }
         }
 
@@ -456,7 +473,7 @@ impl Parser {
         })
     }
 
-    fn parse_block(&mut self) -> Result<Block, String> {
+    fn parse_block(&mut self) -> Result<Block, CompileError> {
         self.expect(&Token::LBrace)?;
         self.skip_newlines();
 
@@ -476,7 +493,7 @@ impl Parser {
         Ok(Block { stmts })
     }
 
-    fn parse_stmt(&mut self) -> Result<Stmt, String> {
+    fn parse_stmt(&mut self) -> Result<Stmt, CompileError> {
         let span = self.span();
         match self.peek().clone() {
             Token::Let => {
@@ -549,7 +566,7 @@ impl Parser {
         }
     }
 
-    fn expr_to_assign_target(&self, expr: Expr) -> Result<AssignTarget, String> {
+    fn expr_to_assign_target(&self, expr: Expr) -> Result<AssignTarget, CompileError> {
         match expr.kind {
             ExprKind::Ident(name) => Ok(AssignTarget::Variable(name)),
             ExprKind::FieldAccess(obj, field) => Ok(AssignTarget::Field(obj, field)),
@@ -558,7 +575,7 @@ impl Parser {
         }
     }
 
-    fn parse_let_decl(&mut self) -> Result<LetDecl, String> {
+    fn parse_let_decl(&mut self) -> Result<LetDecl, CompileError> {
         let span = self.span();
         self.expect(&Token::Let)?;
         let mutable = if *self.peek() == Token::Mut {
@@ -586,12 +603,12 @@ impl Parser {
     }
 
     // Expression parsing with precedence climbing
-    fn parse_expr(&mut self) -> Result<Expr, String> {
+    fn parse_expr(&mut self) -> Result<Expr, CompileError> {
         self.parse_range_expr()
     }
 
     // Precedence 1: Range (..)
-    fn parse_range_expr(&mut self) -> Result<Expr, String> {
+    fn parse_range_expr(&mut self) -> Result<Expr, CompileError> {
         let span = self.span();
         let left = self.parse_or_expr()?;
         if *self.peek() == Token::DotDot {
@@ -604,7 +621,7 @@ impl Parser {
     }
 
     // Precedence 2: Logical OR (||)
-    fn parse_or_expr(&mut self) -> Result<Expr, String> {
+    fn parse_or_expr(&mut self) -> Result<Expr, CompileError> {
         let mut left = self.parse_and_expr()?;
         while *self.peek() == Token::PipePipe {
             let span = self.span();
@@ -616,7 +633,7 @@ impl Parser {
     }
 
     // Precedence 3: Logical AND (&&)
-    fn parse_and_expr(&mut self) -> Result<Expr, String> {
+    fn parse_and_expr(&mut self) -> Result<Expr, CompileError> {
         let mut left = self.parse_bitor_expr()?;
         while *self.peek() == Token::AmpAmp {
             let span = self.span();
@@ -628,7 +645,7 @@ impl Parser {
     }
 
     // Precedence 4: Bitwise OR (|)
-    fn parse_bitor_expr(&mut self) -> Result<Expr, String> {
+    fn parse_bitor_expr(&mut self) -> Result<Expr, CompileError> {
         let mut left = self.parse_bitxor_expr()?;
         while *self.peek() == Token::Pipe {
             let span = self.span();
@@ -640,7 +657,7 @@ impl Parser {
     }
 
     // Precedence 5: Bitwise XOR (^)
-    fn parse_bitxor_expr(&mut self) -> Result<Expr, String> {
+    fn parse_bitxor_expr(&mut self) -> Result<Expr, CompileError> {
         let mut left = self.parse_bitand_expr()?;
         while *self.peek() == Token::Caret {
             let span = self.span();
@@ -652,7 +669,7 @@ impl Parser {
     }
 
     // Precedence 6: Bitwise AND (&)
-    fn parse_bitand_expr(&mut self) -> Result<Expr, String> {
+    fn parse_bitand_expr(&mut self) -> Result<Expr, CompileError> {
         let mut left = self.parse_equality_expr()?;
         while *self.peek() == Token::Ampersand {
             let span = self.span();
@@ -664,7 +681,7 @@ impl Parser {
     }
 
     // Precedence 7: Equality (==, !=, is)
-    fn parse_equality_expr(&mut self) -> Result<Expr, String> {
+    fn parse_equality_expr(&mut self) -> Result<Expr, CompileError> {
         let mut left = self.parse_comparison_expr()?;
         loop {
             let span = self.span();
@@ -690,7 +707,7 @@ impl Parser {
         Ok(left)
     }
 
-    fn parse_is_target(&mut self) -> Result<IsTarget, String> {
+    fn parse_is_target(&mut self) -> Result<IsTarget, CompileError> {
         match self.peek().clone() {
             // Type name or enum variant
             Token::TypeIdent(name) => {
@@ -757,7 +774,7 @@ impl Parser {
     }
 
     // Precedence 8: Comparison (<, <=, >, >=)
-    fn parse_comparison_expr(&mut self) -> Result<Expr, String> {
+    fn parse_comparison_expr(&mut self) -> Result<Expr, CompileError> {
         let mut left = self.parse_shift_expr()?;
         loop {
             let span = self.span();
@@ -776,7 +793,7 @@ impl Parser {
     }
 
     // Precedence 9: Shift (<<, >>)
-    fn parse_shift_expr(&mut self) -> Result<Expr, String> {
+    fn parse_shift_expr(&mut self) -> Result<Expr, CompileError> {
         let mut left = self.parse_additive_expr()?;
         loop {
             let span = self.span();
@@ -793,7 +810,7 @@ impl Parser {
     }
 
     // Precedence 10: Additive (+, -)
-    fn parse_additive_expr(&mut self) -> Result<Expr, String> {
+    fn parse_additive_expr(&mut self) -> Result<Expr, CompileError> {
         let mut left = self.parse_multiplicative_expr()?;
         loop {
             let span = self.span();
@@ -810,7 +827,7 @@ impl Parser {
     }
 
     // Precedence 11: Multiplicative (*, /, %)
-    fn parse_multiplicative_expr(&mut self) -> Result<Expr, String> {
+    fn parse_multiplicative_expr(&mut self) -> Result<Expr, CompileError> {
         let mut left = self.parse_power_expr()?;
         loop {
             let span = self.span();
@@ -828,7 +845,7 @@ impl Parser {
     }
 
     // Precedence 12: Power (**) - right associative
-    fn parse_power_expr(&mut self) -> Result<Expr, String> {
+    fn parse_power_expr(&mut self) -> Result<Expr, CompileError> {
         let span = self.span();
         let base = self.parse_as_expr()?;
         if *self.peek() == Token::StarStar {
@@ -841,7 +858,7 @@ impl Parser {
     }
 
     // Precedence 13: as / as?
-    fn parse_as_expr(&mut self) -> Result<Expr, String> {
+    fn parse_as_expr(&mut self) -> Result<Expr, CompileError> {
         let mut expr = self.parse_unary_expr()?;
         loop {
             if *self.peek() == Token::As {
@@ -863,7 +880,7 @@ impl Parser {
     }
 
     // Precedence 14: Unary (-, !)
-    fn parse_unary_expr(&mut self) -> Result<Expr, String> {
+    fn parse_unary_expr(&mut self) -> Result<Expr, CompileError> {
         let span = self.span();
         match self.peek() {
             Token::Minus => {
@@ -897,12 +914,12 @@ impl Parser {
     }
 
     // Precedence 15: Postfix (., (), [], ?)
-    fn parse_postfix_expr(&mut self) -> Result<Expr, String> {
+    fn parse_postfix_expr(&mut self) -> Result<Expr, CompileError> {
         let expr = self.parse_primary()?;
         self.parse_postfix(expr)
     }
 
-    fn parse_postfix(&mut self, mut expr: Expr) -> Result<Expr, String> {
+    fn parse_postfix(&mut self, mut expr: Expr) -> Result<Expr, CompileError> {
         let span = self.span();
         loop {
             match self.peek() {
@@ -973,9 +990,10 @@ impl Parser {
                             expr = ExprKind::FieldAccess(Box::new(expr), idx.to_string()).at(span);
                         }
                         tok => {
-                            return Err(
-                                self.error(format!("expected field name after '.', got {:?}", tok))
-                            )
+                            return Err(self.error(format!(
+                                "expected field name after '.', got {}",
+                                tok.display_name()
+                            )))
                         }
                     }
                 }
@@ -1001,7 +1019,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn parse_args(&mut self) -> Result<Vec<Expr>, String> {
+    fn parse_args(&mut self) -> Result<Vec<Expr>, CompileError> {
         let mut args = Vec::new();
         self.skip_newlines();
         if *self.peek() == Token::RParen {
@@ -1023,7 +1041,7 @@ impl Parser {
         Ok(args)
     }
 
-    fn parse_primary(&mut self) -> Result<Expr, String> {
+    fn parse_primary(&mut self) -> Result<Expr, CompileError> {
         let span = self.span();
         match self.peek().clone() {
             Token::IntLit(n) => {
@@ -1234,8 +1252,8 @@ impl Parser {
                     Ok(ExprKind::ArrayLit(elements).at(span))
                 } else {
                     Err(self.error(format!(
-                        "expected ',' or ']' in array literal, got {:?}",
-                        self.peek()
+                        "expected , or ] in array literal, got {}",
+                        self.peek().display_name()
                     )))
                 }
             }
@@ -1280,7 +1298,7 @@ impl Parser {
             Token::Loop => self.parse_loop_expr(),
             Token::Guard => self.parse_guard_expr(),
             Token::Fn => self.parse_lambda(),
-            tok => Err(self.error(format!("unexpected token in expression: {:?}", tok))),
+            tok => Err(self.error(format!("unexpected {} in expression", tok.display_name()))),
         }
     }
 
@@ -1366,7 +1384,9 @@ impl Parser {
     }
 
     #[allow(clippy::type_complexity)]
-    fn parse_struct_fields(&mut self) -> Result<(Vec<(String, Expr)>, Option<Box<Expr>>), String> {
+    fn parse_struct_fields(
+        &mut self,
+    ) -> Result<(Vec<(String, Expr)>, Option<Box<Expr>>), CompileError> {
         let mut fields = Vec::new();
         let mut spread = None;
         self.skip_newlines();
@@ -1399,7 +1419,7 @@ impl Parser {
         Ok((fields, spread))
     }
 
-    fn parse_if_expr(&mut self) -> Result<Expr, String> {
+    fn parse_if_expr(&mut self) -> Result<Expr, CompileError> {
         let span = self.span();
         self.expect(&Token::If)?;
         let cond = self.parse_expr()?;
@@ -1427,7 +1447,7 @@ impl Parser {
         Ok(ExprKind::If(Box::new(cond), then_block, else_expr).at(span))
     }
 
-    fn parse_match_expr(&mut self) -> Result<Expr, String> {
+    fn parse_match_expr(&mut self) -> Result<Expr, CompileError> {
         let span = self.span();
         self.expect(&Token::Match)?;
         let scrutinee = self.parse_expr()?;
@@ -1468,7 +1488,7 @@ impl Parser {
         Ok(ExprKind::Match(Box::new(scrutinee), arms).at(span))
     }
 
-    fn parse_pattern(&mut self) -> Result<Pattern, String> {
+    fn parse_pattern(&mut self) -> Result<Pattern, CompileError> {
         let span = self.span();
         match self.peek().clone() {
             Token::Ident(ref name) if name == "_" => {
@@ -1529,7 +1549,10 @@ impl Parser {
                         }
                         Ok(PatternKind::IsType(ty).at(span))
                     }
-                    tok => Err(self.error(format!("expected type after 'is', got {:?}", tok))),
+                    tok => Err(self.error(format!(
+                        "expected type after 'is', got {}",
+                        tok.display_name()
+                    ))),
                 }
             }
             Token::TypeIdent(type_name) => {
@@ -1558,8 +1581,8 @@ impl Parser {
                     }
                 } else {
                     Err(self.error(format!(
-                        "expected '.Variant' after type name in pattern, got {:?}",
-                        self.peek()
+                        "expected .Variant after type name in pattern, got {}",
+                        self.peek().display_name()
                     )))
                 }
             }
@@ -1607,11 +1630,11 @@ impl Parser {
                 }
                 Ok(PatternKind::Binding(name).at(span))
             }
-            tok => Err(self.error(format!("unexpected token in pattern: {:?}", tok))),
+            tok => Err(self.error(format!("unexpected {} in pattern", tok.display_name()))),
         }
     }
 
-    fn parse_for_expr(&mut self) -> Result<Expr, String> {
+    fn parse_for_expr(&mut self) -> Result<Expr, CompileError> {
         let span = self.span();
         self.expect(&Token::For)?;
         let var1 = self.expect_ident()?;
@@ -1628,7 +1651,7 @@ impl Parser {
         Ok(ExprKind::For(var1, var2, Box::new(iterable), body).at(span))
     }
 
-    fn parse_while_expr(&mut self) -> Result<Expr, String> {
+    fn parse_while_expr(&mut self) -> Result<Expr, CompileError> {
         let span = self.span();
         self.expect(&Token::While)?;
         let cond = self.parse_expr()?;
@@ -1637,7 +1660,7 @@ impl Parser {
         Ok(ExprKind::While(Box::new(cond), body).at(span))
     }
 
-    fn parse_loop_expr(&mut self) -> Result<Expr, String> {
+    fn parse_loop_expr(&mut self) -> Result<Expr, CompileError> {
         let span = self.span();
         self.expect(&Token::Loop)?;
         self.skip_newlines();
@@ -1645,7 +1668,7 @@ impl Parser {
         Ok(ExprKind::Loop(body).at(span))
     }
 
-    fn parse_guard_expr(&mut self) -> Result<Expr, String> {
+    fn parse_guard_expr(&mut self) -> Result<Expr, CompileError> {
         let span = self.span();
         self.expect(&Token::Guard)?;
 
@@ -1666,7 +1689,7 @@ impl Parser {
         Ok(ExprKind::Guard(binding, Box::new(condition), else_block).at(span))
     }
 
-    fn parse_lambda(&mut self) -> Result<Expr, String> {
+    fn parse_lambda(&mut self) -> Result<Expr, CompileError> {
         let span = self.span();
         self.expect(&Token::Fn)?;
         self.expect(&Token::LParen)?;
@@ -1686,7 +1709,10 @@ impl Parser {
         Ok(ExprKind::Lambda(params, return_type, body).at(span))
     }
 
-    fn convert_string_parts(&self, parts: Vec<LexStringPart>) -> Result<Vec<StringPart>, String> {
+    fn convert_string_parts(
+        &self,
+        parts: Vec<LexStringPart>,
+    ) -> Result<Vec<StringPart>, CompileError> {
         let mut result = Vec::new();
         for part in parts {
             match part {
@@ -1739,7 +1765,7 @@ mod tests {
     use super::*;
     use crate::lexer;
 
-    fn parse_str(source: &str) -> Result<Program, String> {
+    fn parse_str(source: &str) -> Result<Program, CompileError> {
         let tokens = lexer::lex(source)?;
         parse(tokens)
     }
