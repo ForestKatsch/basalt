@@ -64,9 +64,7 @@ impl TypeChecker {
                     _ => Type::Union(remaining),
                 }
             }
-            Type::Optional(inner) if to_remove == &Type::Nil => {
-                *inner.clone()
-            }
+            Type::Optional(inner) if to_remove == &Type::Nil => *inner.clone(),
             _ => original.clone(),
         }
     }
@@ -95,7 +93,10 @@ impl TypeChecker {
                         return Ok(alias.clone());
                     }
                 }
-                Err(CompileError::bare(format!("unknown type {}.{}", module, name)))
+                Err(CompileError::bare(format!(
+                    "unknown type {}.{}",
+                    module, name
+                )))
             }
             TypeExpr::Array(inner) => Ok(Type::Array(Box::new(self.resolve_type_expr(inner)?))),
             TypeExpr::Map(k, v) => Ok(Type::Map(
@@ -480,32 +481,41 @@ impl TypeChecker {
 
         // Helper: one-arg float -> float
         let one_arg = |name: &str| -> (String, FuncInfo) {
-            (name.to_string(), FuncInfo {
-                name: name.to_string(),
-                params: vec![("x".to_string(), Type::F64)],
-                return_type: float_ty.clone(),
-                is_method: false,
-            })
+            (
+                name.to_string(),
+                FuncInfo {
+                    name: name.to_string(),
+                    params: vec![("x".to_string(), Type::F64)],
+                    return_type: float_ty.clone(),
+                    is_method: false,
+                },
+            )
         };
 
         // Helper: zero-arg -> float (constants)
         let zero_arg = |name: &str| -> (String, FuncInfo) {
-            (name.to_string(), FuncInfo {
-                name: name.to_string(),
-                params: vec![],
-                return_type: float_ty.clone(),
-                is_method: false,
-            })
+            (
+                name.to_string(),
+                FuncInfo {
+                    name: name.to_string(),
+                    params: vec![],
+                    return_type: float_ty.clone(),
+                    is_method: false,
+                },
+            )
         };
 
         // Helper: two-arg (float, float) -> float
         let two_arg = |name: &str| -> (String, FuncInfo) {
-            (name.to_string(), FuncInfo {
-                name: name.to_string(),
-                params: vec![("a".to_string(), Type::F64), ("b".to_string(), Type::F64)],
-                return_type: float_ty.clone(),
-                is_method: false,
-            })
+            (
+                name.to_string(),
+                FuncInfo {
+                    name: name.to_string(),
+                    params: vec![("a".to_string(), Type::F64), ("b".to_string(), Type::F64)],
+                    return_type: float_ty.clone(),
+                    is_method: false,
+                },
+            )
         };
 
         // Existing functions
@@ -543,31 +553,40 @@ impl TypeChecker {
             functions.insert(k, v);
         }
 
-        self.type_info.modules.insert("math".to_string(), ModuleInfo {
-            structs: HashMap::new(),
-            enums: HashMap::new(),
-            aliases: HashMap::new(),
-            functions,
-        });
+        self.type_info.modules.insert(
+            "math".to_string(),
+            ModuleInfo {
+                structs: HashMap::new(),
+                enums: HashMap::new(),
+                aliases: HashMap::new(),
+                functions,
+            },
+        );
     }
 
     /// Phase 1a: Register just the type name as an empty shell.
     fn register_type_name(&mut self, td: &TypeDef) {
         match &td.kind {
             TypeDefKind::Struct(_) => {
-                self.type_info.structs.entry(td.name.clone()).or_insert_with(|| StructInfo {
-                    name: td.name.clone(),
-                    fields: Vec::new(),
-                    methods: HashMap::new(),
-                    parent: td.parent.clone(),
-                });
+                self.type_info
+                    .structs
+                    .entry(td.name.clone())
+                    .or_insert_with(|| StructInfo {
+                        name: td.name.clone(),
+                        fields: Vec::new(),
+                        methods: HashMap::new(),
+                        parent: td.parent.clone(),
+                    });
             }
             TypeDefKind::Enum(_) => {
-                self.type_info.enums.entry(td.name.clone()).or_insert_with(|| EnumInfo {
-                    name: td.name.clone(),
-                    variants: Vec::new(),
-                    methods: HashMap::new(),
-                });
+                self.type_info
+                    .enums
+                    .entry(td.name.clone())
+                    .or_insert_with(|| EnumInfo {
+                        name: td.name.clone(),
+                        variants: Vec::new(),
+                        methods: HashMap::new(),
+                    });
             }
             TypeDefKind::Alias(ty) => {
                 // For aliases, we can try to resolve but it may fail if the alias
@@ -743,7 +762,9 @@ impl TypeChecker {
             .functions
             .get(&fdef.name)
             .cloned()
-            .ok_or_else(|| CompileError::new(format!("unknown function '{}'", fdef.name), fdef.span))?;
+            .ok_or_else(|| {
+                CompileError::new(format!("unknown function '{}'", fdef.name), fdef.span)
+            })?;
 
         self.push_scope();
         let old_return = self.current_fn_return.take();
@@ -767,7 +788,11 @@ impl TypeChecker {
         })
     }
 
-    fn check_method_def(&mut self, method: &FnDef, info: &FuncInfo) -> Result<TypedFnDef, CompileError> {
+    fn check_method_def(
+        &mut self,
+        method: &FnDef,
+        info: &FuncInfo,
+    ) -> Result<TypedFnDef, CompileError> {
         self.push_scope();
         let old_return = self.current_fn_return.take();
         self.current_fn_return = Some(info.return_type.clone());
@@ -794,18 +819,23 @@ impl TypeChecker {
         let value = self.check_expr(&decl.value)?;
 
         let ty = if let Some(ref type_expr) = decl.ty {
-            let declared = self.resolve_type_expr(type_expr).map_err(|e| e.with_span(decl.span))?;
+            let declared = self
+                .resolve_type_expr(type_expr)
+                .map_err(|e| e.with_span(decl.span))?;
             // Special case: integer literal (or negated literal) assigned to narrow integer type
             let int_literal_value = Self::extract_int_literal(&value);
             let is_int_literal_narrowing =
                 int_literal_value.is_some() && value.ty.is_integer() && declared.is_integer();
             if !is_int_literal_narrowing && !self.is_assignable(&value.ty, &declared) {
-                return Err(CompileError::new(format!(
-                    "type mismatch in let '{}': expected {}, got {}",
-                    decl.name,
-                    declared.display_name(),
-                    value.ty.display_name()
-                ), decl.span));
+                return Err(CompileError::new(
+                    format!(
+                        "type mismatch in let '{}': expected {}, got {}",
+                        decl.name,
+                        declared.display_name(),
+                        value.ty.display_name()
+                    ),
+                    decl.span,
+                ));
             }
             // Compile-time range check for integer literals assigned to narrow types
             if let Some(n) = int_literal_value {
@@ -861,11 +891,14 @@ impl TypeChecker {
                 match &typed_value.ty {
                     Type::Tuple(types) => {
                         if names.len() != types.len() {
-                            return Err(CompileError::new(format!(
-                                "tuple destructure: expected {} elements, got {}",
-                                names.len(),
-                                types.len()
-                            ), stmt.span));
+                            return Err(CompileError::new(
+                                format!(
+                                    "tuple destructure: expected {} elements, got {}",
+                                    names.len(),
+                                    types.len()
+                                ),
+                                stmt.span,
+                            ));
                         }
                         let mut bindings = Vec::new();
                         for (i, name) in names.iter().enumerate() {
@@ -875,29 +908,38 @@ impl TypeChecker {
                         }
                         Ok(TypedStmt::LetTuple(bindings, typed_value))
                     }
-                    _ => Err(CompileError::new(format!(
-                        "cannot destructure non-tuple type {}",
-                        typed_value.ty.display_name()
-                    ), stmt.span)),
+                    _ => Err(CompileError::new(
+                        format!(
+                            "cannot destructure non-tuple type {}",
+                            typed_value.ty.display_name()
+                        ),
+                        stmt.span,
+                    )),
                 }
             }
             StmtKind::Assign(target, value) => {
                 let typed_value = self.check_expr(value)?;
                 let typed_target = match target {
                     AssignTarget::Variable(name) => {
-                        let (var_ty, mutable) = self
-                            .lookup_var(name)
-                            .ok_or_else(|| CompileError::new(format!("undefined variable '{}'", name), stmt.span))?;
+                        let (var_ty, mutable) = self.lookup_var(name).ok_or_else(|| {
+                            CompileError::new(format!("undefined variable '{}'", name), stmt.span)
+                        })?;
                         if !mutable {
-                            return Err(CompileError::new(format!("cannot assign to immutable variable '{}'", name), stmt.span));
+                            return Err(CompileError::new(
+                                format!("cannot assign to immutable variable '{}'", name),
+                                stmt.span,
+                            ));
                         }
                         if !self.is_assignable(&typed_value.ty, &var_ty) {
-                            return Err(CompileError::new(format!(
-                                "type mismatch in assignment to '{}': expected {}, got {}",
-                                name,
-                                var_ty.display_name(),
-                                typed_value.ty.display_name()
-                            ), stmt.span));
+                            return Err(CompileError::new(
+                                format!(
+                                    "type mismatch in assignment to '{}': expected {}, got {}",
+                                    name,
+                                    var_ty.display_name(),
+                                    typed_value.ty.display_name()
+                                ),
+                                stmt.span,
+                            ));
                         }
                         TypedAssignTarget::Variable(name.clone(), var_ty)
                     }
@@ -906,11 +948,14 @@ impl TypeChecker {
                         let typed_obj = self.check_expr(obj)?;
                         let field_ty = self.get_field_type(&typed_obj.ty, field, stmt.span)?;
                         if !self.is_assignable(&typed_value.ty, &field_ty) {
-                            return Err(CompileError::new(format!(
-                                "type mismatch in field assignment: expected {}, got {}",
-                                field_ty.display_name(),
-                                typed_value.ty.display_name()
-                            ), stmt.span));
+                            return Err(CompileError::new(
+                                format!(
+                                    "type mismatch in field assignment: expected {}, got {}",
+                                    field_ty.display_name(),
+                                    typed_value.ty.display_name()
+                                ),
+                                stmt.span,
+                            ));
                         }
                         TypedAssignTarget::Field(typed_obj, field.clone(), field_ty)
                     }
@@ -918,29 +963,39 @@ impl TypeChecker {
                         self.check_mutable_target(obj, "assign to index")?;
                         let typed_obj = self.check_expr(obj)?;
                         let typed_idx = self.check_expr(idx)?;
-                        let elem_ty = self.get_index_type(&typed_obj.ty, &typed_idx.ty, stmt.span)?;
+                        let elem_ty =
+                            self.get_index_type(&typed_obj.ty, &typed_idx.ty, stmt.span)?;
                         if !self.is_assignable(&typed_value.ty, &elem_ty) {
-                            return Err(CompileError::new(format!(
-                                "type mismatch in index assignment: expected {}, got {}",
-                                elem_ty.display_name(),
-                                typed_value.ty.display_name()
-                            ), stmt.span));
+                            return Err(CompileError::new(
+                                format!(
+                                    "type mismatch in index assignment: expected {}, got {}",
+                                    elem_ty.display_name(),
+                                    typed_value.ty.display_name()
+                                ),
+                                stmt.span,
+                            ));
                         }
                         TypedAssignTarget::Index(typed_obj, typed_idx, elem_ty)
                     }
                 };
-                Ok(TypedStmt::Assign(Box::new(typed_target), Box::new(typed_value)))
+                Ok(TypedStmt::Assign(
+                    Box::new(typed_target),
+                    Box::new(typed_value),
+                ))
             }
             StmtKind::Return(expr) => {
                 if let Some(expr) = expr {
                     let typed = self.check_expr(expr)?;
                     if let Some(ref ret_ty) = self.current_fn_return {
                         if !self.is_assignable(&typed.ty, ret_ty) {
-                            return Err(CompileError::new(format!(
-                                "return type mismatch: expected {}, got {}",
-                                ret_ty.display_name(),
-                                typed.ty.display_name()
-                            ), stmt.span));
+                            return Err(CompileError::new(
+                                format!(
+                                    "return type mismatch: expected {}, got {}",
+                                    ret_ty.display_name(),
+                                    typed.ty.display_name()
+                                ),
+                                stmt.span,
+                            ));
                         }
                     }
                     Ok(TypedStmt::Return(Some(typed)))
@@ -953,11 +1008,14 @@ impl TypeChecker {
                 // Check that enclosing function returns a result type
                 if let Some(Type::Result(_, err_ty)) = &self.current_fn_return {
                     if !self.is_assignable(&typed.ty, err_ty) {
-                        return Err(CompileError::new(format!(
-                            "error type mismatch: expected {}, got {}",
-                            err_ty.display_name(),
-                            typed.ty.display_name()
-                        ), stmt.span));
+                        return Err(CompileError::new(
+                            format!(
+                                "error type mismatch: expected {}, got {}",
+                                err_ty.display_name(),
+                                typed.ty.display_name()
+                            ),
+                            stmt.span,
+                        ));
                     }
                 }
                 Ok(TypedStmt::ReturnError(typed))
@@ -979,8 +1037,10 @@ impl TypeChecker {
                 // Spec: "Errors cannot be silently ignored."
                 // Result types used as expression statements must be consumed.
                 if let Type::Result(_, _) = &typed.ty {
-                    return Err(CompileError::new("result type must be used: assign to a variable, match, or use '?'"
-                            ,  stmt.span));
+                    return Err(CompileError::new(
+                        "result type must be used: assign to a variable, match, or use '?'",
+                        stmt.span,
+                    ));
                 }
                 Ok(TypedStmt::Expr(typed))
             }
@@ -1066,7 +1126,10 @@ impl TypeChecker {
                             span: expr.span,
                         })
                     } else {
-                        Err(CompileError::new(format!("undefined variable '{}'", name), expr.span))
+                        Err(CompileError::new(
+                            format!("undefined variable '{}'", name),
+                            expr.span,
+                        ))
                     }
                 }
             }
@@ -1097,25 +1160,34 @@ impl TypeChecker {
                 let result_ty = match op {
                     UnaryOp::Neg => {
                         if !typed.ty.is_numeric() {
-                            return Err(CompileError::new(format!("cannot negate {}", typed.ty.display_name()), expr.span));
+                            return Err(CompileError::new(
+                                format!("cannot negate {}", typed.ty.display_name()),
+                                expr.span,
+                            ));
                         }
                         typed.ty.clone()
                     }
                     UnaryOp::Not => {
                         if typed.ty != Type::Bool {
-                            return Err(CompileError::new(format!(
-                                "logical NOT requires bool, got {}",
-                                typed.ty.display_name()
-                            ), expr.span));
+                            return Err(CompileError::new(
+                                format!(
+                                    "logical NOT requires bool, got {}",
+                                    typed.ty.display_name()
+                                ),
+                                expr.span,
+                            ));
                         }
                         Type::Bool
                     }
                     UnaryOp::BitNot => {
                         if !typed.ty.is_integer() {
-                            return Err(CompileError::new(format!(
-                                "bitwise NOT requires integer, got {}",
-                                typed.ty.display_name()
-                            ), expr.span));
+                            return Err(CompileError::new(
+                                format!(
+                                    "bitwise NOT requires integer, got {}",
+                                    typed.ty.display_name()
+                                ),
+                                expr.span,
+                            ));
                         }
                         typed.ty.clone()
                     }
@@ -1160,11 +1232,10 @@ impl TypeChecker {
                                 span: expr.span,
                             });
                         }
-                        return Err(CompileError::new(format!(
-                            "tuple index {} out of bounds (length {})",
-                            idx,
-                            types.len()
-                        ), expr.span));
+                        return Err(CompileError::new(
+                            format!("tuple index {} out of bounds (length {})", idx, types.len()),
+                            expr.span,
+                        ));
                     }
                 }
 
@@ -1195,11 +1266,22 @@ impl TypeChecker {
                     span: expr.span,
                 })
             }
-            ExprKind::Call(func, args) => self.check_call(func, args).map(|mut e| { e.span = expr.span; e }),
-            ExprKind::MethodCall(obj, method, args) => self.check_method_call(obj, method, args).map(|mut e| { e.span = expr.span; e }),
-            ExprKind::StaticMethodCall(type_or_module, method, args) => {
-                self.check_static_method_call(type_or_module, method, args, expr.span).map(|mut e| { e.span = expr.span; e })
+            ExprKind::Call(func, args) => self.check_call(func, args).map(|mut e| {
+                e.span = expr.span;
+                e
+            }),
+            ExprKind::MethodCall(obj, method, args) => {
+                self.check_method_call(obj, method, args).map(|mut e| {
+                    e.span = expr.span;
+                    e
+                })
             }
+            ExprKind::StaticMethodCall(type_or_module, method, args) => self
+                .check_static_method_call(type_or_module, method, args, expr.span)
+                .map(|mut e| {
+                    e.span = expr.span;
+                    e
+                }),
             ExprKind::ArrayLit(elems) => {
                 if elems.is_empty() {
                     return Ok(TypedExpr {
@@ -1215,11 +1297,14 @@ impl TypeChecker {
                 for elem in &elems[1..] {
                     let typed = self.check_expr(elem)?;
                     if !self.is_assignable(&typed.ty, &elem_ty) {
-                        return Err(CompileError::new(format!(
-                            "array element type mismatch: expected {}, got {}",
-                            elem_ty.display_name(),
-                            typed.ty.display_name()
-                        ), expr.span));
+                        return Err(CompileError::new(
+                            format!(
+                                "array element type mismatch: expected {}, got {}",
+                                elem_ty.display_name(),
+                                typed.ty.display_name()
+                            ),
+                            expr.span,
+                        ));
                     }
                     typed_elems.push(typed);
                 }
@@ -1247,18 +1332,24 @@ impl TypeChecker {
                     let typed_k = self.check_expr(k)?;
                     let typed_v = self.check_expr(v)?;
                     if !self.is_assignable(&typed_k.ty, &key_ty) {
-                        return Err(CompileError::new(format!(
-                            "map key type mismatch: expected {}, got {}",
-                            key_ty.display_name(),
-                            typed_k.ty.display_name()
-                        ), expr.span));
+                        return Err(CompileError::new(
+                            format!(
+                                "map key type mismatch: expected {}, got {}",
+                                key_ty.display_name(),
+                                typed_k.ty.display_name()
+                            ),
+                            expr.span,
+                        ));
                     }
                     if !self.is_assignable(&typed_v.ty, &val_ty) {
-                        return Err(CompileError::new(format!(
-                            "map value type mismatch: expected {}, got {}",
-                            val_ty.display_name(),
-                            typed_v.ty.display_name()
-                        ), expr.span));
+                        return Err(CompileError::new(
+                            format!(
+                                "map value type mismatch: expected {}, got {}",
+                                val_ty.display_name(),
+                                typed_v.ty.display_name()
+                            ),
+                            expr.span,
+                        ));
                     }
                     typed_entries.push((typed_k, typed_v));
                 }
@@ -1299,30 +1390,43 @@ impl TypeChecker {
                     self.type_info.structs.get(type_name).cloned()
                 };
 
-                let info =
-                    struct_info.ok_or_else(|| CompileError::new(format!("unknown struct type '{}'", full_name), expr.span))?;
+                let info = struct_info.ok_or_else(|| {
+                    CompileError::new(format!("unknown struct type '{}'", full_name), expr.span)
+                })?;
 
                 let mut typed_fields = Vec::new();
-                let mut provided: std::collections::HashSet<String> = std::collections::HashSet::new();
+                let mut provided: std::collections::HashSet<String> =
+                    std::collections::HashSet::new();
 
                 for (name, expr) in fields {
                     if !provided.insert(name.clone()) {
-                        return Err(CompileError::new(format!("duplicate field '{}' in struct literal", name), expr.span));
+                        return Err(CompileError::new(
+                            format!("duplicate field '{}' in struct literal", name),
+                            expr.span,
+                        ));
                     }
                     let field_ty = info
                         .fields
                         .iter()
                         .find(|(n, _)| n == name)
                         .map(|(_, t)| t.clone())
-                        .ok_or_else(|| CompileError::new(format!("unknown field '{}' on struct '{}'", name, full_name), expr.span))?;
+                        .ok_or_else(|| {
+                            CompileError::new(
+                                format!("unknown field '{}' on struct '{}'", name, full_name),
+                                expr.span,
+                            )
+                        })?;
                     let typed = self.check_expr(expr)?;
                     if !self.is_assignable(&typed.ty, &field_ty) {
-                        return Err(CompileError::new(format!(
-                            "field '{}' type mismatch: expected {}, got {}",
-                            name,
-                            field_ty.display_name(),
-                            typed.ty.display_name()
-                        ), expr.span));
+                        return Err(CompileError::new(
+                            format!(
+                                "field '{}' type mismatch: expected {}, got {}",
+                                name,
+                                field_ty.display_name(),
+                                typed.ty.display_name()
+                            ),
+                            expr.span,
+                        ));
                     }
                     typed_fields.push((name.clone(), typed));
                 }
@@ -1331,11 +1435,14 @@ impl TypeChecker {
                 if let Some(spread_expr) = spread {
                     let typed_spread = self.check_expr(spread_expr)?;
                     if typed_spread.ty != Type::Struct(full_name.clone()) {
-                        return Err(CompileError::new(format!(
-                            "spread type mismatch: expected {}, got {}",
-                            full_name,
-                            typed_spread.ty.display_name()
-                        ), expr.span));
+                        return Err(CompileError::new(
+                            format!(
+                                "spread type mismatch: expected {}, got {}",
+                                full_name,
+                                typed_spread.ty.display_name()
+                            ),
+                            expr.span,
+                        ));
                     }
                     // Fill in any unprovided fields from the spread
                     for (i, (name, _)) in info.fields.iter().enumerate() {
@@ -1359,10 +1466,13 @@ impl TypeChecker {
                 // Check all fields are provided
                 for (name, _) in &info.fields {
                     if !provided.contains(name) {
-                        return Err(CompileError::new(format!(
-                            "missing field '{}' in struct literal for '{}'",
-                            name, full_name
-                        ), expr.span));
+                        return Err(CompileError::new(
+                            format!(
+                                "missing field '{}' in struct literal for '{}'",
+                                name, full_name
+                            ),
+                            expr.span,
+                        ));
                     }
                 }
 
@@ -1392,7 +1502,11 @@ impl TypeChecker {
                 // Check for type narrowing: if x is T
                 let narrowing = if let ExprKind::Is(inner, IsTarget::Type(ty)) = &cond.kind {
                     if let ExprKind::Ident(name) = &inner.kind {
-                        Some((name.clone(), self.resolve_type_expr(ty).map_err(|e| e.with_span(expr.span))?))
+                        Some((
+                            name.clone(),
+                            self.resolve_type_expr(ty)
+                                .map_err(|e| e.with_span(expr.span))?,
+                        ))
                     } else {
                         None
                     }
@@ -1401,10 +1515,13 @@ impl TypeChecker {
                 };
 
                 if typed_cond.ty != Type::Bool {
-                    return Err(CompileError::new(format!(
-                        "if condition must be bool, got {}",
-                        typed_cond.ty.display_name()
-                    ), expr.span));
+                    return Err(CompileError::new(
+                        format!(
+                            "if condition must be bool, got {}",
+                            typed_cond.ty.display_name()
+                        ),
+                        expr.span,
+                    ));
                 }
 
                 // Apply narrowing in then block
@@ -1575,10 +1692,10 @@ impl TypeChecker {
                         self.define_var(var1, Type::I64, false);
                     }
                     _ => {
-                        return Err(CompileError::new(format!(
-                            "cannot iterate over {}",
-                            typed_iterable.ty.display_name()
-                        ), expr.span))
+                        return Err(CompileError::new(
+                            format!("cannot iterate over {}", typed_iterable.ty.display_name()),
+                            expr.span,
+                        ))
                     }
                 }
 
@@ -1600,10 +1717,13 @@ impl TypeChecker {
             ExprKind::While(cond, body) => {
                 let typed_cond = self.check_expr(cond)?;
                 if typed_cond.ty != Type::Bool {
-                    return Err(CompileError::new(format!(
-                        "while condition must be bool, got {}",
-                        typed_cond.ty.display_name()
-                    ), expr.span));
+                    return Err(CompileError::new(
+                        format!(
+                            "while condition must be bool, got {}",
+                            typed_cond.ty.display_name()
+                        ),
+                        expr.span,
+                    ));
                 }
                 let old_in_loop = self.in_loop;
                 self.in_loop = true;
@@ -1634,8 +1754,10 @@ impl TypeChecker {
 
                     // The else block MUST diverge (return, break, continue, panic)
                     if !Self::block_diverges(&typed_else) {
-                        return Err(CompileError::new("guard else block must diverge (return, break, continue, or panic)"
-                                ,  expr.span));
+                        return Err(CompileError::new(
+                            "guard else block must diverge (return, break, continue, or panic)",
+                            expr.span,
+                        ));
                     }
 
                     // Determine unwrapped type
@@ -1661,17 +1783,22 @@ impl TypeChecker {
                     // guard condition else { ... }
                     let typed_cond = self.check_expr(expr)?;
                     if typed_cond.ty != Type::Bool {
-                        return Err(CompileError::new(format!(
-                            "guard condition must be bool, got {}",
-                            typed_cond.ty.display_name()
-                        ), expr.span));
+                        return Err(CompileError::new(
+                            format!(
+                                "guard condition must be bool, got {}",
+                                typed_cond.ty.display_name()
+                            ),
+                            expr.span,
+                        ));
                     }
                     let typed_else = self.check_block(else_block)?;
 
                     // The else block MUST diverge
                     if !Self::block_diverges(&typed_else) {
-                        return Err(CompileError::new("guard else block must diverge (return, break, continue, or panic)"
-                                ,  expr.span));
+                        return Err(CompileError::new(
+                            "guard else block must diverge (return, break, continue, or panic)",
+                            expr.span,
+                        ));
                     }
 
                     Ok(TypedExpr {
@@ -1694,7 +1821,9 @@ impl TypeChecker {
                 let mut param_types = Vec::new();
                 self.push_scope();
                 for p in params {
-                    let ty = self.resolve_type_expr(&p.ty).map_err(|e| e.with_span(expr.span))?;
+                    let ty = self
+                        .resolve_type_expr(&p.ty)
+                        .map_err(|e| e.with_span(expr.span))?;
                     self.define_var(&p.name, ty.clone(), false);
                     param_types.push((p.name.clone(), ty));
                 }
@@ -1721,7 +1850,9 @@ impl TypeChecker {
             }
             ExprKind::As(expr, ty) => {
                 let typed = self.check_expr(expr)?;
-                let target = self.resolve_type_expr(ty).map_err(|e| e.with_span(expr.span))?;
+                let target = self
+                    .resolve_type_expr(ty)
+                    .map_err(|e| e.with_span(expr.span))?;
                 // Validate conversion pair
                 self.check_conversion(&typed.ty, &target, false, expr.span)?;
                 Ok(TypedExpr {
@@ -1732,7 +1863,9 @@ impl TypeChecker {
             }
             ExprKind::AsSafe(expr, ty) => {
                 let typed = self.check_expr(expr)?;
-                let target = self.resolve_type_expr(ty).map_err(|e| e.with_span(expr.span))?;
+                let target = self
+                    .resolve_type_expr(ty)
+                    .map_err(|e| e.with_span(expr.span))?;
                 self.check_conversion(&typed.ty, &target, true, expr.span)?;
                 Ok(TypedExpr {
                     kind: TypedExprKind::AsSafe(Box::new(typed), target.clone()),
@@ -1770,26 +1903,35 @@ impl TypeChecker {
                             span: expr.span,
                         })
                     }
-                    _ => Err(CompileError::new(format!(
-                        "? operator requires result type, got {}",
-                        typed.ty.display_name()
-                    ), expr.span)),
+                    _ => Err(CompileError::new(
+                        format!(
+                            "? operator requires result type, got {}",
+                            typed.ty.display_name()
+                        ),
+                        expr.span,
+                    )),
                 }
             }
             ExprKind::Range(start, end) => {
                 let typed_start = self.check_expr(start)?;
                 let typed_end = self.check_expr(end)?;
                 if !typed_start.ty.is_integer() {
-                    return Err(CompileError::new(format!(
-                        "range start must be integer, got {}",
-                        typed_start.ty.display_name()
-                    ), expr.span));
+                    return Err(CompileError::new(
+                        format!(
+                            "range start must be integer, got {}",
+                            typed_start.ty.display_name()
+                        ),
+                        expr.span,
+                    ));
                 }
                 if !typed_end.ty.is_integer() {
-                    return Err(CompileError::new(format!(
-                        "range end must be integer, got {}",
-                        typed_end.ty.display_name()
-                    ), expr.span));
+                    return Err(CompileError::new(
+                        format!(
+                            "range end must be integer, got {}",
+                            typed_end.ty.display_name()
+                        ),
+                        expr.span,
+                    ));
                 }
                 Ok(TypedExpr {
                     kind: TypedExprKind::Range(Box::new(typed_start), Box::new(typed_end)),
@@ -1826,20 +1968,26 @@ impl TypeChecker {
         match &func_ty {
             Type::Function(param_types, ret_type) => {
                 if param_types.len() != typed_args.len() {
-                    return Err(CompileError::new(format!(
-                        "function expects {} arguments, got {}",
-                        param_types.len(),
-                        typed_args.len()
-                    ), func.span));
+                    return Err(CompileError::new(
+                        format!(
+                            "function expects {} arguments, got {}",
+                            param_types.len(),
+                            typed_args.len()
+                        ),
+                        func.span,
+                    ));
                 }
                 for (i, (param_ty, arg)) in param_types.iter().zip(typed_args.iter()).enumerate() {
                     if !self.is_assignable(&arg.ty, param_ty) {
-                        return Err(CompileError::new(format!(
-                            "argument {} type mismatch: expected {}, got {}",
-                            i + 1,
-                            param_ty.display_name(),
-                            arg.ty.display_name()
-                        ), func.span));
+                        return Err(CompileError::new(
+                            format!(
+                                "argument {} type mismatch: expected {}, got {}",
+                                i + 1,
+                                param_ty.display_name(),
+                                arg.ty.display_name()
+                            ),
+                            func.span,
+                        ));
                     }
                 }
                 let result_ty = *ret_type.clone();
@@ -1849,10 +1997,10 @@ impl TypeChecker {
                     span: Span::default(),
                 })
             }
-            _ => Err(CompileError::new(format!(
-                "cannot call value of type {}",
-                func_ty.display_name()
-            ), func.span)),
+            _ => Err(CompileError::new(
+                format!("cannot call value of type {}", func_ty.display_name()),
+                func.span,
+            )),
         }
     }
 
@@ -1917,12 +2065,15 @@ impl TypeChecker {
                             &method_info.params[..]
                         };
                         if expected_args.len() != args.len() {
-                            return Err(CompileError::new(format!(
-                                "method '{}' expects {} arguments, got {}",
-                                method,
-                                expected_args.len(),
-                                args.len()
-                            ), span));
+                            return Err(CompileError::new(
+                                format!(
+                                    "method '{}' expects {} arguments, got {}",
+                                    method,
+                                    expected_args.len(),
+                                    args.len()
+                                ),
+                                span,
+                            ));
                         }
                         return Ok(method_info.return_type.clone());
                     }
@@ -1933,7 +2084,9 @@ impl TypeChecker {
                 }
                 // Check module structs
                 for mod_info in self.type_info.modules.values() {
-                    if let Some(info) = mod_info.structs.get(name.split('.').next_back().unwrap_or(name))
+                    if let Some(info) = mod_info
+                        .structs
+                        .get(name.split('.').next_back().unwrap_or(name))
                     {
                         if let Some(method_info) = info.methods.get(method) {
                             return Ok(method_info.return_type.clone());
@@ -1943,11 +2096,10 @@ impl TypeChecker {
                         }
                     }
                 }
-                Err(CompileError::new(format!(
-                    "unknown method '{}' on {}",
-                    method,
-                    obj_ty.display_name()
-                ), span))
+                Err(CompileError::new(
+                    format!("unknown method '{}' on {}", method, obj_ty.display_name()),
+                    span,
+                ))
             }
             Type::Enum(name) => {
                 if let Some(info) = self.type_info.enums.get(name) {
@@ -1955,22 +2107,27 @@ impl TypeChecker {
                         return Ok(method_info.return_type.clone());
                     }
                 }
-                Err(CompileError::new(format!(
-                    "unknown method '{}' on {}",
-                    method,
-                    obj_ty.display_name()
-                ), span))
+                Err(CompileError::new(
+                    format!("unknown method '{}' on {}", method, obj_ty.display_name()),
+                    span,
+                ))
             }
-            Type::Capability(cap_name) => self.check_capability_method(cap_name, method, args, span),
-            _ => Err(CompileError::new(format!(
-                "unknown method '{}' on {}",
-                method,
-                obj_ty.display_name()
-            ), span)),
+            Type::Capability(cap_name) => {
+                self.check_capability_method(cap_name, method, args, span)
+            }
+            _ => Err(CompileError::new(
+                format!("unknown method '{}' on {}", method, obj_ty.display_name()),
+                span,
+            )),
         }
     }
 
-    fn check_string_method(&self, method: &str, args: &[TypedExpr], span: Span) -> Result<Type, CompileError> {
+    fn check_string_method(
+        &self,
+        method: &str,
+        args: &[TypedExpr],
+        span: Span,
+    ) -> Result<Type, CompileError> {
         match method {
             "split" => {
                 if args.len() != 1 {
@@ -1980,7 +2137,10 @@ impl TypeChecker {
             }
             "trim" | "trim_start" | "trim_end" | "upper" | "lower" => {
                 if !args.is_empty() {
-                    return Err(CompileError::new(format!("{} takes 0 arguments", method), span));
+                    return Err(CompileError::new(
+                        format!("{} takes 0 arguments", method),
+                        span,
+                    ));
                 }
                 Ok(Type::String)
             }
@@ -2004,7 +2164,10 @@ impl TypeChecker {
             }
             "starts_with" | "ends_with" | "contains" => {
                 if args.len() != 1 {
-                    return Err(CompileError::new(format!("{} takes 1 argument", method), span));
+                    return Err(CompileError::new(
+                        format!("{} takes 1 argument", method),
+                        span,
+                    ));
                 }
                 Ok(Type::Bool)
             }
@@ -2020,7 +2183,10 @@ impl TypeChecker {
                 }
                 Ok(Type::String)
             }
-            _ => Err(CompileError::new(format!("unknown string method '{}'", method), span)),
+            _ => Err(CompileError::new(
+                format!("unknown string method '{}'", method),
+                span,
+            )),
         }
     }
 
@@ -2037,11 +2203,14 @@ impl TypeChecker {
                     return Err(CompileError::new("push takes 1 argument", span));
                 }
                 if !self.is_assignable(&args[0].ty, elem_ty) {
-                    return Err(CompileError::new(format!(
-                        "push type mismatch: array is [{}], got {}",
-                        elem_ty.display_name(),
-                        args[0].ty.display_name()
-                    ), span));
+                    return Err(CompileError::new(
+                        format!(
+                            "push type mismatch: array is [{}], got {}",
+                            elem_ty.display_name(),
+                            args[0].ty.display_name()
+                        ),
+                        span,
+                    ));
                 }
                 Ok(Type::Nil)
             }
@@ -2065,7 +2234,10 @@ impl TypeChecker {
             }
             "sort" | "reverse" => {
                 if !args.is_empty() {
-                    return Err(CompileError::new(format!("{} takes 0 arguments", method), span));
+                    return Err(CompileError::new(
+                        format!("{} takes 0 arguments", method),
+                        span,
+                    ));
                 }
                 Ok(Type::Nil)
             }
@@ -2087,7 +2259,10 @@ impl TypeChecker {
                 }
                 Ok(Type::Array(Box::new(elem_ty.clone())))
             }
-            _ => Err(CompileError::new(format!("unknown array method '{}'", method), span)),
+            _ => Err(CompileError::new(
+                format!("unknown array method '{}'", method),
+                span,
+            )),
         }
     }
 
@@ -2139,7 +2314,10 @@ impl TypeChecker {
                     Box::new(val_ty.clone()),
                 ))
             }
-            _ => Err(CompileError::new(format!("unknown map method '{}'", method), span)),
+            _ => Err(CompileError::new(
+                format!("unknown map method '{}'", method),
+                span,
+            )),
         }
     }
 
@@ -2154,7 +2332,10 @@ impl TypeChecker {
             "Stdout" => match method {
                 "println" | "print" => {
                     if args.len() != 1 {
-                        return Err(CompileError::new(format!("{} takes 1 argument", method), span));
+                        return Err(CompileError::new(
+                            format!("{} takes 1 argument", method),
+                            span,
+                        ));
                     }
                     Ok(Type::Nil)
                 }
@@ -2164,7 +2345,10 @@ impl TypeChecker {
                     }
                     Ok(Type::Nil)
                 }
-                _ => Err(CompileError::new(format!("unknown method '{}' on Stdout", method), span)),
+                _ => Err(CompileError::new(
+                    format!("unknown method '{}' on Stdout", method),
+                    span,
+                )),
             },
             "Stdin" => match method {
                 "read_line" => {
@@ -2179,9 +2363,15 @@ impl TypeChecker {
                     }
                     Ok(Type::String)
                 }
-                _ => Err(CompileError::new(format!("unknown method '{}' on Stdin", method), span)),
+                _ => Err(CompileError::new(
+                    format!("unknown method '{}' on Stdin", method),
+                    span,
+                )),
             },
-            _ => Err(CompileError::new(format!("unknown capability '{}'", cap), span)),
+            _ => Err(CompileError::new(
+                format!("unknown capability '{}'", cap),
+                span,
+            )),
         }
     }
 
@@ -2202,13 +2392,16 @@ impl TypeChecker {
             // module.function(args)
             if let Some(func_info) = mod_info.functions.get(method) {
                 if func_info.params.len() != typed_args.len() {
-                    return Err(CompileError::new(format!(
-                        "function '{}.{}' expects {} arguments, got {}",
-                        name,
-                        method,
-                        func_info.params.len(),
-                        typed_args.len()
-                    ), span));
+                    return Err(CompileError::new(
+                        format!(
+                            "function '{}.{}' expects {} arguments, got {}",
+                            name,
+                            method,
+                            func_info.params.len(),
+                            typed_args.len()
+                        ),
+                        span,
+                    ));
                 }
                 return Ok(TypedExpr {
                     kind: TypedExprKind::StaticMethodCall(
@@ -2223,7 +2416,10 @@ impl TypeChecker {
             // Could be module.Type(args) - enum variant with single field
             if let Some(_enum_info) = mod_info.enums.get(method) {
                 // This is actually accessing a type, not calling a function
-                return Err(CompileError::new(format!("'{}' is a type, not a function", method), span));
+                return Err(CompileError::new(
+                    format!("'{}' is a type, not a function", method),
+                    span,
+                ));
             }
         }
 
@@ -2233,13 +2429,16 @@ impl TypeChecker {
                 if !method_info.is_method {
                     // Static method
                     if method_info.params.len() != typed_args.len() {
-                        return Err(CompileError::new(format!(
-                            "static method '{}.{}' expects {} arguments, got {}",
-                            name,
-                            method,
-                            method_info.params.len(),
-                            typed_args.len()
-                        ), span));
+                        return Err(CompileError::new(
+                            format!(
+                                "static method '{}.{}' expects {} arguments, got {}",
+                                name,
+                                method,
+                                method_info.params.len(),
+                                typed_args.len()
+                            ),
+                            span,
+                        ));
                     }
                     return Ok(TypedExpr {
                         kind: TypedExprKind::StaticMethodCall(
@@ -2258,13 +2457,16 @@ impl TypeChecker {
         if let Some(enum_info) = self.type_info.enums.get(name).cloned() {
             if let Some(variant) = enum_info.variants.iter().find(|v| v.name == method) {
                 if variant.fields.len() != typed_args.len() {
-                    return Err(CompileError::new(format!(
-                        "enum variant '{}.{}' expects {} arguments, got {}",
-                        name,
-                        method,
-                        variant.fields.len(),
-                        typed_args.len()
-                    ), span));
+                    return Err(CompileError::new(
+                        format!(
+                            "enum variant '{}.{}' expects {} arguments, got {}",
+                            name,
+                            method,
+                            variant.fields.len(),
+                            typed_args.len()
+                        ),
+                        span,
+                    ));
                 }
                 return Ok(TypedExpr {
                     kind: TypedExprKind::EnumVariant(
@@ -2278,7 +2480,10 @@ impl TypeChecker {
             }
         }
 
-        Err(CompileError::new(format!("unknown function or method '{}.{}'", name, method), span))
+        Err(CompileError::new(
+            format!("unknown function or method '{}.{}'", name, method),
+            span,
+        ))
     }
 
     fn check_enum_variant(
@@ -2305,33 +2510,42 @@ impl TypeChecker {
             self.type_info.enums.get(type_name).cloned()
         };
 
-        let info = enum_info.ok_or_else(|| CompileError::new(format!("unknown enum type '{}'", full_name), span))?;
+        let info = enum_info
+            .ok_or_else(|| CompileError::new(format!("unknown enum type '{}'", full_name), span))?;
 
         let variant_info = info
             .variants
             .iter()
             .find(|v| v.name == variant)
-            .ok_or_else(|| CompileError::new(format!("unknown variant '{}.{}'", full_name, variant), span))?;
+            .ok_or_else(|| {
+                CompileError::new(format!("unknown variant '{}.{}'", full_name, variant), span)
+            })?;
 
         if variant_info.fields.len() != args.len() {
-            return Err(CompileError::new(format!(
-                "variant '{}.{}' expects {} arguments, got {}",
-                full_name,
-                variant,
-                variant_info.fields.len(),
-                args.len()
-            ), span));
+            return Err(CompileError::new(
+                format!(
+                    "variant '{}.{}' expects {} arguments, got {}",
+                    full_name,
+                    variant,
+                    variant_info.fields.len(),
+                    args.len()
+                ),
+                span,
+            ));
         }
 
         let mut typed_args = Vec::new();
         for (i, arg) in args.iter().enumerate() {
             let typed = self.check_expr(arg)?;
             if !self.is_assignable(&typed.ty, &variant_info.fields[i]) {
-                return Err(CompileError::new(format!(
-                    "variant field type mismatch: expected {}, got {}",
-                    variant_info.fields[i].display_name(),
-                    typed.ty.display_name()
-                ), span));
+                return Err(CompileError::new(
+                    format!(
+                        "variant field type mismatch: expected {}, got {}",
+                        variant_info.fields[i].display_name(),
+                        typed.ty.display_name()
+                    ),
+                    span,
+                ));
             }
             typed_args.push(typed);
         }
@@ -2343,7 +2557,13 @@ impl TypeChecker {
         })
     }
 
-    fn check_binop(&self, left: &Type, op: &BinOp, right: &Type, span: Span) -> Result<Type, CompileError> {
+    fn check_binop(
+        &self,
+        left: &Type,
+        op: &BinOp,
+        right: &Type,
+        span: Span,
+    ) -> Result<Type, CompileError> {
         match op {
             BinOp::Add => {
                 // String concatenation
@@ -2354,81 +2574,108 @@ impl TypeChecker {
                 if left == right && left.is_numeric() {
                     return Ok(left.clone());
                 }
-                Err(CompileError::new(format!(
-                    "cannot add {} and {}",
-                    left.display_name(),
-                    right.display_name()
-                ), span))
+                Err(CompileError::new(
+                    format!(
+                        "cannot add {} and {}",
+                        left.display_name(),
+                        right.display_name()
+                    ),
+                    span,
+                ))
             }
             BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Mod => {
                 if left == right && left.is_numeric() {
                     return Ok(left.clone());
                 }
-                Err(CompileError::new(format!(
-                    "cannot apply {:?} to {} and {}",
-                    op,
-                    left.display_name(),
-                    right.display_name()
-                ), span))
+                Err(CompileError::new(
+                    format!(
+                        "cannot apply {:?} to {} and {}",
+                        op,
+                        left.display_name(),
+                        right.display_name()
+                    ),
+                    span,
+                ))
             }
             BinOp::Pow => {
                 if left == right && left.is_numeric() {
                     return Ok(left.clone());
                 }
-                Err(CompileError::new(format!(
-                    "cannot apply ** to {} and {}",
-                    left.display_name(),
-                    right.display_name()
-                ), span))
+                Err(CompileError::new(
+                    format!(
+                        "cannot apply ** to {} and {}",
+                        left.display_name(),
+                        right.display_name()
+                    ),
+                    span,
+                ))
             }
             BinOp::Eq | BinOp::NotEq => {
                 if left == right || (left == &Type::Nil || right == &Type::Nil) {
                     Ok(Type::Bool)
                 } else {
-                    Err(CompileError::new(format!(
-                        "cannot compare {} and {} for equality",
-                        left.display_name(),
-                        right.display_name()
-                    ), span))
+                    Err(CompileError::new(
+                        format!(
+                            "cannot compare {} and {} for equality",
+                            left.display_name(),
+                            right.display_name()
+                        ),
+                        span,
+                    ))
                 }
             }
             BinOp::Lt | BinOp::LtEq | BinOp::Gt | BinOp::GtEq => {
                 if left == right && (left.is_numeric() || *left == Type::String) {
                     Ok(Type::Bool)
                 } else {
-                    Err(CompileError::new(format!(
-                        "cannot compare {} and {}",
-                        left.display_name(),
-                        right.display_name()
-                    ), span))
+                    Err(CompileError::new(
+                        format!(
+                            "cannot compare {} and {}",
+                            left.display_name(),
+                            right.display_name()
+                        ),
+                        span,
+                    ))
                 }
             }
             BinOp::And | BinOp::Or => {
                 if *left == Type::Bool && *right == Type::Bool {
                     Ok(Type::Bool)
                 } else {
-                    Err(CompileError::new(format!(
-                        "logical operators require bool operands, got {} and {}",
-                        left.display_name(),
-                        right.display_name()
-                    ), span))
+                    Err(CompileError::new(
+                        format!(
+                            "logical operators require bool operands, got {} and {}",
+                            left.display_name(),
+                            right.display_name()
+                        ),
+                        span,
+                    ))
                 }
             }
             BinOp::BitAnd | BinOp::BitOr | BinOp::BitXor | BinOp::ShiftLeft | BinOp::ShiftRight => {
                 if left == right && left.is_integer() {
                     Ok(left.clone())
                 } else {
-                    Err(CompileError::new(format!(
-                        "bitwise operators require matching integer types, got {} and {}",
-                        left.display_name(),
-                        right.display_name()
-                    ), span))
+                    Err(CompileError::new(
+                        format!(
+                            "bitwise operators require matching integer types, got {} and {}",
+                            left.display_name(),
+                            right.display_name()
+                        ),
+                        span,
+                    ))
                 }
             }
         }
     }
 
-    fn check_conversion(&self, from: &Type, to: &Type, _is_safe: bool, span: Span) -> Result<(), CompileError> {
+    fn check_conversion(
+        &self,
+        from: &Type,
+        to: &Type,
+        _is_safe: bool,
+        span: Span,
+    ) -> Result<(), CompileError> {
         // Same type (no-op cast, can arise after type narrowing)
         if from == to {
             return Ok(());
@@ -2480,11 +2727,14 @@ impl TypeChecker {
             return Ok(());
         }
 
-        Err(CompileError::new(format!(
-            "cannot convert {} to {}",
-            from.display_name(),
-            to.display_name()
-        ), span))
+        Err(CompileError::new(
+            format!(
+                "cannot convert {} to {}",
+                from.display_name(),
+                to.display_name()
+            ),
+            span,
+        ))
     }
 
     fn get_field_type(&self, ty: &Type, field: &str, span: Span) -> Result<Type, CompileError> {
@@ -2511,38 +2761,51 @@ impl TypeChecker {
                         }
                     }
                 }
-                Err(CompileError::new(format!("unknown field '{}' on {}", field, name), span))
+                Err(CompileError::new(
+                    format!("unknown field '{}' on {}", field, name),
+                    span,
+                ))
             }
-            _ => Err(CompileError::new(format!(
-                "cannot access field '{}' on {}",
-                field,
-                ty.display_name()
-            ), span)),
+            _ => Err(CompileError::new(
+                format!("cannot access field '{}' on {}", field, ty.display_name()),
+                span,
+            )),
         }
     }
 
-    fn get_index_type(&self, obj_ty: &Type, idx_ty: &Type, span: Span) -> Result<Type, CompileError> {
+    fn get_index_type(
+        &self,
+        obj_ty: &Type,
+        idx_ty: &Type,
+        span: Span,
+    ) -> Result<Type, CompileError> {
         match obj_ty {
             Type::Array(elem_ty) => {
                 if !idx_ty.is_integer() {
-                    return Err(CompileError::new(format!(
-                        "array index must be integer, got {}",
-                        idx_ty.display_name()
-                    ), span));
+                    return Err(CompileError::new(
+                        format!("array index must be integer, got {}", idx_ty.display_name()),
+                        span,
+                    ));
                 }
                 Ok(*elem_ty.clone())
             }
             Type::Map(key_ty, val_ty) => {
                 if !self.is_assignable(idx_ty, key_ty) {
-                    return Err(CompileError::new(format!(
-                        "map key type mismatch: expected {}, got {}",
-                        key_ty.display_name(),
-                        idx_ty.display_name()
-                    ), span));
+                    return Err(CompileError::new(
+                        format!(
+                            "map key type mismatch: expected {}, got {}",
+                            key_ty.display_name(),
+                            idx_ty.display_name()
+                        ),
+                        span,
+                    ));
                 }
                 Ok(*val_ty.clone())
             }
-            _ => Err(CompileError::new(format!("cannot index into {}", obj_ty.display_name()), span)),
+            _ => Err(CompileError::new(
+                format!("cannot index into {}", obj_ty.display_name()),
+                span,
+            )),
         }
     }
 
@@ -2554,10 +2817,13 @@ impl TypeChecker {
             ExprKind::Ident(name) => {
                 if let Some((_, mutable)) = self.lookup_var(name) {
                     if !mutable {
-                        return Err(CompileError::new(format!(
-                            "cannot {} on immutable binding '{}' (declare with 'let mut')",
-                            action, name
-                        ), expr.span));
+                        return Err(CompileError::new(
+                            format!(
+                                "cannot {} on immutable binding '{}' (declare with 'let mut')",
+                                action, name
+                            ),
+                            expr.span,
+                        ));
                     }
                 }
                 Ok(())
@@ -2587,7 +2853,12 @@ impl TypeChecker {
     }
 
     /// Check that an integer literal fits within a declared narrow integer type.
-    fn check_int_literal_range(n: i64, ty: &Type, name: &str, span: Span) -> Result<(), CompileError> {
+    fn check_int_literal_range(
+        n: i64,
+        ty: &Type,
+        name: &str,
+        span: Span,
+    ) -> Result<(), CompileError> {
         let (min, max): (i64, i64) = match ty {
             Type::I8 => (i8::MIN as i64, i8::MAX as i64),
             Type::I16 => (i16::MIN as i64, i16::MAX as i64),
@@ -2598,12 +2869,15 @@ impl TypeChecker {
             _ => return Ok(()), // i64, u64, or non-integer — no check needed
         };
         if n < min || n > max {
-            return Err(CompileError::new(format!(
-                "integer literal {} out of range for {} in '{}'",
-                n,
-                ty.display_name(),
-                name
-            ), span));
+            return Err(CompileError::new(
+                format!(
+                    "integer literal {} out of range for {} in '{}'",
+                    n,
+                    ty.display_name(),
+                    name
+                ),
+                span,
+            ));
         }
         Ok(())
     }
@@ -2612,7 +2886,9 @@ impl TypeChecker {
     fn block_diverges(block: &TypedBlock) -> bool {
         if let Some(last) = block.stmts.last() {
             match last {
-                TypedStmt::Return(_) | TypedStmt::ReturnError(_) | TypedStmt::Break
+                TypedStmt::Return(_)
+                | TypedStmt::ReturnError(_)
+                | TypedStmt::Break
                 | TypedStmt::Continue => true,
                 TypedStmt::Expr(expr) => matches!(&expr.kind, TypedExprKind::Panic(_)),
                 _ => false,
@@ -2652,19 +2928,15 @@ impl TypeChecker {
                     match &arm.pattern.kind {
                         PatternKind::EnumVariant(_, variant, _)
                         | PatternKind::QualifiedEnumVariant(_, _, variant, _) => {
-                            if let Some(idx) = enum_info
-                                .variants
-                                .iter()
-                                .position(|v| v.name == *variant)
+                            if let Some(idx) =
+                                enum_info.variants.iter().position(|v| v.name == *variant)
                             {
                                 covered[idx] = true;
                             }
                         }
                         PatternKind::IsEnumVariant(_, variant) => {
-                            if let Some(idx) = enum_info
-                                .variants
-                                .iter()
-                                .position(|v| v.name == *variant)
+                            if let Some(idx) =
+                                enum_info.variants.iter().position(|v| v.name == *variant)
                             {
                                 covered[idx] = true;
                             }
@@ -2680,11 +2952,14 @@ impl TypeChecker {
                     .map(|(v, _)| v.name.as_str())
                     .collect();
                 if !missing.is_empty() {
-                    return Err(CompileError::new(format!(
-                        "non-exhaustive match on '{}': missing variant(s) {}",
-                        name,
-                        missing.join(", ")
-                    ), span));
+                    return Err(CompileError::new(
+                        format!(
+                            "non-exhaustive match on '{}': missing variant(s) {}",
+                            name,
+                            missing.join(", ")
+                        ),
+                        span,
+                    ));
                 }
             }
             Type::Bool => {
@@ -2698,7 +2973,10 @@ impl TypeChecker {
                     }
                 }
                 if !has_true || !has_false {
-                    return Err(CompileError::new("non-exhaustive match on bool: missing true or false branch", span));
+                    return Err(CompileError::new(
+                        "non-exhaustive match on bool: missing true or false branch",
+                        span,
+                    ));
                 }
             }
             Type::Union(members) => {
@@ -2721,10 +2999,13 @@ impl TypeChecker {
                     .map(|(t, _)| t.display_name())
                     .collect();
                 if !missing.is_empty() {
-                    return Err(CompileError::new(format!(
-                        "non-exhaustive match on union type: missing type(s) {}",
-                        missing.join(", ")
-                    ), span));
+                    return Err(CompileError::new(
+                        format!(
+                            "non-exhaustive match on union type: missing type(s) {}",
+                            missing.join(", ")
+                        ),
+                        span,
+                    ));
                 }
             }
             // For integers, strings, etc. we can't check exhaustiveness
@@ -2763,13 +3044,16 @@ impl TypeChecker {
                 if let Some(info) = self.type_info.enums.get(type_name) {
                     if let Some(v) = info.variants.iter().find(|v| v.name == *variant) {
                         if bound_names.len() != v.fields.len() {
-                            return Err(CompileError::new(format!(
-                                "pattern for '{}.{}' expects {} bindings, got {}",
-                                type_name,
-                                variant,
-                                v.fields.len(),
-                                bound_names.len()
-                            ), pattern.span));
+                            return Err(CompileError::new(
+                                format!(
+                                    "pattern for '{}.{}' expects {} bindings, got {}",
+                                    type_name,
+                                    variant,
+                                    v.fields.len(),
+                                    bound_names.len()
+                                ),
+                                pattern.span,
+                            ));
                         }
                         for (i, name) in bound_names.iter().enumerate() {
                             if name != "_" {

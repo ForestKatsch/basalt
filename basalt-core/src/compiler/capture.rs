@@ -113,7 +113,8 @@ fn find_lambdas_in_expr(
 /// locally defined within the block or its sub-blocks.
 pub fn collect_free_vars(body: &TypedBlock, params: &[(String, Type)]) -> Vec<String> {
     let mut free = Vec::new();
-    let mut defined: std::collections::HashSet<String> = params.iter().map(|(n, _)| n.clone()).collect();
+    let mut defined: std::collections::HashSet<String> =
+        params.iter().map(|(n, _)| n.clone()).collect();
     collect_free_in_block(body, &mut defined, &mut free);
     // Deduplicate while preserving order
     let mut seen = std::collections::HashSet::new();
@@ -121,13 +122,21 @@ pub fn collect_free_vars(body: &TypedBlock, params: &[(String, Type)]) -> Vec<St
     free
 }
 
-fn collect_free_in_block(block: &TypedBlock, defined: &mut std::collections::HashSet<String>, free: &mut Vec<String>) {
+fn collect_free_in_block(
+    block: &TypedBlock,
+    defined: &mut std::collections::HashSet<String>,
+    free: &mut Vec<String>,
+) {
     for stmt in &block.stmts {
         collect_free_in_stmt(stmt, defined, free);
     }
 }
 
-fn collect_free_in_stmt(stmt: &TypedStmt, defined: &mut std::collections::HashSet<String>, free: &mut Vec<String>) {
+fn collect_free_in_stmt(
+    stmt: &TypedStmt,
+    defined: &mut std::collections::HashSet<String>,
+    free: &mut Vec<String>,
+) {
     match stmt {
         TypedStmt::Let(decl) => {
             collect_free_in_expr(&decl.value, defined, free);
@@ -142,7 +151,9 @@ fn collect_free_in_stmt(stmt: &TypedStmt, defined: &mut std::collections::HashSe
         TypedStmt::Assign(target, value) => {
             match target.as_ref() {
                 TypedAssignTarget::Variable(name, _) => {
-                    if !defined.contains(name) { free.push(name.clone()); }
+                    if !defined.contains(name) {
+                        free.push(name.clone());
+                    }
                 }
                 TypedAssignTarget::Field(obj, _, _) => collect_free_in_expr(obj, defined, free),
                 TypedAssignTarget::Index(obj, idx, _) => {
@@ -159,35 +170,53 @@ fn collect_free_in_stmt(stmt: &TypedStmt, defined: &mut std::collections::HashSe
     }
 }
 
-fn collect_free_in_expr(expr: &TypedExpr, defined: &mut std::collections::HashSet<String>, free: &mut Vec<String>) {
+fn collect_free_in_expr(
+    expr: &TypedExpr,
+    defined: &mut std::collections::HashSet<String>,
+    free: &mut Vec<String>,
+) {
     match &expr.kind {
         TypedExprKind::Ident(name) => {
-            if !defined.contains(name) { free.push(name.clone()); }
+            if !defined.contains(name) {
+                free.push(name.clone());
+            }
         }
         TypedExprKind::BinOp(l, _, r) => {
             collect_free_in_expr(l, defined, free);
             collect_free_in_expr(r, defined, free);
         }
-        TypedExprKind::UnaryOp(_, e) | TypedExprKind::As(e, _) | TypedExprKind::AsSafe(e, _)
-        | TypedExprKind::Is(e, _) | TypedExprKind::Try(e) | TypedExprKind::ErrorLit(e) => {
+        TypedExprKind::UnaryOp(_, e)
+        | TypedExprKind::As(e, _)
+        | TypedExprKind::AsSafe(e, _)
+        | TypedExprKind::Is(e, _)
+        | TypedExprKind::Try(e)
+        | TypedExprKind::ErrorLit(e) => {
             collect_free_in_expr(e, defined, free);
         }
         TypedExprKind::Call(f, args) => {
             collect_free_in_expr(f, defined, free);
-            for a in args { collect_free_in_expr(a, defined, free); }
+            for a in args {
+                collect_free_in_expr(a, defined, free);
+            }
         }
         TypedExprKind::MethodCall(obj, _, args) => {
             collect_free_in_expr(obj, defined, free);
-            for a in args { collect_free_in_expr(a, defined, free); }
+            for a in args {
+                collect_free_in_expr(a, defined, free);
+            }
         }
         TypedExprKind::StaticMethodCall(_, _, args) => {
-            for a in args { collect_free_in_expr(a, defined, free); }
+            for a in args {
+                collect_free_in_expr(a, defined, free);
+            }
         }
         TypedExprKind::FieldAccess(e, _) | TypedExprKind::Index(e, _) => {
             collect_free_in_expr(e, defined, free);
         }
         TypedExprKind::ArrayLit(elems) | TypedExprKind::TupleLit(elems) => {
-            for e in elems { collect_free_in_expr(e, defined, free); }
+            for e in elems {
+                collect_free_in_expr(e, defined, free);
+            }
         }
         TypedExprKind::MapLit(entries) => {
             for (k, v) in entries {
@@ -196,24 +225,34 @@ fn collect_free_in_expr(expr: &TypedExpr, defined: &mut std::collections::HashSe
             }
         }
         TypedExprKind::StructLit(_, fields) => {
-            for (_, e) in fields { collect_free_in_expr(e, defined, free); }
+            for (_, e) in fields {
+                collect_free_in_expr(e, defined, free);
+            }
         }
         TypedExprKind::EnumVariant(_, _, args) | TypedExprKind::Panic(args) => {
-            for a in args { collect_free_in_expr(a, defined, free); }
+            for a in args {
+                collect_free_in_expr(a, defined, free);
+            }
         }
         TypedExprKind::If(cond, then_b, else_e) => {
             collect_free_in_expr(cond, defined, free);
             collect_free_in_block(then_b, defined, free);
-            if let Some(e) = else_e { collect_free_in_expr(e, defined, free); }
+            if let Some(e) = else_e {
+                collect_free_in_expr(e, defined, free);
+            }
         }
         TypedExprKind::Match(scrut, arms) => {
             collect_free_in_expr(scrut, defined, free);
-            for arm in arms { collect_free_in_expr(&arm.body, defined, free); }
+            for arm in arms {
+                collect_free_in_expr(&arm.body, defined, free);
+            }
         }
         TypedExprKind::For(v1, v2, iter, body) => {
             collect_free_in_expr(iter, defined, free);
             defined.insert(v1.clone());
-            if let Some(v) = v2 { defined.insert(v.clone()); }
+            if let Some(v) = v2 {
+                defined.insert(v.clone());
+            }
             collect_free_in_block(body, defined, free);
         }
         TypedExprKind::While(cond, body) => {
@@ -226,11 +265,15 @@ fn collect_free_in_expr(expr: &TypedExpr, defined: &mut std::collections::HashSe
         TypedExprKind::Guard(binding, e, else_b) => {
             collect_free_in_expr(e, defined, free);
             collect_free_in_block(else_b, defined, free);
-            if let Some(n) = binding { defined.insert(n.clone()); }
+            if let Some(n) = binding {
+                defined.insert(n.clone());
+            }
         }
         TypedExprKind::Lambda(params, _, body) => {
             let mut inner_defined = defined.clone();
-            for (n, _) in params { inner_defined.insert(n.clone()); }
+            for (n, _) in params {
+                inner_defined.insert(n.clone());
+            }
             collect_free_in_block(body, &mut inner_defined, free);
         }
         TypedExprKind::Range(s, e) => {
@@ -239,10 +282,11 @@ fn collect_free_in_expr(expr: &TypedExpr, defined: &mut std::collections::HashSe
         }
         TypedExprKind::InterpolatedString(parts) => {
             for p in parts {
-                if let TypedStringPart::Expr(e) = p { collect_free_in_expr(e, defined, free); }
+                if let TypedStringPart::Expr(e) = p {
+                    collect_free_in_expr(e, defined, free);
+                }
             }
         }
         _ => {} // Literals, Nil, etc.
     }
 }
-

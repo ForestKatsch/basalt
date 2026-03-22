@@ -22,8 +22,13 @@ pub struct VM {
 
 /// Helper to extract a heap reference, returning a runtime error instead of panicking.
 fn heap_ref<'a>(val: &'a Value, context: &str) -> Result<&'a HeapRef, String> {
-    val.as_heap_ref()
-        .ok_or_else(|| format!("runtime error: expected heap value for {}, got {}", context, val.type_tag()))
+    val.as_heap_ref().ok_or_else(|| {
+        format!(
+            "runtime error: expected heap value for {}, got {}",
+            context,
+            val.type_tag()
+        )
+    })
 }
 
 /// Helper to extract a heap object and match on it, producing a runtime error on mismatch.
@@ -82,7 +87,10 @@ impl VM {
         self.call_depth += 1;
         if self.call_depth > MAX_CALL_DEPTH {
             let trace = self.format_stack_trace();
-            return Err(format!("stack overflow: maximum call depth exceeded\nstack trace:\n{}", trace));
+            return Err(format!(
+                "stack overflow: maximum call depth exceeded\nstack trace:\n{}",
+                trace
+            ));
         }
 
         // Check instruction budget at call boundaries (amortized)
@@ -412,11 +420,7 @@ impl VM {
                 }
                 Op::FloatToIntSafe(d, s) => {
                     let f = reg[s as usize].as_float();
-                    if f.is_nan()
-                        || f.is_infinite()
-                        || f > i64::MAX as f64
-                        || f < i64::MIN as f64
-                    {
+                    if f.is_nan() || f.is_infinite() || f > i64::MAX as f64 || f < i64::MIN as f64 {
                         reg[d as usize] = Value::Nil;
                     } else {
                         reg[d as usize] = Value::int(f as i64);
@@ -600,7 +604,10 @@ impl VM {
                     reg[d as usize] = match &*obj {
                         HeapObject::Struct(s) => {
                             s.fields.get(fi as usize).cloned().ok_or_else(|| {
-                                format!("field index {} out of bounds on struct '{}'", fi, s.type_name)
+                                format!(
+                                    "field index {} out of bounds on struct '{}'",
+                                    fi, s.type_name
+                                )
                             })?
                         }
                         HeapObject::Tuple(vals) => {
@@ -645,11 +652,11 @@ impl VM {
                     let href = heap_ref(&reg[s as usize], "enum field")?.clone();
                     let obj = href.borrow();
                     reg[d as usize] = match &*obj {
-                        HeapObject::Enum(e) => {
-                            e.fields.get(fi as usize).cloned().ok_or_else(|| {
-                                format!("enum field index {} out of bounds", fi)
-                            })?
-                        }
+                        HeapObject::Enum(e) => e
+                            .fields
+                            .get(fi as usize)
+                            .cloned()
+                            .ok_or_else(|| format!("enum field index {} out of bounds", fi))?,
                         _ => return Err("enum field access on non-enum".to_string()),
                     };
                 }
@@ -734,7 +741,8 @@ impl VM {
                 }
                 // === Identity ===
                 Op::IsIdentical(d, a, b) => {
-                    reg[d as usize] = Value::bool(values_identical(&reg[a as usize], &reg[b as usize]));
+                    reg[d as usize] =
+                        Value::bool(values_identical(&reg[a as usize], &reg[b as usize]));
                 }
 
                 // === Range ===
@@ -839,7 +847,8 @@ impl VM {
                             };
                             if *index < keys.len() {
                                 reg[kd as usize] = map_key_to_value(&keys[*index]);
-                                reg[vd as usize] = map.get(&keys[*index]).cloned().unwrap_or(Value::Nil);
+                                reg[vd as usize] =
+                                    map.get(&keys[*index]).cloned().unwrap_or(Value::Nil);
                                 reg[dd as usize] = Value::bool(false);
                                 *index += 1;
                             } else {
@@ -853,8 +862,9 @@ impl VM {
                 // === Capture Cells ===
                 Op::MakeCell(d, s) => {
                     let val = reg[s as usize].clone();
-                    reg[d as usize] =
-                        Value::Heap(Arc::new(RefCell::new(HeapObject::CaptureCell(Box::new(val)))));
+                    reg[d as usize] = Value::Heap(Arc::new(RefCell::new(HeapObject::CaptureCell(
+                        Box::new(val),
+                    ))));
                 }
                 Op::CellGet(d, s) => {
                     let href = heap_ref(&reg[s as usize], "cell read")?.clone();
@@ -905,11 +915,16 @@ impl VM {
     }
 
     fn format_stack_trace(&self) -> String {
-        let frames: Vec<(String, u32)> = self.call_stack.iter().rev().map(|&(fi, ip)| {
-            let func = &self.program.functions[fi];
-            let line = func.line_table.get(ip).copied().unwrap_or(0);
-            (func.name.clone(), line)
-        }).collect();
+        let frames: Vec<(String, u32)> = self
+            .call_stack
+            .iter()
+            .rev()
+            .map(|&(fi, ip)| {
+                let func = &self.program.functions[fi];
+                let line = func.line_table.get(ip).copied().unwrap_or(0);
+                (func.name.clone(), line)
+            })
+            .collect();
 
         let mut trace = String::new();
 
@@ -1026,10 +1041,7 @@ impl VM {
                 chars: s.chars().map(|c| c.to_string()).collect(),
                 index: 0,
             }),
-            &HeapObject::Range(s, e) => Ok(IterState::Range {
-                current: s,
-                end: e,
-            }),
+            &HeapObject::Range(s, e) => Ok(IterState::Range { current: s, end: e }),
             _ => Err(format!("cannot iterate over {}", val.display_as_string())),
         }
     }
@@ -1184,12 +1196,24 @@ impl VM {
                 );
                 Ok(Value::float(a.max(b)))
             }
-            "sin" => Ok(Value::float(args.first().map(|a| a.as_float()).unwrap_or(0.0).sin())),
-            "cos" => Ok(Value::float(args.first().map(|a| a.as_float()).unwrap_or(0.0).cos())),
-            "tan" => Ok(Value::float(args.first().map(|a| a.as_float()).unwrap_or(0.0).tan())),
-            "asin" => Ok(Value::float(args.first().map(|a| a.as_float()).unwrap_or(0.0).asin())),
-            "acos" => Ok(Value::float(args.first().map(|a| a.as_float()).unwrap_or(0.0).acos())),
-            "atan" => Ok(Value::float(args.first().map(|a| a.as_float()).unwrap_or(0.0).atan())),
+            "sin" => Ok(Value::float(
+                args.first().map(|a| a.as_float()).unwrap_or(0.0).sin(),
+            )),
+            "cos" => Ok(Value::float(
+                args.first().map(|a| a.as_float()).unwrap_or(0.0).cos(),
+            )),
+            "tan" => Ok(Value::float(
+                args.first().map(|a| a.as_float()).unwrap_or(0.0).tan(),
+            )),
+            "asin" => Ok(Value::float(
+                args.first().map(|a| a.as_float()).unwrap_or(0.0).asin(),
+            )),
+            "acos" => Ok(Value::float(
+                args.first().map(|a| a.as_float()).unwrap_or(0.0).acos(),
+            )),
+            "atan" => Ok(Value::float(
+                args.first().map(|a| a.as_float()).unwrap_or(0.0).atan(),
+            )),
             "atan2" => {
                 let (y, x) = (
                     args.first().map(|v| v.as_float()).unwrap_or(0.0),
@@ -1197,10 +1221,18 @@ impl VM {
                 );
                 Ok(Value::float(y.atan2(x)))
             }
-            "log" => Ok(Value::float(args.first().map(|a| a.as_float()).unwrap_or(0.0).ln())),
-            "log2" => Ok(Value::float(args.first().map(|a| a.as_float()).unwrap_or(0.0).log2())),
-            "log10" => Ok(Value::float(args.first().map(|a| a.as_float()).unwrap_or(0.0).log10())),
-            "exp" => Ok(Value::float(args.first().map(|a| a.as_float()).unwrap_or(0.0).exp())),
+            "log" => Ok(Value::float(
+                args.first().map(|a| a.as_float()).unwrap_or(0.0).ln(),
+            )),
+            "log2" => Ok(Value::float(
+                args.first().map(|a| a.as_float()).unwrap_or(0.0).log2(),
+            )),
+            "log10" => Ok(Value::float(
+                args.first().map(|a| a.as_float()).unwrap_or(0.0).log10(),
+            )),
+            "exp" => Ok(Value::float(
+                args.first().map(|a| a.as_float()).unwrap_or(0.0).exp(),
+            )),
             "pow" => {
                 let (base, exp) = (
                     args.first().map(|v| v.as_float()).unwrap_or(0.0),

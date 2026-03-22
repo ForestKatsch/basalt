@@ -64,16 +64,16 @@ pub struct EnumObj {
 #[derive(Debug, Clone)]
 pub enum IterState {
     Array {
-        source: HeapRef,  // Arc ref to the original array
+        source: HeapRef, // Arc ref to the original array
         index: usize,
     },
     Map {
-        keys: Vec<MapKey>,     // keys snapshot (needed for stable iteration order)
-        source: HeapRef,       // Arc ref to the original map
+        keys: Vec<MapKey>, // keys snapshot (needed for stable iteration order)
+        source: HeapRef,   // Arc ref to the original map
         index: usize,
     },
     String {
-        chars: Vec<String>,  // strings are immutable value types, we need the char vec
+        chars: Vec<String>, // strings are immutable value types, we need the char vec
         index: usize,
     },
     Range {

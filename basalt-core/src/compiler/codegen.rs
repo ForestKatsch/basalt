@@ -1,6 +1,6 @@
-use crate::ast::{BinOp, Pattern, PatternKind, UnaryOp};
-use super::*;
 use super::capture::*;
+use super::*;
+use crate::ast::{BinOp, Pattern, PatternKind, UnaryOp};
 use std::collections::HashMap;
 
 pub fn compile_program(program: &TypedProgram) -> Result<Program, String> {
@@ -188,7 +188,11 @@ impl Compiler {
         let mut entry_point = None;
         for fdef in &fn_defs {
             // SAFETY: fdef.name was pre-registered in the loop above
-            let idx = self.functions.iter().position(|f| f.name == fdef.name).unwrap();
+            let idx = self
+                .functions
+                .iter()
+                .position(|f| f.name == fdef.name)
+                .unwrap();
             self.compile_fn_body(idx, fdef)?;
             if fdef.name == "main" {
                 entry_point = Some(idx);
@@ -219,11 +223,7 @@ impl Compiler {
         })
     }
 
-    fn compile_fn(
-        &mut self,
-        fdef: &TypedFnDef,
-        cell_params: &[String],
-    ) -> Result<usize, String> {
+    fn compile_fn(&mut self, fdef: &TypedFnDef, cell_params: &[String]) -> Result<usize, String> {
         // Register a placeholder then compile the body.
         let idx = self.functions.len();
         self.functions.push(CompiledFunction {
@@ -592,7 +592,12 @@ impl Compiler {
 
                 let dst = fc.alloc_reg();
                 let method_id = self.intern_method(&format!("{}.{}", type_name, method));
-                fc.emit(Op::CallMethod(dst, frame_start, method_id, args.len() as u8));
+                fc.emit(Op::CallMethod(
+                    dst,
+                    frame_start,
+                    method_id,
+                    args.len() as u8,
+                ));
                 Ok(dst)
             }
             TypedExprKind::ArrayLit(elems) => {
@@ -853,7 +858,9 @@ impl Compiler {
                     .iter()
                     .filter_map(|name| {
                         fc.locals.get(name).and_then(|_| {
-                            fc.local_types.get(name).map(|ty| (name.clone(), ty.clone()))
+                            fc.local_types
+                                .get(name)
+                                .map(|ty| (name.clone(), ty.clone()))
                         })
                     })
                     .collect();

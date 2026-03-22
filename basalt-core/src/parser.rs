@@ -448,7 +448,12 @@ impl Parser {
             TypeDefKind::Struct(StructDef { fields, methods })
         };
 
-        Ok(TypeDef { name, parent, kind, span })
+        Ok(TypeDef {
+            name,
+            parent,
+            kind,
+            span,
+        })
     }
 
     fn parse_block(&mut self) -> Result<Block, String> {
@@ -729,10 +734,14 @@ impl Parser {
                         }
                     } else {
                         // Just an expression
-                        Ok(IsTarget::Expr(Box::new(ExprKind::Ident(name).at(self.span()))))
+                        Ok(IsTarget::Expr(Box::new(
+                            ExprKind::Ident(name).at(self.span()),
+                        )))
                     }
                 } else {
-                    Ok(IsTarget::Expr(Box::new(ExprKind::Ident(name).at(self.span()))))
+                    Ok(IsTarget::Expr(Box::new(
+                        ExprKind::Ident(name).at(self.span()),
+                    )))
                 }
             }
             Token::Nil => {
@@ -923,23 +932,31 @@ impl Parser {
                                 // Determine if this is EnumVariant, StaticMethodCall, or QualifiedEnumVariant
                                 match &expr.kind {
                                     ExprKind::TypeIdent(type_name) => {
-                                        expr = ExprKind::EnumVariant(type_name.clone(), name, args).at(span);
+                                        expr = ExprKind::EnumVariant(type_name.clone(), name, args)
+                                            .at(span);
                                     }
                                     ExprKind::Ident(module_name) => {
                                         // module.Type(args) -> could be static method call or
                                         // qualified type access
-                                        expr =
-                                            ExprKind::StaticMethodCall(module_name.clone(), name, args).at(span);
+                                        expr = ExprKind::StaticMethodCall(
+                                            module_name.clone(),
+                                            name,
+                                            args,
+                                        )
+                                        .at(span);
                                     }
                                     _ => {
-                                        expr = ExprKind::MethodCall(Box::new(expr), name, args).at(span);
+                                        expr = ExprKind::MethodCall(Box::new(expr), name, args)
+                                            .at(span);
                                     }
                                 }
                             } else {
                                 // Type.Variant with no args, or module.Type access
                                 match &expr.kind {
                                     ExprKind::TypeIdent(type_name) => {
-                                        expr = ExprKind::EnumVariant(type_name.clone(), name, vec![]).at(span);
+                                        expr =
+                                            ExprKind::EnumVariant(type_name.clone(), name, vec![])
+                                                .at(span);
                                     }
                                     ExprKind::Ident(_) => {
                                         expr = ExprKind::TypeAccess(Box::new(expr), name).at(span);
@@ -955,7 +972,11 @@ impl Parser {
                             self.advance();
                             expr = ExprKind::FieldAccess(Box::new(expr), idx.to_string()).at(span);
                         }
-                        tok => return Err(self.error(format!("expected field name after '.', got {:?}", tok))),
+                        tok => {
+                            return Err(
+                                self.error(format!("expected field name after '.', got {:?}", tok))
+                            )
+                        }
                     }
                 }
                 Token::LParen => {
@@ -1052,7 +1073,13 @@ impl Parser {
                                 self.skip_newlines();
                                 let (fields, spread) = self.parse_struct_fields()?;
                                 self.expect(&Token::RBrace)?;
-                                return Ok(ExprKind::StructLit(type_name, Some(name), fields, spread).at(span));
+                                return Ok(ExprKind::StructLit(
+                                    type_name,
+                                    Some(name),
+                                    fields,
+                                    spread,
+                                )
+                                .at(span));
                             }
                             Token::Dot => {
                                 // module.Type.Variant or module.Type.method
@@ -1066,14 +1093,16 @@ impl Parser {
                                             self.expect(&Token::RParen)?;
                                             return Ok(ExprKind::QualifiedEnumVariant(
                                                 name, type_name, variant, args,
-                                            ).at(span));
+                                            )
+                                            .at(span));
                                         }
                                         return Ok(ExprKind::QualifiedEnumVariant(
                                             name,
                                             type_name,
                                             variant,
                                             vec![],
-                                        ).at(span));
+                                        )
+                                        .at(span));
                                     }
                                     Token::Ident(method) => {
                                         self.advance();
@@ -1084,24 +1113,32 @@ impl Parser {
                                             let type_expr = ExprKind::TypeAccess(
                                                 Box::new(ExprKind::Ident(name.clone()).at(span)),
                                                 type_name.clone(),
-                                            ).at(span);
+                                            )
+                                            .at(span);
                                             return Ok(ExprKind::MethodCall(
                                                 Box::new(type_expr),
                                                 method,
                                                 args,
-                                            ).at(span));
+                                            )
+                                            .at(span));
                                         }
                                         let type_expr = ExprKind::TypeAccess(
                                             Box::new(ExprKind::Ident(name.clone()).at(span)),
                                             type_name.clone(),
-                                        ).at(span);
-                                        return Ok(ExprKind::FieldAccess(Box::new(type_expr), method).at(span));
+                                        )
+                                        .at(span);
+                                        return Ok(ExprKind::FieldAccess(
+                                            Box::new(type_expr),
+                                            method,
+                                        )
+                                        .at(span));
                                     }
                                     _ => {
                                         return Ok(ExprKind::TypeAccess(
                                             Box::new(ExprKind::Ident(name).at(span)),
                                             type_name,
-                                        ).at(span));
+                                        )
+                                        .at(span));
                                     }
                                 }
                             }
@@ -1110,13 +1147,16 @@ impl Parser {
                                 self.advance();
                                 let args = self.parse_args()?;
                                 self.expect(&Token::RParen)?;
-                                return Ok(ExprKind::StaticMethodCall(name, type_name, args).at(span));
+                                return Ok(
+                                    ExprKind::StaticMethodCall(name, type_name, args).at(span)
+                                );
                             }
                             _ => {
                                 return Ok(ExprKind::TypeAccess(
                                     Box::new(ExprKind::Ident(name).at(span)),
                                     type_name,
-                                ).at(span));
+                                )
+                                .at(span));
                             }
                         }
                     }
@@ -1551,14 +1591,16 @@ impl Parser {
                                     self.expect(&Token::RParen)?;
                                     return Ok(PatternKind::QualifiedEnumVariant(
                                         name, type_name, variant, bindings,
-                                    ).at(span));
+                                    )
+                                    .at(span));
                                 }
                                 return Ok(PatternKind::QualifiedEnumVariant(
                                     name,
                                     type_name,
                                     variant,
                                     vec![],
-                                ).at(span));
+                                )
+                                .at(span));
                             }
                         }
                     }

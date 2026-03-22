@@ -161,9 +161,9 @@ pub enum Op {
     IsIdentical(u16, u16, u16), // dst = a is b (reference identity)
 
     // Capture cells (for by-reference closure capture)
-    MakeCell(u16, u16),  // dst = new cell wrapping value in src
-    CellGet(u16, u16),   // dst = read value from cell in src
-    CellSet(u16, u16),   // cell[src1] = src2 (write value into cell)
+    MakeCell(u16, u16), // dst = new cell wrapping value in src
+    CellGet(u16, u16),  // dst = read value from cell in src
+    CellSet(u16, u16),  // cell[src1] = src2 (write value into cell)
 
     // Closures
     MakeClosure(u16, u16, u16), // dst, func_idx_reg, capture_count (captures in consecutive regs before dst)
@@ -221,5 +221,5 @@ pub fn compile(program: &TypedProgram) -> Result<Program, String> {
     codegen::compile_program(program)
 }
 
-mod codegen;
 mod capture;
+mod codegen;

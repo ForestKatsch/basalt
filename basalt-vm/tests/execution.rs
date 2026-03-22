@@ -2350,7 +2350,6 @@ fn test_math_pow_atan2() {
     );
 }
 
-
 // ==================== Type Checker Error Tests ====================
 
 #[test]
@@ -2371,10 +2370,7 @@ fn test_error_type_mismatch_let() {
 
 #[test]
 fn test_error_undefined_function() {
-    run_expect_compile_error_containing(
-        "fn main(stdout: Stdout) { foo() }",
-        "undefined",
-    );
+    run_expect_compile_error_containing("fn main(stdout: Stdout) { foo() }", "undefined");
 }
 
 #[test]
