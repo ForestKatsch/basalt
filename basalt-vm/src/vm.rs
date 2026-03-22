@@ -320,6 +320,13 @@ impl VM {
                 Op::ConcatString(d, a, b) | Op::StringConcat(d, a, b) => {
                     let sa = self.val_to_string(&reg[a as usize]);
                     let sb = self.val_to_string(&reg[b as usize]);
+                    let result_len = sa.len() + sb.len();
+                    if result_len > MAX_STRING_REPEAT {
+                        return Err(format!(
+                            "string concatenation too large ({} bytes)",
+                            result_len
+                        ));
+                    }
                     reg[d as usize] = Value::string(sa + &sb);
                 }
 
@@ -1136,8 +1143,13 @@ impl VM {
             if parts[0] == "math" {
                 return self.call_math(parts[1], args);
             }
-            // Look up compiled function by name via method_lookup
-            if let Some(indices) = self.program.method_lookup.get(parts[1]) {
+            // Look up compiled function by qualified name (module.func) or bare name
+            if let Some(indices) = self
+                .program
+                .method_lookup
+                .get(method)
+                .or_else(|| self.program.method_lookup.get(parts[1]))
+            {
                 if let Some(&idx) = indices.first() {
                     return self.call_function(idx, args);
                 }

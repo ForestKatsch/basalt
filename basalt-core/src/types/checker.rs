@@ -182,12 +182,31 @@ impl TypeChecker {
                 Ok(Type::Tuple(resolved?))
             }
             TypeExpr::Optional(inner) => {
-                Ok(Type::Optional(Box::new(self.resolve_type_expr(inner)?)))
+                let resolved = self.resolve_type_expr(inner)?;
+                // Reject T?? — double optional is redundant (T? = T | nil, T?? = T | nil | nil = T | nil)
+                if matches!(resolved, Type::Optional(_)) {
+                    return Err(CompileError::bare(
+                        "double optional T?? is not allowed; T? already includes nil",
+                    ));
+                }
+                Ok(Type::Optional(Box::new(resolved)))
             }
-            TypeExpr::Result(ok, err) => Ok(Type::Result(
-                Box::new(self.resolve_type_expr(ok)?),
-                Box::new(self.resolve_type_expr(err)?),
-            )),
+            TypeExpr::Result(ok, err) => {
+                let ok_ty = self.resolve_type_expr(ok)?;
+                let err_ty = self.resolve_type_expr(err)?;
+                // Reject T!E? and T?!E — ambiguous composite types
+                if matches!(ok_ty, Type::Optional(_)) {
+                    return Err(CompileError::bare(
+                        "T?!E is not allowed; wrap in parentheses or restructure the type",
+                    ));
+                }
+                if matches!(err_ty, Type::Optional(_)) {
+                    return Err(CompileError::bare(
+                        "T!E? is not allowed; wrap in parentheses or restructure the type",
+                    ));
+                }
+                Ok(Type::Result(Box::new(ok_ty), Box::new(err_ty)))
+            }
             TypeExpr::Function(params, ret) => {
                 let p: Result<Vec<_>, _> =
                     params.iter().map(|t| self.resolve_type_expr(t)).collect();
@@ -430,6 +449,30 @@ impl TypeChecker {
                                 self.current_type_name = None;
                                 errors.push(e);
                             }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Fourth pass: type-check and add module function bodies
+        for (module_name, items) in &program.modules {
+            for item in items {
+                if let Item::Function(fdef) = item {
+                    let qualified_name = format!("{}.{}", module_name, fdef.name);
+                    let func_info = self
+                        .type_info
+                        .modules
+                        .get(module_name)
+                        .and_then(|m| m.functions.get(&fdef.name))
+                        .cloned();
+                    if let Some(info) = func_info {
+                        match self.check_fn_def_with_info(fdef, &info) {
+                            Ok(mut typed_fn) => {
+                                typed_fn.name = qualified_name;
+                                typed_items.push(TypedItem::Function(typed_fn));
+                            }
+                            Err(e) => errors.push(e),
                         }
                     }
                 }
@@ -925,7 +968,14 @@ impl TypeChecker {
             .ok_or_else(|| {
                 CompileError::new(format!("unknown function '{}'", fdef.name), fdef.span)
             })?;
+        self.check_fn_def_with_info(fdef, &info)
+    }
 
+    fn check_fn_def_with_info(
+        &mut self,
+        fdef: &FnDef,
+        info: &FuncInfo,
+    ) -> Result<TypedFnDef, CompileError> {
         self.push_scope();
         let old_return = self.current_fn_return.take();
         self.current_fn_return = Some(info.return_type.clone());
@@ -962,8 +1012,8 @@ impl TypeChecker {
 
         Ok(TypedFnDef {
             name: fdef.name.clone(),
-            params: info.params,
-            return_type: info.return_type,
+            params: info.params.clone(),
+            return_type: info.return_type.clone(),
             body,
         })
     }
